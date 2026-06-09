@@ -1,24 +1,3 @@
-.page {
-  display: grid;
-  gap: 20px;
-}
-
-.header {
-  display: grid;
-  gap: 6px;
-}
-
-.kicker {
-  color: var(--accent);
-  font-size: 0.9rem;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-
-.notice {
-  margin: 0;
-  padding: 14px 16px;
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.78);
+.app-root {
+  min-height: 100vh;
 }
