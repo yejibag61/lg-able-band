@@ -48,12 +48,10 @@ cd ML && python server.py
 - `http://localhost:8080/api/app/status`
 - `http://localhost:8080/api/wearable/status`
 - `http://localhost:8080/api/db/status`
-- `http://localhost:8080/api/app/users`
 
-## Frontend Test View
+## Frontend
 
 - Open `http://localhost:5173` after running the backend and frontend
-- The page fetches `users` table rows from `/api/app/users` and renders them as a table
 - `FE/wearable` runs on `http://localhost:5174`
 
 ## ML Test Server
