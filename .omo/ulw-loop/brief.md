@@ -1,1 +1,0 @@
-FE/app login to USER home MVP. Scope: FE/app only. Implement mock-first login and home UI for iPhone 8 375x667. Do not edit docs/api/final.md, BE, ML, or FE/wearable. Criteria: USER login reaches home; invalid login shows Korean error; GUARDIAN login reaches placeholder not USER home; 375x667 layout has no horizontal clipping; lint/test/build pass.
