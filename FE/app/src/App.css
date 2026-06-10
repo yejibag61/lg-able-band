@@ -4,8 +4,8 @@
   margin: 0 auto;
   padding: 20px 16px 16px;
   background:
-    radial-gradient(circle at 18% 0%, rgba(255, 241, 244, 0.9), transparent 34%),
-    linear-gradient(180deg, #fffdfd 0%, #fff7f8 100%);
+    radial-gradient(circle at 18% 0%, rgba(244, 246, 248, 0.92), transparent 34%),
+    linear-gradient(180deg, #ffffff 0%, #f5f6f8 100%);
   color: #121826;
 }
 
@@ -663,7 +663,7 @@ button:disabled {
   gap: 6px;
   border-top: 1px solid #dfe6ef;
   padding-top: 8px;
-  background: #fff7f8;
+  background: #f5f6f8;
 }
 
 .tab-button {
