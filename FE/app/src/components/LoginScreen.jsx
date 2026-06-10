@@ -3,10 +3,12 @@ export function LoginScreen({
   email,
   password,
   error,
+  message,
   isSubmitting,
   onRoleChange,
   onEmailChange,
   onPasswordChange,
+  onSignupClick,
   onSubmit,
 }) {
   return (
@@ -70,8 +72,17 @@ export function LoginScreen({
           </p>
         ) : null}
 
+        {message ? (
+          <p className="status-message" role="status">
+            {message}
+          </p>
+        ) : null}
+
         <button className="primary-button" type="submit" disabled={isSubmitting}>
           {isSubmitting ? '로그인 중...' : '로그인'}
+        </button>
+        <button className="secondary-button" type="button" onClick={onSignupClick}>
+          회원가입
         </button>
       </form>
     </main>
