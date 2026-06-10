@@ -207,8 +207,28 @@ describe('App login to home flow', () => {
 
     await user.click(screen.getByRole('button', { name: '알림' }))
     expect(screen.getByRole('heading', { name: '실시간 알림' })).toBeTruthy()
-    expect(screen.getAllByRole('button', { name: '다시 듣기' }).length).toBeGreaterThan(0)
-    expect(screen.getAllByRole('button', { name: '확인 완료' }).length).toBeGreaterThan(0)
+    expect(screen.getByRole('button', { name: '전체' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '미확인' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '위험' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '도어센서 장시간 열림 다시 듣기' })).toBeNull()
+    expect(screen.getByRole('button', { name: '도어센서 장시간 열림 상세 보기' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '도어센서 장시간 열림 확인 완료' })).toBeTruthy()
+
+    await user.click(screen.getByRole('button', { name: '도어센서 장시간 열림 상세 보기' }))
+    expect(screen.getByRole('heading', { name: '도어센서 장시간 열림' })).toBeTruthy()
+    expect(screen.getByText('현관문이 장시간 열려 있습니다. 문이 닫혔는지 확인하세요.')).toBeTruthy()
+    expect(screen.getByText('현관문을 닫고 외출 전 잠금 상태를 확인하세요.')).toBeTruthy()
+
+    await user.click(screen.getByRole('button', { name: '다시 듣기' }))
+    expect(screen.getByRole('status').textContent).toContain('다시 듣기:')
+
+    await user.click(screen.getByRole('button', { name: '확인 완료' }))
+    expect(screen.getByRole('status').textContent).toContain('확인 완료 처리했습니다.')
+    expect(screen.getByRole('button', { name: '확인 완료됨' }).disabled).toBe(true)
+
+    await user.click(screen.getByRole('button', { name: '목록으로 돌아가기' }))
+    await user.click(screen.getByRole('button', { name: '생활' }))
+    expect(screen.getByText('세탁 완료')).toBeTruthy()
 
     await user.click(screen.getByRole('button', { name: '기기' }))
     expect(screen.getByRole('heading', { name: '기기와 UWB' })).toBeTruthy()
