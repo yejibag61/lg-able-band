@@ -1,0 +1,65 @@
+export const mockAppPreview = {
+  alerts: [
+    {
+      alertId: 201,
+      severity: '긴급',
+      title: '가스레인지 장시간 사용',
+      message: '주방에서 위험 신호가 감지되었습니다. 보호자에게도 전달됩니다.',
+      deviceName: '가스레인지',
+      occurredAt: '2026-06-10T14:42:00+09:00',
+      location: '주방',
+      status: '미확인',
+    },
+    {
+      alertId: 202,
+      severity: '생활',
+      title: '세탁 완료',
+      message: '세탁이 완료되었습니다. 다시 듣기로 안내를 반복할 수 있어요.',
+      deviceName: '세탁기',
+      occurredAt: '2026-06-10T14:20:00+09:00',
+      location: '세탁실',
+      status: '확인됨',
+    },
+  ],
+  devices: [
+    {
+      deviceId: 1,
+      name: 'Able Band',
+      type: '웨어러블',
+      status: '연결됨',
+      detail: '배터리 82% · 진동 알림 가능',
+    },
+    {
+      deviceId: 2,
+      name: '세탁기',
+      type: 'LG ThinQ',
+      status: '연결됨',
+      detail: '생활 알림 수신 중',
+    },
+    {
+      deviceId: 3,
+      name: '공기청정기',
+      type: 'UWB 지원',
+      status: '위치 안내 가능',
+      detail: '현재 거리 2.4m · 약한 진동',
+    },
+  ],
+  accessibility: {
+    disabilityType: '시각장애인',
+    voiceGuide: true,
+    vibrationGuide: true,
+    highContrast: true,
+    textSize: '크게',
+  },
+  guardian: {
+    name: '보호자',
+    relation: '가족',
+    status: '위험 알림 자동 전달 중',
+  },
+  uwb: {
+    targetName: '공기청정기',
+    distanceM: 2.4,
+    vibrationPattern: '약한 진동',
+    voiceGuide: '오른쪽으로 두 걸음 이동하세요.',
+  },
+}

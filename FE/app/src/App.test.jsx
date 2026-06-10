@@ -45,6 +45,38 @@ describe('App login to home flow', () => {
     expect(await screen.findByRole('heading', { name: /able band 홈/i })).toBeTruthy()
     expect(screen.getByText('현재 위험 알림이 없습니다.')).toBeTruthy()
     expect(screen.getByRole('button', { name: '긴급 도움 요청' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '홈' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '알림' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '기기' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '메뉴' })).toBeTruthy()
+  })
+
+  it('lets a USER preview alerts, devices, and menu tabs after login', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.click(screen.getByRole('radio', { name: '사용자' }))
+    await user.type(screen.getByLabelText('이메일'), 'user@example.com')
+    await user.type(screen.getByLabelText('비밀번호'), 'password1234')
+    await user.click(screen.getByRole('button', { name: '로그인' }))
+
+    await screen.findByRole('heading', { name: /able band 홈/i })
+
+    await user.click(screen.getByRole('button', { name: '알림' }))
+    expect(screen.getByRole('heading', { name: '실시간 알림' })).toBeTruthy()
+    expect(screen.getAllByRole('button', { name: '다시 듣기' }).length).toBeGreaterThan(0)
+    expect(screen.getAllByRole('button', { name: '확인 완료' }).length).toBeGreaterThan(0)
+
+    await user.click(screen.getByRole('button', { name: '기기' }))
+    expect(screen.getByRole('heading', { name: '기기와 UWB' })).toBeTruthy()
+    expect(screen.getByText('UWB 위치 안내')).toBeTruthy()
+    expect(screen.getByRole('button', { name: '위치 안내 시작' })).toBeTruthy()
+
+    await user.click(screen.getByRole('button', { name: '메뉴' }))
+    expect(screen.getByRole('heading', { name: '메뉴' })).toBeTruthy()
+    expect(screen.getByText('접근성 설정')).toBeTruthy()
+    expect(screen.getByText('시각장애인')).toBeTruthy()
+    expect(screen.getByText('보호자 연결')).toBeTruthy()
   })
 
   it('routes GUARDIAN login to guardian placeholder', async () => {

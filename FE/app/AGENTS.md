@@ -5,13 +5,13 @@
 
 ## 우선 참고 문서
 
-- API 계약: `../../docs/api/final.md`
-- FE 구현 순서와 mock/API 교체 기준: `../../docs/frontend/fe-final-api-guide.md`
-- 화면 설계와 흐름: `../../docs/frontend/fe-screens.md`, `../../docs/frontend/screen-api-map.md`, `../../docs/frontend/fe-user-flows.md`
-- 디자인 참고: `../../docs/frontend/fe-design-reference.md`, `../../docs/frontend/home-screen-plan.md`
-- 보조 참고: `../../docs/api/api-spec-by-screen.md`, `../../docs/api/api-spec-draft.md`, `../../docs/reference/be-reference.md`, `../../docs/reference/ml-reference.md`
+- API 계약: `../docs/api/final.md`
+- FE 구현 순서와 mock/API 교체 기준: `../docs/frontend/fe-final-api-guide.md`
+- 화면 설계와 흐름: `../docs/frontend/fe-screens.md`, `../docs/frontend/screen-api-map.md`, `../docs/frontend/fe-user-flows.md`
+- 디자인 참고: `../docs/frontend/fe-design-reference.md`, `../docs/frontend/home-screen-plan.md`
+- 보조 참고: `../docs/api/api-spec-by-screen.md`, `../docs/api/api-spec-draft.md`, `../docs/reference/be-reference.md`, `../docs/reference/ml-reference.md`
 
-`../../docs/api/final.md`가 백엔드와 합의된 확정본이다. 앱 구현 중 이 파일은 수정하지 않는다.
+`../docs/api/final.md`가 백엔드와 합의된 확정본이다. 앱 구현 중 이 파일은 수정하지 않는다.
 
 ## 담당 화면
 
