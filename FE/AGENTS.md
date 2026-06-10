@@ -18,12 +18,12 @@ Codex는 기본적으로 `FE/` 폴더 안의 파일만 확인하고 수정한다
 
 ## 참고 문서
 
-- API 계약 최우선 문서: `../docs/api/final.md`
-- FE 적용 순서와 mock/API 교체 기준: `../docs/frontend/fe-final-api-guide.md`
-- 화면, 흐름, 디자인 참고: `../docs/frontend/fe-screens.md`, `../docs/frontend/screen-api-map.md`, `../docs/frontend/fe-user-flows.md`, `../docs/frontend/fe-design-reference.md`
-- 보조 참고 문서: `../docs/api/api-spec-by-screen.md`, `../docs/api/api-spec-draft.md`, `../docs/reference/be-reference.md`, `../docs/reference/ml-reference.md`
+- API 계약 최우선 문서: `docs/api/final.md`
+- FE 적용 순서와 mock/API 교체 기준: `docs/frontend/fe-final-api-guide.md`
+- 화면, 흐름, 디자인 참고: `docs/frontend/fe-screens.md`, `docs/frontend/screen-api-map.md`, `docs/frontend/fe-user-flows.md`, `docs/frontend/fe-design-reference.md`
+- 보조 참고 문서: `docs/api/api-spec-by-screen.md`, `docs/api/api-spec-draft.md`, `docs/reference/be-reference.md`, `docs/reference/ml-reference.md`
 
-`../docs/api/final.md`와 다른 문서가 충돌하면 `../docs/api/final.md`를 우선한다.
+`docs/api/final.md`와 다른 문서가 충돌하면 `docs/api/final.md`를 우선한다.
 확정본 변경이 필요하면 직접 수정하지 말고 백엔드 담당자와 재협의할 항목으로 정리한다.
 
 ## 작업 원칙
