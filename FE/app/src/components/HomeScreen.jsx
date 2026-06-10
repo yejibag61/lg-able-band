@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { AlertsTab } from './AlertsTab'
 import { DevicesTab } from './DevicesTab'
 import { HomeTab } from './HomeTab'
 import { getAppPreview, getHomeSummary } from '../services/homeService'
@@ -170,44 +171,6 @@ export function HomeScreen({ session, onLogout }) {
         ))}
       </nav>
     </main>
-  )
-}
-
-function AlertsTab({ alerts }) {
-  return (
-    <section className="tab-stack" aria-labelledby="alerts-title">
-      <div className="content-card hero-card">
-        <p className="card-label">실시간 알림</p>
-        <h2 id="alerts-title">지금 확인해야 할 알림을 모았어요.</h2>
-        <p>위험도와 위치, 발생 시간을 보고 바로 확인하거나 다시 들을 수 있어요.</p>
-      </div>
-
-      <div className="alert-list">
-        {alerts.map((alert) => (
-          <article className="content-card alert-detail-card" key={alert.alertId}>
-            <div className="section-title-row">
-              <span className={alert.severity === '긴급' ? 'severity severity-high' : 'severity'}>
-                {alert.severity}
-              </span>
-              <small>{alert.status}</small>
-            </div>
-            <h3>{alert.title}</h3>
-            <p>{alert.message}</p>
-            <small>
-              {alert.deviceName} · {alert.location} · {alert.occurredAt.slice(11, 16)}
-            </small>
-            <div className="action-row">
-              <button className="secondary-button compact-button" type="button">
-                다시 듣기
-              </button>
-              <button className="primary-button compact-button" type="button">
-                확인 완료
-              </button>
-            </div>
-          </article>
-        ))}
-      </div>
-    </section>
   )
 }
 
