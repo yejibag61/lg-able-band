@@ -22,8 +22,28 @@ const tabTitles = {
   menu: '메뉴',
 }
 
+const severityLabels = {
+  LOW: '생활',
+  MEDIUM: '주의',
+  HIGH: '위험',
+  CRITICAL: '긴급',
+}
+
+const MAX_DEVICE_COUNT = 10
+
+const mockDeviceNames = [
+  '현관 센서',
+  '거실 조명',
+  '침실 공기청정기',
+  '주방 감지기',
+  '욕실 비상벨',
+  '베란다 창문 센서',
+  '복도 UWB 태그',
+]
+
 export function HomeScreen({ session, onLogout }) {
   const [activeTab, setActiveTab] = useState('home')
+  const [emergencyMessage, setEmergencyMessage] = useState('')
   const [homeState, setHomeState] = useState({
     loading: true,
     error: '',
@@ -60,6 +80,43 @@ export function HomeScreen({ session, onLogout }) {
     }
   }, [])
 
+  function handleAddMockDevice() {
+    setHomeState((current) => {
+      if (!current.preview || current.preview.devices.length >= MAX_DEVICE_COUNT) {
+        return current
+      }
+
+      const nextDeviceNumber = current.preview.devices.length + 1
+      const nextDeviceName = mockDeviceNames[(nextDeviceNumber - 4) % mockDeviceNames.length]
+      const nextDevices = [
+        ...current.preview.devices,
+        {
+          deviceId: nextDeviceNumber,
+          name: nextDeviceName,
+          type: 'Mock 기기',
+          status: '연결됨',
+          detail: '생활 알림 수신 준비 완료',
+        },
+      ]
+
+      return {
+        ...current,
+        preview: {
+          ...current.preview,
+          devices: nextDevices,
+        },
+        summary: {
+          ...current.summary,
+          deviceSummary: {
+            ...current.summary.deviceSummary,
+            totalCount: nextDevices.length,
+            connectedCount: nextDevices.length,
+          },
+        },
+      }
+    })
+  }
+
   if (homeState.loading) {
     return (
       <main className="phone-screen home-screen app-screen">
@@ -80,31 +137,41 @@ export function HomeScreen({ session, onLogout }) {
 
   const { preview, summary } = homeState
   const statusLabel = statusLabels[summary.safetyStatus.level] || summary.safetyStatus.level
+  const todayMessage = `${session.account.name}님, ${summary.safetyStatus.message}`
 
   return (
     <main className="phone-screen home-screen app-screen" aria-labelledby="home-title">
       <header className="home-header app-header">
         <div>
-          <p className="eyebrow">{activeTab === 'home' ? '우리집' : 'Able Band'}</p>
+          <p className="eyebrow">{activeTab === 'home' ? session.account.name : 'Able Band'}</p>
           <h1 id="home-title">{tabTitles[activeTab]}</h1>
+          {activeTab === 'home' ? <p className="header-summary">{todayMessage}</p> : null}
         </div>
-        <button className="icon-button" type="button" onClick={onLogout} aria-label="로그아웃">
-          ⋯
+        <button className="logout-button" type="button" onClick={onLogout}>
+          로그아웃
         </button>
       </header>
 
       <div className="app-content">
         {activeTab === 'home' ? (
           <HomeTab
-            session={session}
+            emergencyMessage={emergencyMessage}
             statusLabel={statusLabel}
             summary={summary}
+            onEmergencyRequest={() => setEmergencyMessage('보호자에게 도움 요청을 보냈습니다.')}
             onOpenAlerts={() => setActiveTab('alerts')}
             onOpenDevices={() => setActiveTab('devices')}
           />
         ) : null}
         {activeTab === 'alerts' ? <AlertsTab alerts={preview.alerts} /> : null}
-        {activeTab === 'devices' ? <DevicesTab devices={preview.devices} uwb={preview.uwb} /> : null}
+        {activeTab === 'devices' ? (
+          <DevicesTab
+            devices={preview.devices}
+            maxDeviceCount={MAX_DEVICE_COUNT}
+            onAddMockDevice={handleAddMockDevice}
+            uwb={preview.uwb}
+          />
+        ) : null}
         {activeTab === 'menu' ? (
           <MenuTab
             accessibility={preview.accessibility}
@@ -133,41 +200,63 @@ export function HomeScreen({ session, onLogout }) {
   )
 }
 
-function HomeTab({ session, statusLabel, summary, onOpenAlerts, onOpenDevices }) {
+function HomeTab({
+  emergencyMessage,
+  statusLabel,
+  summary,
+  onEmergencyRequest,
+  onOpenAlerts,
+  onOpenDevices,
+}) {
+  const recentAlerts = summary.recentAlerts.slice(0, 1)
+
   return (
     <>
       <section className={`status-card status-${summary.safetyStatus.level.toLowerCase()}`}>
-        <p className="card-label">오늘의 상태</p>
+        <p className="card-label">오늘의 안전 상태</p>
         <div className="status-row">
           <strong>{statusLabel}</strong>
-          <span>{summary.safetyStatus.lastCheckedAt.slice(11, 16)} 업데이트</span>
+          <span>마지막 확인: 방금 전</span>
         </div>
         <p>{summary.safetyStatus.message}</p>
       </section>
 
       <section className="emergency-card">
         <div>
-          <p className="card-label">긴급 도움</p>
+          <p className="card-label">긴급 도움 요청</p>
           <h2>{summary.emergency.primaryGuardianName}에게 바로 알림</h2>
         </div>
-        <button className="sos-button" type="button" disabled={!summary.quickActions.canRequestEmergency}>
+        <button
+          className="sos-button"
+          type="button"
+          disabled={!summary.quickActions.canRequestEmergency}
+          onClick={onEmergencyRequest}
+        >
           긴급 도움 요청
         </button>
+        {emergencyMessage ? (
+          <p className="emergency-message" role="status">
+            {emergencyMessage}
+          </p>
+        ) : null}
       </section>
 
-      <section className="content-card">
+      <section className="content-card alert-summary-card">
         <div className="section-title-row">
-          <h2>최근 알림</h2>
+          <div>
+            <p className="card-label">실시간 알림 요약</p>
+            <h2>최근 알림</h2>
+          </div>
           <button className="text-button" type="button" onClick={onOpenAlerts}>
-            {summary.recentAlerts.length}건 보기
+            알림 전체 보기
           </button>
         </div>
         <div className="alert-list">
-          {summary.recentAlerts.length > 0 ? (
-            summary.recentAlerts.map((alert) => (
+          {recentAlerts.length > 0 ? (
+            recentAlerts.map((alert) => (
               <article className="alert-item" key={alert.alertId}>
                 <span className={`severity severity-${alert.severity.toLowerCase()}`}>
-                  {alert.severity}
+                  {severityLabels[alert.severity] || alert.severity}
                 </span>
                 <div>
                   <h3>{alert.title}</h3>
@@ -185,25 +274,18 @@ function HomeTab({ session, statusLabel, summary, onOpenAlerts, onOpenDevices })
         </div>
       </section>
 
-      <section className="summary-grid" aria-label="홈 요약">
-        <button className="mini-card mini-button" type="button" onClick={onOpenDevices}>
-          <p className="card-label">기기</p>
-          <strong>
-            {summary.deviceSummary.connectedCount}/{summary.deviceSummary.totalCount}
-          </strong>
-          <span>연결됨 · 주의 {summary.deviceSummary.warningCount}</span>
+      <section className="content-card device-summary-card">
+        <div>
+          <p className="card-label">기기 연결 상태</p>
+          <h2>연결된 기기 {summary.deviceSummary.connectedCount}/{summary.deviceSummary.totalCount}개</h2>
+          <p>
+            주의가 필요한 기기 {summary.deviceSummary.warningCount}개 · UWB 위치 안내 가능{' '}
+            {summary.deviceSummary.uwbSupportedCount}개
+          </p>
+        </div>
+        <button className="secondary-button compact-button" type="button" onClick={onOpenDevices}>
+          기기 확인
         </button>
-        <button className="mini-card mini-button" type="button" onClick={onOpenDevices}>
-          <p className="card-label">UWB</p>
-          <strong>{summary.deviceSummary.uwbSupportedCount}대</strong>
-          <span>위치 안내 가능</span>
-        </button>
-      </section>
-
-      <section className="soft-card guardian-card">
-        <p className="card-label">보호자 연결</p>
-        <h2>{summary.emergency.primaryGuardianName} 연결됨</h2>
-        <p>{session.account.name}님의 위험 알림을 보호자가 함께 확인할 수 있어요.</p>
       </section>
     </>
   )
@@ -247,7 +329,9 @@ function AlertsTab({ alerts }) {
   )
 }
 
-function DevicesTab({ devices, uwb }) {
+function DevicesTab({ devices, maxDeviceCount, onAddMockDevice, uwb }) {
+  const canAddDevice = devices.length < maxDeviceCount
+
   return (
     <section className="tab-stack" aria-labelledby="devices-title">
       <div className="content-card hero-card">
@@ -266,6 +350,27 @@ function DevicesTab({ devices, uwb }) {
         <button className="primary-button full-button" type="button">
           위치 안내 시작
         </button>
+      </section>
+
+      <section className="content-card device-register-card">
+        <div>
+          <p className="card-label">기기 등록</p>
+          <h2>등록된 기기 {devices.length}/{maxDeviceCount}개</h2>
+          <p>시연용 mock 기기를 최대 {maxDeviceCount}개까지 추가할 수 있습니다.</p>
+        </div>
+        <button
+          className="secondary-button compact-button"
+          type="button"
+          disabled={!canAddDevice}
+          onClick={onAddMockDevice}
+        >
+          Mock 기기 추가
+        </button>
+        {!canAddDevice ? (
+          <p className="limit-message" role="status">
+            최대 10개까지 등록할 수 있습니다.
+          </p>
+        ) : null}
       </section>
 
       <div className="device-list">

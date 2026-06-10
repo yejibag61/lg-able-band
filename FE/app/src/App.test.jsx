@@ -157,8 +157,22 @@ describe('App login to home flow', () => {
     await user.click(screen.getByRole('button', { name: '로그인' }))
 
     expect(await screen.findByRole('heading', { name: /able band 홈/i })).toBeTruthy()
+    expect(screen.getByText('홍길동님, 현재 위험 알림이 없습니다.')).toBeTruthy()
+    expect(screen.getByRole('button', { name: '로그아웃' })).toBeTruthy()
+    expect(screen.getByText('오늘의 안전 상태')).toBeTruthy()
+    expect(screen.getByText('안전')).toBeTruthy()
     expect(screen.getByText('현재 위험 알림이 없습니다.')).toBeTruthy()
+    expect(screen.getByText('마지막 확인: 방금 전')).toBeTruthy()
+    expect(screen.getByText('실시간 알림 요약')).toBeTruthy()
+    expect(screen.getByRole('button', { name: '알림 전체 보기' })).toBeTruthy()
+    expect(screen.getByText('기기 연결 상태')).toBeTruthy()
+    expect(screen.getByText('연결된 기기 4/5개')).toBeTruthy()
+    expect(screen.getByRole('button', { name: '기기 확인' })).toBeTruthy()
     expect(screen.getByRole('button', { name: '긴급 도움 요청' })).toBeTruthy()
+    await user.click(screen.getByRole('button', { name: '긴급 도움 요청' }))
+    expect(screen.getByRole('status').textContent).toContain(
+      '보호자에게 도움 요청을 보냈습니다.',
+    )
     expect(screen.getByRole('button', { name: '홈' })).toBeTruthy()
     expect(screen.getByRole('button', { name: '알림' })).toBeTruthy()
     expect(screen.getByRole('button', { name: '기기' })).toBeTruthy()
@@ -185,6 +199,14 @@ describe('App login to home flow', () => {
     expect(screen.getByRole('heading', { name: '기기와 UWB' })).toBeTruthy()
     expect(screen.getByText('UWB 위치 안내')).toBeTruthy()
     expect(screen.getByRole('button', { name: '위치 안내 시작' })).toBeTruthy()
+    expect(screen.getByText('등록된 기기 3/10개')).toBeTruthy()
+    const addDeviceButton = screen.getByRole('button', { name: 'Mock 기기 추가' })
+    for (let count = 0; count < 7; count += 1) {
+      await user.click(addDeviceButton)
+    }
+    expect(screen.getByText('등록된 기기 10/10개')).toBeTruthy()
+    expect(addDeviceButton.disabled).toBe(true)
+    expect(screen.getByRole('status').textContent).toContain('최대 10개까지 등록할 수 있습니다.')
 
     await user.click(screen.getByRole('button', { name: '메뉴' }))
     expect(screen.getByRole('heading', { name: '메뉴' })).toBeTruthy()
