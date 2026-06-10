@@ -1,0 +1,66 @@
+# FE 작업 지침
+
+이 폴더는 LG Able Band 프론트엔드 작업 범위다.
+Codex는 기본적으로 `FE/` 폴더 안의 파일만 확인하고 수정한다.
+
+## 담당자와 작업 범위
+
+- 사용자는 FE 담당자다.
+- 기본 수정 범위는 `FE/` 폴더다.
+- `BE/`와 `ML/`은 직접 수정하지 않는다.
+- 백엔드/ML 정보가 필요하면 API 계약이나 참고 목적으로만 읽는다.
+- 백엔드/ML 수정이 필요해 보이면 직접 고치지 않고 담당자에게 전달할 요청사항으로 정리한다.
+
+## 역할 분리
+
+- `FE/app`: 사용자의 웹/모바일 메인 앱이다. 세부 역할은 `FE/app/AGENTS.md`를 따른다.
+- `FE/wearable`: 웨어러블 밴드용 표시 앱이다. 세부 역할은 `FE/wearable/AGENTS.md`를 따른다.
+
+## 참고 문서
+
+- API 계약 최우선 문서: `../docs/api/final.md`
+- FE 적용 순서와 mock/API 교체 기준: `../docs/frontend/fe-final-api-guide.md`
+- 화면, 흐름, 디자인 참고: `../docs/frontend/fe-screens.md`, `../docs/frontend/screen-api-map.md`, `../docs/frontend/fe-user-flows.md`, `../docs/frontend/fe-design-reference.md`
+- 보조 참고 문서: `../docs/api/api-spec-by-screen.md`, `../docs/api/api-spec-draft.md`, `../docs/reference/be-reference.md`, `../docs/reference/ml-reference.md`
+
+`../docs/api/final.md`와 다른 문서가 충돌하면 `../docs/api/final.md`를 우선한다.
+확정본 변경이 필요하면 직접 수정하지 말고 백엔드 담당자와 재협의할 항목으로 정리한다.
+
+## 작업 원칙
+
+- API가 없으면 mock data로 먼저 구현한다.
+- mock data는 실제 API 계약으로 교체하기 쉽도록 별도 데이터/서비스 레이어로 분리한다.
+- `FE/app`은 LG ThinQ 레퍼런스를 참고한 `홈`, `알림`, `기기`, `메뉴` 하단 탭 구조를 기본으로 한다.
+- 주요 화면은 접근성을 우선한다.
+- 큰 버튼, 명확한 문구, 고대비 UI를 사용한다.
+- 시각장애인/청각장애인 사용자가 핵심 정보를 인지할 수 있도록 음성, 진동, 화면, 텍스트, 색상 보조 표현을 고려한다.
+- 사용자가 버튼을 누르고, 값을 입력하고, 결과를 보고, 실패했을 때 이유를 알 수 있는 완성된 흐름을 만든다.
+- 구현 후에는 변경 파일이 `FE/` 범위 안에 있는지 확인한다.
+- 가능하면 화면별 로딩, 에러, 빈 데이터 상태를 함께 구현한다.
+- `BE/` 또는 `ML/` 변경이 필요한 상황은 코드 수정 대신 `docs/frontend/fe-api-needs.md` 또는 작업 메모에 요청사항으로 남긴다.
+
+## MVP 화면 기준
+
+프로젝트 루트의 `최종_LG_Able_Band_개발산출물_260609.docx`는 서비스 전체 원본 산출물이다.
+FE 작업 시에는 해당 문서에서 프론트엔드에 필요한 화면, 메뉴 구조, 기능 요구사항, 사용자 흐름만 추출해 반영한다.
+
+MVP 기준 주요 FE 화면은 다음과 같다.
+
+- 홈 화면
+- 접근성 프로필 설정 화면
+- 기기 연동 화면
+- 실시간 알림 화면
+- 알림 상세/다시 듣기 화면
+- 보호자 위험 알림 화면
+- UWB 가전 위치 안내 화면
+- 이벤트/알림 이력 화면
+
+## 실행과 검증
+
+`FE/app`과 `FE/wearable`은 각각 독립된 Vite React 앱이다.
+
+- 개발 서버: 각 앱 폴더에서 `npm run dev`
+- 빌드 검증: 각 앱 폴더에서 `npm run build`
+- 린트 검증: 각 앱 폴더에서 `npm run lint`
+
+기능 구현 후에는 해당 앱을 실제 화면으로 열어 사용 흐름을 확인한다.
