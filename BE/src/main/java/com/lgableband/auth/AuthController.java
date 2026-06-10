@@ -32,7 +32,9 @@ public class AuthController {
 			request.email(),
 			request.password(),
 			request.accessibilityType(),
-			request.notificationPrefs()
+			request.notificationPrefs(),
+			request.phone(),
+			request.relationship()
 		);
 
 		return ResponseEntity.status(HttpStatus.CREATED).body(new SignupResponse(
@@ -63,7 +65,9 @@ public class AuthController {
 		@NotBlank @Email String email,
 		@NotBlank String password,
 		AccessibilityType accessibilityType,
-		NotificationPrefs notificationPrefs
+		NotificationPrefs notificationPrefs,
+		String phone,
+		String relationship
 	) {
 	}
 

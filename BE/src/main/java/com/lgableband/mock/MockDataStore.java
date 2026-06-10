@@ -74,7 +74,16 @@ public class MockDataStore {
 		)));
 	}
 
-	public Account signup(AccountRole role, String name, String email, String password, AccessibilityType accessibilityType, NotificationPrefs notificationPrefs) {
+	public Account signup(
+		AccountRole role,
+		String name,
+		String email,
+		String password,
+		AccessibilityType accessibilityType,
+		NotificationPrefs notificationPrefs,
+		String phone,
+		String relationship
+	) {
 		boolean duplicated = this.accounts.values().stream()
 			.anyMatch(account -> account.email().equalsIgnoreCase(email) && account.role() == role);
 		if (duplicated) {
@@ -98,7 +107,13 @@ public class MockDataStore {
 		}
 		else {
 			long guardianId = this.guardianProfileSequence.incrementAndGet();
-			this.guardianProfiles.put(guardianId, new GuardianProfile(guardianId, accountId, 1, "FAMILY", ""));
+			this.guardianProfiles.put(guardianId, new GuardianProfile(
+				guardianId,
+				accountId,
+				1,
+				relationship == null || relationship.isBlank() ? "FAMILY" : relationship,
+				phone == null ? "" : phone
+			));
 		}
 
 		return account;

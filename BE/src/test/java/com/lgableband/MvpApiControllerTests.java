@@ -75,4 +75,36 @@ class MvpApiControllerTests {
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.status").value("CONFIRMED"));
 	}
+
+	@Test
+	void guardianCanSignupAndLogin() throws Exception {
+		this.mockMvc.perform(post("/api/auth/signup")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "role": "GUARDIAN",
+					  "name": "guardian",
+					  "email": "guardian-new@example.com",
+					  "password": "password1234",
+					  "phone": "010-1234-5678",
+					  "relationship": "FAMILY"
+					}
+					"""))
+			.andExpect(status().isCreated())
+			.andExpect(jsonPath("$.role").value("GUARDIAN"));
+
+		this.mockMvc.perform(post("/api/auth/login")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "role": "GUARDIAN",
+					  "email": "guardian-new@example.com",
+					  "password": "password1234"
+					}
+					"""))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.accessToken", not(blankOrNullString())))
+			.andExpect(jsonPath("$.role").value("GUARDIAN"))
+			.andExpect(jsonPath("$.guardianProfile.relationship").value("FAMILY"));
+	}
 }

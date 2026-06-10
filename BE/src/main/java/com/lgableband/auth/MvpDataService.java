@@ -47,11 +47,13 @@ public class MvpDataService {
 		String email,
 		String password,
 		AccessibilityType accessibilityType,
-		NotificationPrefs notificationPrefs
+		NotificationPrefs notificationPrefs,
+		String phone,
+		String relationship
 	) {
 		JdbcTemplate jdbcTemplate = jdbcTemplate();
 		if (jdbcTemplate == null) {
-			MockDataStore.Account account = this.mockDataStore.signup(role, name, email, password, accessibilityType, notificationPrefs);
+			MockDataStore.Account account = this.mockDataStore.signup(role, name, email, password, accessibilityType, notificationPrefs, phone, relationship);
 			Long userId = role == AccountRole.USER
 				? this.mockDataStore.findUserByAccountId(account.accountId()).userId()
 				: null;
@@ -79,7 +81,7 @@ public class MvpDataService {
 			insertNotificationChannels(jdbcTemplate, userId, prefs.channels());
 		}
 		else {
-			insertGuardian(jdbcTemplate, accountId, name);
+			insertGuardian(jdbcTemplate, accountId, name, phone, relationship);
 		}
 
 		return new SignupResult(accountId, role, userId, name, email, accessibilityType == null ? AccessibilityType.VISUAL : accessibilityType);
@@ -284,13 +286,13 @@ public class MvpDataService {
 		return keyHolder.getKey().longValue();
 	}
 
-	private void insertGuardian(JdbcTemplate jdbcTemplate, long accountId, String name) {
+	private void insertGuardian(JdbcTemplate jdbcTemplate, long accountId, String name, String phone, String relationship) {
 		jdbcTemplate.update(
 			"INSERT INTO guardian (account_id, name, phone, relationship) VALUES (?, ?, ?, ?)",
 			accountId,
 			name,
-			"",
-			"FAMILY"
+			phone == null ? "" : phone,
+			relationship == null || relationship.isBlank() ? "FAMILY" : relationship
 		);
 	}
 
