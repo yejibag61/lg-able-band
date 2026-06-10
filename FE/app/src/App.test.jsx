@@ -121,7 +121,7 @@ describe('App login to home flow', () => {
     await user.type(screen.getByLabelText('비밀번호'), 'password1234')
     await user.click(screen.getByRole('button', { name: '로그인' }))
 
-    expect(await screen.findByRole('heading', { name: /able band 홈/i })).toBeTruthy()
+    expect(await screen.findByRole('heading', { name: /소희 홈/i })).toBeTruthy()
     expect(window.localStorage.getItem('lg-able-band.accessToken')).toBe('api-user-token-3')
   })
 
@@ -166,17 +166,22 @@ describe('App login to home flow', () => {
     await user.type(screen.getByLabelText('비밀번호'), 'password1234')
     await user.click(screen.getByRole('button', { name: '로그인' }))
 
-    expect(await screen.findByRole('heading', { name: /able band 홈/i })).toBeTruthy()
+    expect(await screen.findByRole('heading', { name: /소희 홈/i })).toBeTruthy()
     expect(screen.getByText('소희님, 현재 위험 알림은 없습니다.')).toBeTruthy()
     expect(screen.getByRole('button', { name: '로그아웃' })).toBeTruthy()
+    expect(screen.getByText('Able Band가 실시간 안전 상태를 확인 중입니다.')).toBeTruthy()
     expect(screen.getByText('오늘의 안전 상태')).toBeTruthy()
     expect(screen.getByText('안전')).toBeTruthy()
     expect(screen.getByText('현재 위험 알림은 없습니다.')).toBeTruthy()
     expect(screen.getByText('마지막 확인: 방금 전')).toBeTruthy()
+    expect(screen.getByText('최근 알림 2건')).toBeTruthy()
+    expect(screen.getByText('미확인 1건')).toBeTruthy()
+    expect(screen.getByText('위험 1건')).toBeTruthy()
     expect(screen.getByText('실시간 알림 요약')).toBeTruthy()
     expect(screen.getByRole('button', { name: '알림 전체 보기' })).toBeTruthy()
     expect(screen.getByText('기기 연결 상태')).toBeTruthy()
-    expect(screen.getByText('연결된 기기 4/5개')).toBeTruthy()
+    expect(screen.getByText('연결된 기기 4/6개')).toBeTruthy()
+    expect(screen.getByText('UWB 가능 2개')).toBeTruthy()
     expect(screen.getByRole('button', { name: '기기 확인' })).toBeTruthy()
     expect(screen.getByRole('button', { name: '긴급 지원 요청' })).toBeTruthy()
 
@@ -198,7 +203,7 @@ describe('App login to home flow', () => {
     await user.type(screen.getByLabelText('비밀번호'), 'password1234')
     await user.click(screen.getByRole('button', { name: '로그인' }))
 
-    await screen.findByRole('heading', { name: /able band 홈/i })
+    await screen.findByRole('heading', { name: /소희 홈/i })
 
     await user.click(screen.getByRole('button', { name: '알림' }))
     expect(screen.getByRole('heading', { name: '실시간 알림' })).toBeTruthy()
@@ -207,17 +212,25 @@ describe('App login to home flow', () => {
 
     await user.click(screen.getByRole('button', { name: '기기' }))
     expect(screen.getByRole('heading', { name: '기기와 UWB' })).toBeTruthy()
-    expect(screen.getByText('UWB 위치 안내')).toBeTruthy()
+    expect(screen.getByRole('heading', { name: '우리집 MVP 가전을 연결해요.' })).toBeTruthy()
+    expect(screen.getAllByText('UWB 위치 안내').length).toBeGreaterThan(0)
     expect(screen.getByRole('button', { name: '위치 안내 시작' })).toBeTruthy()
-    expect(screen.getByText('등록된 기기 3/10개')).toBeTruthy()
+    expect(screen.getByText('등록 슬롯')).toBeTruthy()
+    expect(screen.getByText('6/10')).toBeTruthy()
+    expect(screen.getByRole('button', { name: '세탁기 관리 열기' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'TV 관리 열기' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '안전 전기레인지 관리 열기' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '도어센서 관리 열기' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'LG 공기질 센서 관리 열기' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '냉장고 관리 열기' })).toBeTruthy()
+    expect(screen.getByText('세탁기 관리')).toBeTruthy()
 
-    const addDeviceButton = screen.getByRole('button', { name: 'Mock 기기 추가' })
-    for (let count = 0; count < 7; count += 1) {
-      await user.click(addDeviceButton)
-    }
-    expect(screen.getByText('등록된 기기 10/10개')).toBeTruthy()
-    expect(addDeviceButton.disabled).toBe(true)
-    expect(screen.getByRole('status').textContent).toContain('최대 10개까지 등록되어 있습니다.')
+    await user.click(screen.getByRole('button', { name: '안전 전기레인지 관리 열기' }))
+    expect(screen.getByText('안전 전기레인지 관리')).toBeTruthy()
+    expect(screen.getAllByText('잔열·과열 경고').length).toBeGreaterThan(0)
+
+    await user.click(screen.getByRole('button', { name: '주변 제품 찾기' }))
+    expect(screen.getByRole('status').textContent).toContain('연결 가능한 MVP 가전 6종')
 
     await user.click(screen.getByRole('button', { name: '메뉴' }))
     expect(screen.getByRole('heading', { name: '메뉴' })).toBeTruthy()
@@ -270,7 +283,7 @@ describe('App login to home flow', () => {
     expect(screen.getByRole('button', { name: '로그인 중...' }).disabled).toBe(true)
 
     await waitFor(() => {
-      expect(screen.getByRole('heading', { name: /able band 홈/i })).toBeTruthy()
+      expect(screen.getByRole('heading', { name: /소희 홈/i })).toBeTruthy()
     })
   })
 })
