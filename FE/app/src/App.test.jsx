@@ -222,10 +222,10 @@ describe('App login to home flow', () => {
     expect(screen.getByRole('heading', { name: '도어센서 장시간 열림' })).toBeTruthy()
     expect(screen.getByText('현관문이 장시간 열려 있습니다. 문이 닫혔는지 확인하세요.')).toBeTruthy()
     expect(screen.getByText('현관문을 닫고 외출 전 잠금 상태를 확인하세요.')).toBeTruthy()
-    expect(await screen.findByText('맞춤 알림 추천')).toBeTruthy()
+    expect(await screen.findByText('전달된 알림')).toBeTruthy()
     expect(screen.getByText('밴드 진동')).toBeTruthy()
     expect(screen.getByText('반복 진동')).toBeTruthy()
-    expect(screen.getByText('보호자 알림 포함')).toBeTruthy()
+    expect(screen.getByText('보호자에게도 전달됨')).toBeTruthy()
     expect(screen.queryByText('BASIC_REPEAT')).toBeNull()
 
     await user.click(screen.getByRole('button', { name: '다시 듣기' }))

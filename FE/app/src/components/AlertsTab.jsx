@@ -258,17 +258,13 @@ function AlertDetail({ alert, feedbackMessage, onBack, onConfirm, onReplay, warn
         <strong>{alert.voiceGuide}</strong>
       </section>
 
-      <section className="recommended-action-card" aria-label="추천 후속 행동">
-        <p className="card-label">추천 행동</p>
+      <section className="recommended-action-card" aria-label="필요한 조치">
+        <p className="card-label">필요한 조치</p>
         <strong>{alert.recommendedAction}</strong>
       </section>
 
       {warningRecommendation ? (
         <WarningRecommendationCard recommendation={warningRecommendation} />
-      ) : null}
-
-      {alert.requiresGuardianNotify ? (
-        <p className="guardian-notify-note">위험 상황으로 보호자에게도 전달되는 알림입니다.</p>
       ) : null}
 
       <div className="action-row">
@@ -300,18 +296,18 @@ function WarningRecommendationCard({ recommendation }) {
   )
 
   return (
-    <section className="warning-recommendation-card" aria-label="추천 알림 방식">
+    <section className="warning-recommendation-card" aria-label="전달된 알림 방식">
       <div className="warning-recommendation-header">
         <div>
-          <p className="card-label">맞춤 알림 추천</p>
-          <strong>이 상황은 여러 방식으로 함께 알려드려요.</strong>
+          <p className="card-label">전달된 알림</p>
+          <strong>이 알림은 아래 방식으로 전달되었습니다.</strong>
         </div>
         <span className={recommendation.notifyGuardian ? 'guardian-badge active' : 'guardian-badge'}>
-          {recommendation.notifyGuardian ? '보호자 알림 포함' : '사용자에게 알림'}
+          {recommendation.notifyGuardian ? '보호자에게도 전달됨' : '사용자에게 전달됨'}
         </span>
       </div>
 
-      <div className="warning-channel-list" aria-label="추천 전달 수단">
+      <div className="warning-channel-list" aria-label="사용된 전달 수단">
         {channelNames.map((channel) => (
           <span key={channel}>{channel}</span>
         ))}
@@ -323,12 +319,12 @@ function WarningRecommendationCard({ recommendation }) {
           <dd>{vibrationLabels[recommendation.vibrationPattern] || recommendation.vibrationPattern}</dd>
         </div>
         <div>
-          <dt>화면 표시</dt>
+          <dt>표시된 화면</dt>
           <dd>{screenModeLabels[recommendation.screenMode] || recommendation.screenMode}</dd>
         </div>
         <div>
           <dt>음성 안내</dt>
-          <dd>{recommendation.voiceEnabled ? '함께 사용' : '사용하지 않음'}</dd>
+          <dd>{recommendation.voiceEnabled ? '사용됨' : '사용되지 않음'}</dd>
         </div>
       </dl>
     </section>
