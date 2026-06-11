@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
-import { confirmAlert, getAlerts, replayAlert } from '../services/alertService'
+import { useMemo, useState } from 'react'
+import { confirmAlert, replayAlert } from '../services/alertService'
+import { getWarningRecommendation } from '../services/warningService'
 
 const typeLabels = {
   LIFE: '생활',
@@ -29,122 +30,95 @@ const filters = [
   { id: 'LIFE', label: '생활' },
 ]
 
-export function AlertsTab() {
-  const [alertItems, setAlertItems] = useState([])
+const channelLabels = {
+  BAND_VIBRATION: '밴드 진동',
+  BAND_SCREEN: '밴드 화면',
+  APP_SCREEN: '앱 화면',
+  APP_VOICE: '음성 안내',
+  TV_POPUP: 'TV 팝업',
+  THINQ_LIGHT: 'ThinQ 조명',
+  THINQ_ON_LIGHT: 'ThinQ 조명',
+  GUARDIAN_PUSH: '보호자 알림',
+  GUARDIAN_CALL: '보호자 전화',
+}
+
+const vibrationLabels = {
+  BASIC_SHORT: '짧은 진동',
+  BASIC_REPEAT: '반복 진동',
+  STRONG_REPEAT: '강한 반복 진동',
+  SOS_REPEAT: '긴급 반복 진동',
+}
+
+const screenModeLabels = {
+  SIMPLE_TEXT: '간단한 안내 화면',
+  LARGE_TEXT: '큰 글씨 화면',
+  HIGH_CONTRAST: '고대비 화면',
+  HIGH_CONTRAST_LARGE_TEXT: '고대비 큰 글씨 화면',
+  EMERGENCY_FULL_SCREEN: '긴급 전체 화면',
+}
+
+export function AlertsTab({ accessibilityType, alerts }) {
+  const [alertItems, setAlertItems] = useState(alerts)
   const [activeFilter, setActiveFilter] = useState('ALL')
   const [selectedAlertId, setSelectedAlertId] = useState(null)
   const [feedbackMessage, setFeedbackMessage] = useState('')
-  const [isLoading, setIsLoading] = useState(true)
-  const [errorMessage, setErrorMessage] = useState('')
-
+  const [warningRecommendation, setWarningRecommendation] = useState(null)
   const selectedAlert =
     selectedAlertId === null
       ? null
-      : alertItems.find((alert) => alert.alertId === selectedAlertId) || null
-
+      : alertItems.find((alert) => alert.alertId === selectedAlertId) || alertItems[0]
   const filteredAlerts = useMemo(
     () => alertItems.filter((alert) => filterAlert(alert, activeFilter)),
     [activeFilter, alertItems],
   )
 
-  useEffect(() => {
-    let isMounted = true
-
-    async function loadAlerts() {
-      setIsLoading(true)
-      setErrorMessage('')
-
-      try {
-        const items = await getAlerts({ limit: 20 })
-        if (!isMounted) {
-          return
-        }
-
-        setAlertItems(items)
-      } catch (error) {
-        if (!isMounted) {
-          return
-        }
-
-        setErrorMessage(error.message || '알림 목록을 불러오지 못했습니다.')
-      } finally {
-        if (isMounted) {
-          setIsLoading(false)
-        }
-      }
-    }
-
-    loadAlerts()
-
-    return () => {
-      isMounted = false
-    }
-  }, [])
-
-  function handleSelectAlert(alertId) {
+  async function handleSelectAlert(alertId) {
     setSelectedAlertId(alertId)
     setFeedbackMessage('')
+    setWarningRecommendation(null)
+    const alert = alertItems.find((item) => item.alertId === alertId)
+    if (alert) {
+      setWarningRecommendation(await getWarningRecommendation(alert, accessibilityType))
+    }
   }
 
   async function handleConfirmAlert(alertId) {
     try {
-      const response = await confirmAlert(alertId)
-      setAlertItems((currentAlerts) =>
-        currentAlerts.map((alert) =>
-          alert.alertId === alertId
-            ? {
-                ...alert,
-                status: response.status,
-              }
-            : alert,
-        ),
-      )
+      await confirmAlert(alertId)
+      setAlertItems((currentAlerts) => currentAlerts.filter((alert) => alert.alertId !== alertId))
+      setSelectedAlertId(null)
       setFeedbackMessage('확인 완료 처리했습니다.')
     } catch (error) {
-      setFeedbackMessage(error.message || '알림 확인 처리에 실패했습니다.')
+      setFeedbackMessage(error.message || '알림을 확인 처리하지 못했습니다.')
     }
   }
 
   async function handleReplayAlert(alert) {
-    try {
-      const response = await replayAlert(alert.alertId)
+    const guide = alert.voiceGuide || alert.message
+    const speechStarted = speakAlert(guide)
+    setFeedbackMessage(
+      speechStarted
+        ? `다시 듣기: ${guide}`
+        : '이 브라우저에서는 음성 안내를 사용할 수 없습니다.',
+    )
 
+    try {
+      await replayAlert(alert.alertId)
       setAlertItems((currentAlerts) =>
         currentAlerts.map((item) =>
           item.alertId === alert.alertId
             ? {
                 ...item,
-                status: response.status,
-                voiceGuide: response.voiceGuide || item.voiceGuide,
+                status: 'REPLAYED',
               }
-            : item,
+          : item,
         ),
       )
-
-      const replayText = response.voiceGuide || alert.voiceGuide || alert.message
-      speakAlert(replayText)
-      setFeedbackMessage(`다시 듣기: ${replayText}`)
     } catch (error) {
-      setFeedbackMessage(error.message || '다시 듣기 처리에 실패했습니다.')
+      if (!speechStarted) {
+        setFeedbackMessage(error.message || '알림을 다시 재생하지 못했습니다.')
+      }
     }
-  }
-
-  if (isLoading) {
-    return (
-      <section className="tab-stack alert-tab" aria-label="실시간 알림 목록">
-        <p className="status-message">알림 목록을 불러오는 중입니다.</p>
-      </section>
-    )
-  }
-
-  if (errorMessage) {
-    return (
-      <section className="tab-stack alert-tab" aria-label="실시간 알림 목록">
-        <p className="form-error" role="alert">
-          {errorMessage}
-        </p>
-      </section>
-    )
   }
 
   return (
@@ -157,6 +131,7 @@ export function AlertsTab() {
         <AlertDetail
           alert={selectedAlert}
           feedbackMessage={feedbackMessage}
+          warningRecommendation={warningRecommendation}
           onBack={() => {
             setSelectedAlertId(null)
             setFeedbackMessage('')
@@ -204,8 +179,7 @@ export function AlertsTab() {
                       <h3>{alert.title}</h3>
                       <p className="alert-card-message">{alert.message}</p>
                       <small className="alert-meta-line">
-                        {alert.deviceName || '알림 기기'} · {alert.locationName || '위치 정보 없음'} ·{' '}
-                        {formatAlertTime(alert.occurredAt)}
+                        {alert.deviceName} · {alert.locationName} · {formatAlertTime(alert.occurredAt)}
                       </small>
                     </div>
                   </div>
@@ -222,10 +196,9 @@ export function AlertsTab() {
                       className="primary-button compact-button"
                       type="button"
                       aria-label={`${alert.title} 확인 완료`}
-                      disabled={alert.status === 'CONFIRMED'}
                       onClick={() => handleConfirmAlert(alert.alertId)}
                     >
-                      {alert.status === 'CONFIRMED' ? '확인됨' : '확인 완료'}
+                      확인 완료
                     </button>
                   </div>
                 </article>
@@ -246,7 +219,7 @@ export function AlertsTab() {
   )
 }
 
-function AlertDetail({ alert, feedbackMessage, onBack, onConfirm, onReplay }) {
+function AlertDetail({ alert, feedbackMessage, onBack, onConfirm, onReplay, warningRecommendation }) {
   return (
     <section className="content-card alert-detail-panel" aria-labelledby="alert-detail-title">
       <button className="text-button back-button" type="button" onClick={onBack}>
@@ -268,27 +241,31 @@ function AlertDetail({ alert, feedbackMessage, onBack, onConfirm, onReplay }) {
         </div>
         <div>
           <dt>발생 위치</dt>
-          <dd>{alert.locationName || '위치 정보 없음'}</dd>
+          <dd>{alert.locationName}</dd>
         </div>
         <div>
           <dt>발생 기기</dt>
-          <dd>{alert.device?.name || alert.deviceName || '알림 기기'}</dd>
+          <dd>{alert.device?.name || alert.deviceName}</dd>
         </div>
         <div>
           <dt>발생 시간</dt>
-          <dd>{formatAlertDateTime(alert.occurredAt)}</dd>
+          <dd>{formatAlertTime(alert.occurredAt)}</dd>
         </div>
       </dl>
 
       <section className="voice-guide-card" aria-label="음성 안내 문구">
         <p className="card-label">다시 듣기 문구</p>
-        <strong>{alert.voiceGuide || alert.message}</strong>
+        <strong>{alert.voiceGuide}</strong>
       </section>
 
       <section className="recommended-action-card" aria-label="추천 후속 행동">
         <p className="card-label">추천 행동</p>
-        <strong>{alert.recommendedAction || '알림 내용을 먼저 확인해 주세요.'}</strong>
+        <strong>{alert.recommendedAction}</strong>
       </section>
+
+      {warningRecommendation ? (
+        <WarningRecommendationCard recommendation={warningRecommendation} />
+      ) : null}
 
       {alert.requiresGuardianNotify ? (
         <p className="guardian-notify-note">위험 상황으로 보호자에게도 전달되는 알림입니다.</p>
@@ -313,6 +290,47 @@ function AlertDetail({ alert, feedbackMessage, onBack, onConfirm, onReplay }) {
           {feedbackMessage}
         </p>
       ) : null}
+    </section>
+  )
+}
+
+function WarningRecommendationCard({ recommendation }) {
+  const channelNames = recommendation.recommendedChannels.map(
+    (channel) => channelLabels[channel] || channel,
+  )
+
+  return (
+    <section className="warning-recommendation-card" aria-label="추천 알림 방식">
+      <div className="warning-recommendation-header">
+        <div>
+          <p className="card-label">맞춤 알림 추천</p>
+          <strong>이 상황은 여러 방식으로 함께 알려드려요.</strong>
+        </div>
+        <span className={recommendation.notifyGuardian ? 'guardian-badge active' : 'guardian-badge'}>
+          {recommendation.notifyGuardian ? '보호자 알림 포함' : '사용자에게 알림'}
+        </span>
+      </div>
+
+      <div className="warning-channel-list" aria-label="추천 전달 수단">
+        {channelNames.map((channel) => (
+          <span key={channel}>{channel}</span>
+        ))}
+      </div>
+
+      <dl className="warning-setting-grid">
+        <div>
+          <dt>진동 방식</dt>
+          <dd>{vibrationLabels[recommendation.vibrationPattern] || recommendation.vibrationPattern}</dd>
+        </div>
+        <div>
+          <dt>화면 표시</dt>
+          <dd>{screenModeLabels[recommendation.screenMode] || recommendation.screenMode}</dd>
+        </div>
+        <div>
+          <dt>음성 안내</dt>
+          <dd>{recommendation.voiceEnabled ? '함께 사용' : '사용하지 않음'}</dd>
+        </div>
+      </dl>
     </section>
   )
 }
@@ -343,27 +361,7 @@ function isUrgentAlert(alert) {
 }
 
 function formatAlertTime(isoString) {
-  if (!isoString) {
-    return '--:--'
-  }
-
-  return new Date(isoString).toLocaleTimeString('ko-KR', {
-    hour: '2-digit',
-    minute: '2-digit',
-  })
-}
-
-function formatAlertDateTime(isoString) {
-  if (!isoString) {
-    return '시간 정보 없음'
-  }
-
-  return new Date(isoString).toLocaleString('ko-KR', {
-    month: 'numeric',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
+  return isoString.slice(11, 16)
 }
 
 function speakAlert(text) {
@@ -372,11 +370,24 @@ function speakAlert(text) {
     !window.speechSynthesis ||
     typeof window.SpeechSynthesisUtterance !== 'function'
   ) {
-    return
+    return false
   }
 
+  const synthesis = window.speechSynthesis
   const utterance = new window.SpeechSynthesisUtterance(text)
   utterance.lang = 'ko-KR'
-  window.speechSynthesis.cancel()
-  window.speechSynthesis.speak(utterance)
+  utterance.volume = 1
+  utterance.rate = 0.9
+  utterance.pitch = 1
+
+  const voices = synthesis.getVoices()
+  const koreanVoice = voices.find((voice) => voice.lang?.toLowerCase().startsWith('ko'))
+  if (koreanVoice) {
+    utterance.voice = koreanVoice
+  }
+
+  synthesis.cancel()
+  synthesis.resume()
+  synthesis.speak(utterance)
+  return true
 }

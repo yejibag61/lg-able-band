@@ -31,6 +31,8 @@ public class MockDataStore {
 	private final AtomicLong guardianSequence = new AtomicLong(1);
 	private final AtomicLong deviceSequence = new AtomicLong(12);
 	private final AtomicLong emergencySequence = new AtomicLong(300);
+	private final AtomicLong alertSequence = new AtomicLong(200);
+	private final AtomicLong eventSequence = new AtomicLong(600);
 	private final AtomicLong uwbSequence = new AtomicLong(9000);
 
 	private final Map<Long, Account> accounts = new HashMap<>();
@@ -40,6 +42,7 @@ public class MockDataStore {
 	private final Map<Long, List<Device>> devicesByUserId = new HashMap<>();
 	private final Map<Long, List<Alert>> alertsByUserId = new HashMap<>();
 	private final Map<Long, List<EventHistory>> eventsByUserId = new HashMap<>();
+	private final Map<Long, List<EmergencyRequest>> emergenciesByUserId = new HashMap<>();
 	private final Map<Long, UwbSession> uwbSessions = new HashMap<>();
 	private final Map<String, Long> accountIdsByToken = new HashMap<>();
 
@@ -73,6 +76,7 @@ public class MockDataStore {
 			new EventHistory(501, 101, AlertType.LIFE, Severity.LOW, "세탁 완료", "세탁기", OffsetDateTime.now().minusMinutes(20), AlertStatus.UNREAD),
 			new EventHistory(502, 102, AlertType.DANGER, Severity.HIGH, "공기질 주의", "공기질 센서", OffsetDateTime.now().minusMinutes(35), AlertStatus.UNREAD)
 		)));
+		this.emergenciesByUserId.put(1L, new ArrayList<>());
 	}
 
 	public Account signup(
@@ -105,6 +109,7 @@ public class MockDataStore {
 			this.devicesByUserId.put(userId, new ArrayList<>());
 			this.alertsByUserId.put(userId, new ArrayList<>());
 			this.eventsByUserId.put(userId, new ArrayList<>());
+			this.emergenciesByUserId.put(userId, new ArrayList<>());
 		}
 		else {
 			long guardianId = this.guardianProfileSequence.incrementAndGet();
@@ -213,24 +218,19 @@ public class MockDataStore {
 	}
 
 	public Alert confirmAlert(long userId, long alertId) {
-		List<Alert> alerts = this.alertsByUserId.getOrDefault(userId, new ArrayList<>());
-		for (int index = 0; index < alerts.size(); index++) {
-			Alert alert = alerts.get(index);
-			if (alert.alertId() == alertId) {
-				Alert updated = alert.withStatus(AlertStatus.CONFIRMED);
-				alerts.set(index, updated);
-				return updated;
-			}
-		}
-		throw new ApiException(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND", "알림을 찾을 수 없습니다.");
+		return updateAlertStatus(userId, alertId, AlertStatus.CONFIRMED);
 	}
 
 	public Alert replayAlert(long userId, long alertId) {
+		return updateAlertStatus(userId, alertId, AlertStatus.REPLAYED);
+	}
+
+	private Alert updateAlertStatus(long userId, long alertId, AlertStatus status) {
 		List<Alert> alerts = this.alertsByUserId.getOrDefault(userId, new ArrayList<>());
 		for (int index = 0; index < alerts.size(); index++) {
 			Alert alert = alerts.get(index);
 			if (alert.alertId() == alertId) {
-				Alert updated = alert.withStatus(AlertStatus.REPLAYED);
+				Alert updated = alert.withStatus(status);
 				alerts.set(index, updated);
 				return updated;
 			}
@@ -253,7 +253,78 @@ public class MockDataStore {
 		if (guardians.isEmpty()) {
 			throw new ApiException(HttpStatus.BAD_REQUEST, "NO_GUARDIAN", "등록된 보호자가 없습니다.");
 		}
-		return new EmergencyRequest(this.emergencySequence.incrementAndGet(), "SENT", message, source, OffsetDateTime.now(), guardians);
+		EmergencyRequest request = new EmergencyRequest(
+			this.emergencySequence.incrementAndGet(),
+			"SENT",
+			message,
+			source,
+			OffsetDateTime.now(),
+			true,
+			guardians
+		);
+		this.emergenciesByUserId.computeIfAbsent(userId, ignored -> new ArrayList<>()).add(request);
+		return request;
+	}
+
+	public List<EmergencyRequest> emergencies(long userId) {
+		return this.emergenciesByUserId.getOrDefault(userId, List.of()).stream()
+			.sorted(Comparator.comparing(EmergencyRequest::sentAt).reversed())
+			.toList();
+	}
+
+	public EmergencyRequest emergency(long userId, long emergencyRequestId) {
+		return this.emergenciesByUserId.getOrDefault(userId, List.of()).stream()
+			.filter(request -> request.emergencyRequestId() == emergencyRequestId)
+			.findFirst()
+			.orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND", "긴급 요청을 찾을 수 없습니다."));
+	}
+
+	public EmergencyRequest updateEmergencyStatus(long userId, long emergencyRequestId, String status) {
+		List<EmergencyRequest> requests = this.emergenciesByUserId.getOrDefault(userId, new ArrayList<>());
+		for (int index = 0; index < requests.size(); index++) {
+			EmergencyRequest request = requests.get(index);
+			if (request.emergencyRequestId() == emergencyRequestId) {
+				EmergencyRequest updated = request.withStatus(status);
+				requests.set(index, updated);
+				return updated;
+			}
+		}
+		throw new ApiException(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND", "긴급 요청을 찾을 수 없습니다.");
+	}
+
+	public Alert addContextAlert(
+		long userId,
+		AlertType type,
+		Severity severity,
+		String title,
+		String message,
+		String deviceName,
+		OffsetDateTime occurredAt,
+		String voiceGuide
+	) {
+		Alert alert = new Alert(
+			this.alertSequence.incrementAndGet(),
+			type,
+			severity,
+			title,
+			message,
+			deviceName,
+			occurredAt,
+			AlertStatus.UNREAD,
+			voiceGuide
+		);
+		this.alertsByUserId.computeIfAbsent(userId, ignored -> new ArrayList<>()).add(alert);
+		this.eventsByUserId.computeIfAbsent(userId, ignored -> new ArrayList<>()).add(new EventHistory(
+			this.eventSequence.incrementAndGet(),
+			alert.alertId(),
+			type,
+			severity,
+			title,
+			deviceName,
+			occurredAt,
+			AlertStatus.UNREAD
+		));
+		return alert;
 	}
 
 	public List<EventHistory> events(long userId, AlertType type, int page, int size) {
@@ -358,7 +429,11 @@ public class MockDataStore {
 	public record Guardian(long guardianId, String name, String phone, boolean isPrimary, boolean notifyOnDanger, ConnectionStatus connectionStatus) {
 	}
 
-	public record EmergencyRequest(long emergencyRequestId, String status, String message, String source, OffsetDateTime sentAt, List<Guardian> guardianTargets) {
+	public record EmergencyRequest(long emergencyRequestId, String status, String message, String source, OffsetDateTime sentAt, boolean guardianNotified, List<Guardian> guardianTargets) {
+
+		public EmergencyRequest withStatus(String status) {
+			return new EmergencyRequest(this.emergencyRequestId, status, this.message, this.source, this.sentAt, this.guardianNotified, this.guardianTargets);
+		}
 	}
 
 	public record EventHistory(long eventId, long alertId, AlertType type, Severity severity, String title, String deviceName, OffsetDateTime occurredAt, AlertStatus alertStatus) {

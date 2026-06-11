@@ -58,6 +58,8 @@ public class AlertService {
 			       d.name AS device_name,
 			       d.device_type,
 			       COALESCE(JSON_UNQUOTE(JSON_EXTRACT(de.payload_json, '$.locationName')), '') AS location_name,
+			       COALESCE(JSON_UNQUOTE(JSON_EXTRACT(de.payload_json, '$.recommendedAction')), '') AS recommended_action,
+			       JSON_UNQUOTE(JSON_EXTRACT(de.payload_json, '$.requiresGuardianNotify')) AS guardian_notify_override,
 			       EXISTS (
 			         SELECT 1
 			         FROM alert_delivery ad
@@ -106,11 +108,13 @@ public class AlertService {
 				toOffsetDateTime(rs.getObject("occurred_at", LocalDateTime.class)),
 				AlertStatus.valueOf(rs.getString("status")),
 				recommendedAction(
+					rs.getString("recommended_action"),
 					AlertType.valueOf(rs.getString("alert_type")),
 					Severity.valueOf(rs.getString("severity")),
 					deviceType
 				),
 				rs.getBoolean("has_delivery") || requiresGuardianNotify(
+					rs.getString("guardian_notify_override"),
 					AlertType.valueOf(rs.getString("alert_type")),
 					Severity.valueOf(rs.getString("severity"))
 				)
@@ -140,6 +144,8 @@ public class AlertService {
 			       d.name AS device_name,
 			       d.device_type,
 			       COALESCE(JSON_UNQUOTE(JSON_EXTRACT(de.payload_json, '$.locationName')), '') AS location_name,
+			       COALESCE(JSON_UNQUOTE(JSON_EXTRACT(de.payload_json, '$.recommendedAction')), '') AS recommended_action,
+			       JSON_UNQUOTE(JSON_EXTRACT(de.payload_json, '$.requiresGuardianNotify')) AS guardian_notify_override,
 			       EXISTS (
 			         SELECT 1
 			         FROM alert_delivery ad
@@ -173,8 +179,9 @@ public class AlertService {
 					fallbackLocation(rs.getString("location_name"), deviceType),
 					toOffsetDateTime(rs.getObject("occurred_at", LocalDateTime.class)),
 					AlertStatus.valueOf(rs.getString("status")),
-					recommendedAction(alertType, severity, deviceType),
-					rs.getBoolean("has_delivery") || requiresGuardianNotify(alertType, severity)
+					recommendedAction(rs.getString("recommended_action"), alertType, severity, deviceType),
+					rs.getBoolean("has_delivery")
+						|| requiresGuardianNotify(rs.getString("guardian_notify_override"), alertType, severity)
 				);
 			},
 			user.userId(),
@@ -273,7 +280,7 @@ public class AlertService {
 			alert.severity(),
 			alert.title(),
 			alert.message(),
-			alert.voiceGuide(),
+			alert.voiceGuide() == null || alert.voiceGuide().isBlank() ? alert.message() : alert.voiceGuide(),
 			alert.deviceName() == null || alert.deviceName().isBlank()
 				? null
 				: new DeviceInfo(0, alert.deviceName(), deviceType),
@@ -281,16 +288,22 @@ public class AlertService {
 			fallbackLocation("", deviceType),
 			alert.occurredAt(),
 			alert.status(),
-			recommendedAction(alert.type(), alert.severity(), deviceType),
-			requiresGuardianNotify(alert.type(), alert.severity())
+			recommendedAction("", alert.type(), alert.severity(), deviceType),
+			requiresGuardianNotify(null, alert.type(), alert.severity())
 		);
 	}
 
-	private boolean requiresGuardianNotify(AlertType type, Severity severity) {
+	private boolean requiresGuardianNotify(String override, AlertType type, Severity severity) {
+		if (override != null && !override.isBlank()) {
+			return Boolean.parseBoolean(override);
+		}
 		return type == AlertType.DANGER || type == AlertType.EMERGENCY || severity == Severity.HIGH || severity == Severity.CRITICAL;
 	}
 
-	private String recommendedAction(AlertType type, Severity severity, DeviceType deviceType) {
+	private String recommendedAction(String override, AlertType type, Severity severity, DeviceType deviceType) {
+		if (override != null && !override.isBlank()) {
+			return override;
+		}
 		if (type == AlertType.EMERGENCY) {
 			return "즉시 안전한 곳으로 이동하고 주변에 도움을 요청하세요.";
 		}

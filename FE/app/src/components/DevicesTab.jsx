@@ -89,9 +89,9 @@ const deviceCatalog = [
   },
 ]
 
-export function DevicesTab({ devices: _devices, maxDeviceCount, uwb }) {
-  const [connectedDevices, setConnectedDevices] = useState([])
-  const [selectedDeviceId, setSelectedDeviceId] = useState(null)
+export function DevicesTab({ devices = [], maxDeviceCount, uwb }) {
+  const [connectedDevices, setConnectedDevices] = useState(devices)
+  const [selectedDeviceId, setSelectedDeviceId] = useState(devices[0]?.deviceId ?? null)
   const [connectionMessage, setConnectionMessage] = useState('')
   const [isLoadingDevices, setIsLoadingDevices] = useState(false)
   const [isDevicePickerOpen, setIsDevicePickerOpen] = useState(false)

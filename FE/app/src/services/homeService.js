@@ -1,13 +1,39 @@
 import { apiRequest } from './apiClient'
 import { mockHomeSummary } from '../mocks/homeMock'
 import { mockAppPreview } from '../mocks/appPreviewMock'
+import { getAlerts } from './alertService'
 
 export async function getHomeSummary() {
   return normalizeHomeSummary(await apiRequest('/api/app/home'))
 }
 
 export async function getAppPreview() {
-  return structuredClone(mockAppPreview)
+  const preview = structuredClone(mockAppPreview)
+
+  try {
+    const alerts = await getAlerts()
+    preview.alerts = alerts.map((alert) => normalizeAlert(alert, preview.alerts))
+  } catch {
+    // Keep the separate preview fixture available while the backend is offline.
+  }
+
+  return preview
+}
+
+function normalizeAlert(alert, fixtures) {
+  const fixture = fixtures.find((item) => item.alertId === alert.alertId) || {}
+  return {
+    ...fixture,
+    ...alert,
+    locationName: alert.locationName || fixture.locationName || '집 안',
+    device: alert.device || fixture.device || {
+      name: alert.deviceName,
+    },
+    voiceGuide: alert.voiceGuide || alert.message,
+    recommendedAction: alert.recommendedAction || fixture.recommendedAction || '현재 상황을 확인해 주세요.',
+    requiresGuardianNotify:
+      alert.requiresGuardianNotify ?? fixture.requiresGuardianNotify ?? alert.severity === 'CRITICAL',
+  }
 }
 
 function normalizeHomeSummary(summary) {

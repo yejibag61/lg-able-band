@@ -32,26 +32,17 @@ public class AlertController {
 	}
 
 	@GetMapping("/{alertId}")
-	public AlertService.AlertView alert(
-		@RequestHeader("Authorization") String authorization,
-		@PathVariable long alertId
-	) {
+	public AlertService.AlertView alert(@RequestHeader("Authorization") String authorization, @PathVariable long alertId) {
 		return this.alertService.alert(authorization, alertId);
 	}
 
 	@PostMapping("/{alertId}/confirm")
-	public AlertService.StatusResponse confirm(
-		@RequestHeader("Authorization") String authorization,
-		@PathVariable long alertId
-	) {
+	public AlertService.StatusResponse confirm(@RequestHeader("Authorization") String authorization, @PathVariable long alertId) {
 		return this.alertService.confirm(authorization, alertId);
 	}
 
 	@PostMapping("/{alertId}/replay")
-	public ReplayResponse replay(
-		@RequestHeader("Authorization") String authorization,
-		@PathVariable long alertId
-	) {
+	public ReplayResponse replay(@RequestHeader("Authorization") String authorization, @PathVariable long alertId) {
 		AlertService.StatusResponse response = this.alertService.replay(authorization, alertId);
 		return new ReplayResponse(
 			response.alertId(),

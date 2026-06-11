@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { LivingSignalSettingsScreen } from '../features/living-signal'
 import { getAppPreview, getHomeSummary } from '../services/homeService'
+import { createEmergencyRequest } from '../services/emergencyService'
 import { AlertsTab } from './AlertsTab'
 import { DevicesTab } from './DevicesTab'
 import { HomeTab } from './HomeTab'
@@ -85,6 +86,16 @@ export function HomeScreen({ session, onLogout }) {
     }
   }
 
+  async function handleEmergencyRequest() {
+    setEmergencyMessage('긴급 요청을 보내는 중입니다.')
+    try {
+      const request = await createEmergencyRequest()
+      setEmergencyMessage(request.message || '보호자에게 긴급 요청을 보냈습니다.')
+    } catch (error) {
+      setEmergencyMessage(error.message || '긴급 요청을 보내지 못했습니다.')
+    }
+  }
+
   if (homeState.loading) {
     return (
       <main className="phone-screen home-screen app-screen">
@@ -128,12 +139,17 @@ export function HomeScreen({ session, onLogout }) {
             emergencyMessage={emergencyMessage}
             statusLabel={statusLabel}
             summary={summary}
-            onEmergencyRequest={() => setEmergencyMessage('보호자에게 긴급 요청을 보냈습니다.')}
+            onEmergencyRequest={handleEmergencyRequest}
             onOpenAlerts={() => handleTabChange('alerts')}
             onOpenDevices={() => handleTabChange('devices')}
           />
         ) : null}
-        {activeTab === 'alerts' ? <AlertsTab /> : null}
+        {activeTab === 'alerts' ? (
+          <AlertsTab
+            accessibilityType={session.userProfile?.accessibilityType || 'VISUAL'}
+            alerts={preview.alerts}
+          />
+        ) : null}
         {activeTab === 'devices' ? (
           <DevicesTab
             devices={preview.devices}
