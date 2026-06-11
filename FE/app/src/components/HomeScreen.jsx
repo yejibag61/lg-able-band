@@ -107,8 +107,15 @@ export function HomeScreen({ session, onLogout }) {
 
   if (homeState.loading) {
     return (
-      <main className="phone-screen home-screen app-screen">
-        <p className="status-message">홈 정보를 불러오는 중입니다.</p>
+      <main className="phone-screen home-screen app-screen home-loading-screen">
+        <div className="home-loading-group" role="status">
+          <img
+            className="home-loading-logo"
+            src="/LG_Able_Band_wordmark_transparent.png"
+            alt="LG Able Band"
+          />
+          <p>홈 정보를 불러오는 중입니다.</p>
+        </div>
       </main>
     )
   }
@@ -133,7 +140,7 @@ export function HomeScreen({ session, onLogout }) {
     <main className="phone-screen home-screen app-screen" aria-labelledby="home-title">
       <header className="home-header app-header">
         <div>
-          <p className="eyebrow">{activeTab === 'home' ? 'LG Able Band' : 'Able Band'}</p>
+          <p className="eyebrow">LG Able Band</p>
           <h1 id="home-title">{displayTitle}</h1>
           {activeTab === 'home' ? <p className="header-summary">{todayMessage}</p> : null}
         </div>
