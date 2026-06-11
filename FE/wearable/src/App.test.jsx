@@ -17,7 +17,9 @@ describe('Wearable MVP', () => {
     render(<App />)
 
     expect(screen.getByRole('heading', { name: '휴대폰으로 연동' })).toBeTruthy()
-    expect(screen.getByAltText('Able Band 연동 QR 코드')).toBeTruthy()
+    const qrCode = screen.getByAltText('Able Band 연동 QR 코드')
+    expect(qrCode.getAttribute('src')).toMatch(/^data:image\/svg\+xml/)
+    expect(qrCode.getAttribute('data-pairing-payload')).toContain('lg-able-band://pair')
     expect(screen.getByText('ABLE-4IN-260610')).toBeTruthy()
     expect(screen.getByText(/5분 동안 유효/)).toBeTruthy()
   })

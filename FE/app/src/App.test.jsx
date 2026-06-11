@@ -2,13 +2,15 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import App from './App'
 import { mockHomeSummary } from './mocks/homeMock'
+import { mockAppPreview } from './mocks/appPreviewMock'
 
 const API_BASE_URL = 'http://localhost:8080'
-const REQUEST_DELAY_MS = 30
+const REQUEST_DELAY_MS = 80
 
-describe('App', () => {
+describe('App login to home flow', () => {
   beforeEach(() => {
     window.localStorage.clear()
+    installSpeechSynthesisMock()
     installMockBackend()
   })
 
@@ -17,153 +19,325 @@ describe('App', () => {
     window.localStorage.clear()
   })
 
-  it('renders login screen by default', () => {
+  it('renders login screen by default and does not request legacy users table', async () => {
     render(<App />)
 
-    expect(screen.getByRole('heading', { name: /able band/i })).toBeTruthy()
-    expect(screen.getByRole('button', { name: /로그인/i })).toBeTruthy()
-    expect(screen.getByRole('button', { name: /회원가입/i })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: /able band 로그인/i })).toBeTruthy()
+    expect(screen.getByLabelText('이메일')).toBeTruthy()
+    expect(screen.getByLabelText('비밀번호')).toBeTruthy()
+    expect(screen.getByRole('button', { name: '로그인' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '회원가입' })).toBeTruthy()
+    expect(screen.queryByText('Users Table')).toBeNull()
+    expect(globalThis.fetch).not.toHaveBeenCalled()
   })
 
-  it('opens signup and returns to login', async () => {
+  it('opens signup screen from login and returns to login', async () => {
     const user = userEvent.setup()
     render(<App />)
 
-    await user.click(screen.getByRole('button', { name: /회원가입/i }))
-    expect(screen.getByRole('heading', { name: /회원가입/i })).toBeTruthy()
+    await user.click(screen.getByRole('button', { name: '회원가입' }))
 
-    await user.click(screen.getByRole('button', { name: /로그인.*돌아가기/i }))
-    expect(screen.getByRole('heading', { name: /able band/i })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'Able Band 회원가입' })).toBeTruthy()
+    expect(screen.getByLabelText('이름')).toBeTruthy()
+    expect(screen.getByLabelText('비밀번호 확인')).toBeTruthy()
+
+    await user.click(screen.getByRole('button', { name: '로그인으로 돌아가기' }))
+
+    expect(screen.getByRole('heading', { name: /able band 로그인/i })).toBeTruthy()
   })
 
-  it('logs in as a USER and opens the home screen', async () => {
+  it('clears signup password fields after returning to login', async () => {
     const user = userEvent.setup()
     render(<App />)
 
-    await user.type(screen.getByLabelText(/이메일/i), 'user@example.com')
-    await user.type(screen.getByLabelText(/비밀번호/i), 'password1234')
-    await user.click(screen.getByRole('button', { name: /^로그인$/i }))
+    await user.click(screen.getByRole('button', { name: '회원가입' }))
+    await user.type(screen.getByLabelText('비밀번호'), 'password1234')
+    await user.type(screen.getByLabelText('비밀번호 확인'), 'password1234')
+    await user.click(screen.getByRole('button', { name: '로그인으로 돌아가기' }))
+    await user.click(screen.getByRole('button', { name: '회원가입' }))
 
-    expect(await screen.findByRole('button', { name: '로그아웃' })).toBeTruthy()
-    expect(window.localStorage.getItem('lg-able-band.accessToken')).toBe('api-user-token')
+    expect(screen.getByLabelText('비밀번호').value).toBe('')
+    expect(screen.getByLabelText('비밀번호 확인').value).toBe('')
+  })
+
+  it('shows USER signup constraints before submitting API signup', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.click(screen.getByRole('button', { name: '회원가입' }))
+    await user.click(screen.getByRole('button', { name: '가입하기' }))
+
+    expect((await screen.findByRole('alert')).textContent).toContain('이름은 2자 이상 입력해주세요.')
+
+    await user.type(screen.getByLabelText('이름'), '가')
+    await user.type(screen.getByLabelText('이메일'), 'bad-email')
+    await user.type(screen.getByLabelText('비밀번호'), 'short')
+    await user.type(screen.getByLabelText('비밀번호 확인'), 'different')
+    await user.click(screen.getByRole('button', { name: '가입하기' }))
+
+    const errorText = (await screen.findByRole('alert')).textContent
+    expect(errorText).toContain('올바른 이메일 형식으로 입력해주세요.')
+    expect(errorText).toContain('비밀번호는 8자 이상이며 영문과 숫자를 포함해야 합니다.')
+    expect(errorText).toContain('비밀번호가 일치하지 않습니다.')
+  })
+
+  it('submits USER signup API and returns to login with the new email filled', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.click(screen.getByRole('button', { name: '회원가입' }))
+    await user.type(screen.getByLabelText('이름'), '김사용')
+    await user.type(screen.getByLabelText('이메일'), 'new-user@example.com')
+    await user.type(screen.getByLabelText('비밀번호'), 'password1234')
+    await user.type(screen.getByLabelText('비밀번호 확인'), 'password1234')
+    await user.click(screen.getByRole('radio', { name: '시각장애인' }))
+    await user.click(screen.getByRole('button', { name: '가입하기' }))
+
+    expect(await screen.findByRole('heading', { name: /able band 로그인/i })).toBeTruthy()
+    expect(screen.getByDisplayValue('new-user@example.com')).toBeTruthy()
+    expect(screen.getByRole('status').textContent).toContain('회원가입이 완료되었습니다. 로그인해주세요.')
+
+    const signupCall = globalThis.fetch.mock.calls.find(([url]) => url.endsWith('/api/auth/signup'))
+    expect(signupCall).toBeTruthy()
+    expect(JSON.parse(signupCall[1].body)).toMatchObject({
+      role: 'USER',
+      name: '김사용',
+      email: 'new-user@example.com',
+      accessibilityType: 'VISUAL',
+    })
+  })
+
+  it('lets a newly signed up USER log in with the API account', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.click(screen.getByRole('button', { name: '회원가입' }))
+    await user.type(screen.getByLabelText('이름'), '박로그')
+    await user.type(screen.getByLabelText('이메일'), 'loginable-user@example.com')
+    await user.type(screen.getByLabelText('비밀번호'), 'password1234')
+    await user.type(screen.getByLabelText('비밀번호 확인'), 'password1234')
+    await user.click(screen.getByRole('button', { name: '가입하기' }))
+
+    expect(await screen.findByRole('heading', { name: /able band 로그인/i })).toBeTruthy()
+
+    await user.type(screen.getByLabelText('비밀번호'), 'password1234')
+    await user.click(screen.getByRole('button', { name: '로그인' }))
+
+    expect(await screen.findByRole('heading', { name: /소희 홈/i })).toBeTruthy()
+    expect(window.localStorage.getItem('lg-able-band.accessToken')).toBe('api-user-token-3')
+  })
+
+  it('shows GUARDIAN signup fields and validates phone and relationship', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.click(screen.getByRole('button', { name: '회원가입' }))
+    await user.click(screen.getByRole('radio', { name: '보호자' }))
+
+    expect(screen.getByLabelText('연락처')).toBeTruthy()
+    expect(screen.getByLabelText('관계')).toBeTruthy()
+
+    await user.type(screen.getByLabelText('이름'), '김보호')
+    await user.type(screen.getByLabelText('이메일'), 'guardian-new@example.com')
+    await user.type(screen.getByLabelText('비밀번호'), 'password1234')
+    await user.type(screen.getByLabelText('비밀번호 확인'), 'password1234')
+    await user.click(screen.getByRole('button', { name: '가입하기' }))
+
+    const errorText = (await screen.findByRole('alert')).textContent
+    expect(errorText).toContain('연락처를 입력해주세요.')
+    expect(errorText).toContain('관계를 입력해주세요.')
+  })
+
+  it('shows required-field error on empty login submit', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.click(screen.getByRole('button', { name: '로그인' }))
+
+    expect((await screen.findByRole('alert')).textContent).toContain(
+      '이메일과 비밀번호를 모두 입력해주세요.',
+    )
+  })
+
+  it('routes USER login to the home screen', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.click(screen.getByRole('radio', { name: '사용자' }))
+    await user.type(screen.getByLabelText('이메일'), 'user@example.com')
+    await user.type(screen.getByLabelText('비밀번호'), 'password1234')
+    await user.click(screen.getByRole('button', { name: '로그인' }))
+
+    expect(await screen.findByRole('heading', { name: /소희 홈/i })).toBeTruthy()
+    expect(screen.getByText('소희님, 현재 위험 알림은 없습니다.')).toBeTruthy()
+    expect(screen.getByRole('button', { name: '로그아웃' })).toBeTruthy()
+    expect(screen.getByText('Able Band가 실시간 안전 상태를 확인 중입니다.')).toBeTruthy()
+    expect(screen.getByText('오늘의 안전 상태')).toBeTruthy()
+    expect(screen.getByText('안전')).toBeTruthy()
+    expect(screen.getByText('현재 위험 알림은 없습니다.')).toBeTruthy()
+    expect(screen.getByText('마지막 확인: 방금 전')).toBeTruthy()
+    expect(screen.getByText('최근 알림 2건')).toBeTruthy()
+    expect(screen.getByText('미확인 1건')).toBeTruthy()
+    expect(screen.getByText('위험 1건')).toBeTruthy()
+    expect(screen.getByText('실시간 알림 요약')).toBeTruthy()
+    expect(screen.getByRole('button', { name: '알림 전체 보기' })).toBeTruthy()
+    expect(screen.getByText('기기 연결 상태')).toBeTruthy()
+    expect(screen.getByText('연결된 기기 4/6개')).toBeTruthy()
+    expect(screen.getByText('UWB 가능 2개')).toBeTruthy()
+    expect(screen.getByRole('button', { name: '기기 확인' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '긴급 지원 요청' })).toBeTruthy()
+
+    const homeCall = globalThis.fetch.mock.calls.find(([url]) => url.endsWith('/api/app/home'))
+    expect(homeCall).toBeTruthy()
+    expect(new Headers(homeCall[1].headers).get('Authorization')).toBe('Bearer api-user-token')
+
+    await user.click(screen.getByRole('button', { name: '긴급 지원 요청' }))
+
+    await waitFor(() => {
+      expect(screen.getByRole('status').textContent).toContain('보호자에게 긴급 요청을 보냈습니다.')
+    })
   })
 
   it('lets a USER preview alerts, devices, menu, and living signal settings after login', async () => {
     const user = userEvent.setup()
     render(<App />)
 
-    await user.type(screen.getByLabelText(/이메일/i), 'user@example.com')
-    await user.type(screen.getByLabelText(/비밀번호/i), 'password1234')
-    await user.click(screen.getByRole('button', { name: /^로그인$/i }))
+    await user.click(screen.getByRole('radio', { name: '사용자' }))
+    await user.type(screen.getByLabelText('이메일'), 'user@example.com')
+    await user.type(screen.getByLabelText('비밀번호'), 'password1234')
+    await user.click(screen.getByRole('button', { name: '로그인' }))
 
-    await screen.findByRole('button', { name: '로그아웃' })
+    await screen.findByRole('heading', { name: /소희 홈/i })
 
     await user.click(screen.getByRole('button', { name: '알림' }))
     expect(screen.getByRole('heading', { name: '실시간 알림' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '전체' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '미확인' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '위험' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '도어센서 장시간 열림 다시 듣기' })).toBeNull()
+    expect(screen.getByRole('button', { name: '도어센서 장시간 열림 상세 보기' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '도어센서 장시간 열림 확인 완료' })).toBeTruthy()
+
+    await user.click(screen.getByRole('button', { name: '도어센서 장시간 열림 상세 보기' }))
+    expect(screen.getByRole('heading', { name: '도어센서 장시간 열림' })).toBeTruthy()
+    expect(screen.getByText('현관문이 장시간 열려 있습니다. 문이 닫혔는지 확인하세요.')).toBeTruthy()
+    expect(screen.getByText('현관문을 닫고 외출 전 잠금 상태를 확인하세요.')).toBeTruthy()
+    expect(await screen.findByText('맞춤 알림 추천')).toBeTruthy()
+    expect(screen.getByText('밴드 진동')).toBeTruthy()
+    expect(screen.getByText('반복 진동')).toBeTruthy()
+    expect(screen.getByText('보호자 알림 포함')).toBeTruthy()
+    expect(screen.queryByText('BASIC_REPEAT')).toBeNull()
+
+    await user.click(screen.getByRole('button', { name: '다시 듣기' }))
+    await waitFor(() => {
+      expect(screen.getByRole('status').textContent).toContain('다시 듣기:')
+    })
+    expect(window.speechSynthesis.speak).toHaveBeenCalled()
+
+    await user.click(screen.getByRole('button', { name: '확인 완료' }))
+    await waitFor(() => {
+      expect(screen.getByRole('status').textContent).toContain('확인 완료 처리했습니다.')
+    })
+    expect(screen.queryByText('도어센서 장시간 열림')).toBeNull()
+
+    await user.click(screen.getByRole('button', { name: '생활' }))
+    expect(screen.getByText('세탁 완료')).toBeTruthy()
 
     await user.click(screen.getByRole('button', { name: '기기' }))
     expect(screen.getByRole('heading', { name: '기기와 UWB' })).toBeTruthy()
     expect(screen.getByRole('heading', { name: '우리 집 MVP 가전을 연결해요.' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: '가전 추가하기' })).toBeTruthy()
-
-    await user.click(screen.getByRole('button', { name: '가전 추가하기' }))
-    expect(screen.getByRole('button', { name: '세탁기 추가하기' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'TV 추가하기' })).toBeTruthy()
-
-    await user.click(screen.getByRole('button', { name: '세탁기 추가하기' }))
-    expect(screen.getByRole('heading', { name: '세탁기 연결' })).toBeTruthy()
-    expect(screen.getByDisplayValue('thinq-washer-001')).toBeTruthy()
-
-    await user.click(screen.getByRole('button', { name: '가전 연결 완료' }))
+    expect(screen.getAllByText('UWB 위치 안내').length).toBeGreaterThan(0)
+    expect(screen.getByRole('button', { name: '위치 안내 시작' })).toBeTruthy()
+    expect(screen.getByText('등록 현황')).toBeTruthy()
     expect(await screen.findByRole('button', { name: '세탁기 관리 열기' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'TV 관리 열기' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '안전 전기레인지 관리 열기' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '도어센서 관리 열기' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'LG 공기질 센서 관리 열기' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '냉장고 관리 열기' })).toBeTruthy()
     expect(screen.getByText('세탁기 관리')).toBeTruthy()
-    expect(screen.getByRole('status').textContent).toContain('세탁기를 연결했어요.')
+
+    await user.click(screen.getByRole('button', { name: '안전 전기레인지 관리 열기' }))
+    expect(screen.getByText('안전 전기레인지 관리')).toBeTruthy()
+    expect(screen.getAllByText('잔열·과열 경고').length).toBeGreaterThan(0)
 
     await user.click(screen.getByRole('button', { name: '주변 제품 찾기' }))
     expect(screen.getByRole('status').textContent).toContain('연결 가능한 MVP 가전 6종')
 
     await user.click(screen.getByRole('button', { name: '메뉴' }))
     expect(screen.getByRole('heading', { name: '메뉴' })).toBeTruthy()
+    expect(screen.getByText('접근성 설정')).toBeTruthy()
+    expect(screen.getByText('보호자 연결')).toBeTruthy()
     expect(screen.getByRole('button', { name: /생활 신호 설정/i })).toBeTruthy()
 
     await user.click(screen.getByRole('button', { name: /생활 신호 설정/i }))
-    expect(screen.getByRole('heading', { level: 2, name: '생활 신호 설정' })).toBeTruthy()
+    expect(screen.getAllByRole('heading', { name: '생활 신호 설정' }).length).toBeGreaterThan(0)
+    expect(screen.getByText('등록된 알림음')).toBeTruthy()
+    expect(screen.getByText('Front Door Bell')).toBeTruthy()
+    expect(screen.getByText('주변 소리 감지')).toBeTruthy()
   })
 
   it('routes GUARDIAN login to guardian placeholder', async () => {
     const user = userEvent.setup()
     render(<App />)
 
-    await user.click(screen.getByRole('radio', { name: /보호자/i }))
-    await user.type(screen.getByLabelText(/이메일/i), 'guardian@example.com')
-    await user.type(screen.getByLabelText(/비밀번호/i), 'password1234')
-    await user.click(screen.getByRole('button', { name: /^로그인$/i }))
+    await user.click(screen.getByRole('radio', { name: '보호자' }))
+    await user.type(screen.getByLabelText('이메일'), 'guardian@example.com')
+    await user.type(screen.getByLabelText('비밀번호'), 'password1234')
+    await user.click(screen.getByRole('button', { name: '로그인' }))
 
     expect(await screen.findByRole('heading', { name: '보호자 화면 준비 중' })).toBeTruthy()
+    expect(screen.queryByRole('heading', { name: /able band 홈/i })).toBeNull()
+  })
+
+  it('shows invalid login error and keeps the user on login screen', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.type(screen.getByLabelText('이메일'), 'wrong@example.com')
+    await user.type(screen.getByLabelText('비밀번호'), 'wrong')
+    await user.click(screen.getByRole('button', { name: '로그인' }))
+
+    expect((await screen.findByRole('alert')).textContent).toContain(
+      '이메일 또는 비밀번호가 올바르지 않습니다.',
+    )
+    expect(screen.getByRole('heading', { name: /able band 로그인/i })).toBeTruthy()
+  })
+
+  it('keeps login button disabled while submitting', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.type(screen.getByLabelText('이메일'), 'user@example.com')
+    await user.type(screen.getByLabelText('비밀번호'), 'password1234')
+    await user.click(screen.getByRole('button', { name: '로그인' }))
+
+    expect(screen.getByRole('button', { name: '로그인 중...' }).disabled).toBe(true)
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: /소희 홈/i })).toBeTruthy()
+    })
   })
 })
 
 function installMockBackend() {
-  const deviceItems = []
-  const alertItems = [
-    {
-      alertId: 201,
-      type: 'DANGER',
-      severity: 'HIGH',
-      title: '가스 위험 감지',
-      message: '가스 위험이 감지되었습니다. 즉시 확인하세요.',
-      voiceGuide: '가스 위험이 감지되었습니다. 즉시 확인하세요.',
-      deviceName: '가스 센서',
-      device: {
-        deviceId: 20,
-        name: '가스 센서',
-        type: 'AIR_SENSOR',
-      },
-      locationName: '주방',
-      occurredAt: '2026-06-10T18:30:00+09:00',
-      status: 'UNREAD',
-      recommendedAction: '창문을 열고 안전한 곳으로 이동하세요.',
-      requiresGuardianNotify: true,
-    },
-    {
-      alertId: 202,
-      type: 'LIFE',
-      severity: 'LOW',
-      title: '세탁 완료',
-      message: '세탁이 완료되었습니다. 건조기로 옮겨주세요.',
-      voiceGuide: '세탁이 완료되었습니다. 건조기로 옮겨주세요.',
-      deviceName: '세탁기',
-      device: {
-        deviceId: 10,
-        name: '세탁기',
-        type: 'WASHER',
-      },
-      locationName: '세탁실',
-      occurredAt: '2026-06-10T18:20:00+09:00',
-      status: 'UNREAD',
-      recommendedAction: '세탁물을 꺼내 주세요.',
-      requiresGuardianNotify: false,
-    },
-  ]
-  let nextAccountId = 3
-  let nextDeviceId = 100
-
+  let alerts = structuredClone(mockAppPreview.alerts)
   const accounts = new Map([
     [
-      accountMapKey('USER', 'user@example.com'),
+      'USER:user@example.com',
       {
         role: 'USER',
         email: 'user@example.com',
         password: 'password1234',
         accountId: 1,
-        name: '홍길동',
+        name: '소희',
         userId: 1,
         accessibilityType: 'VISUAL',
         accessToken: 'api-user-token',
       },
     ],
     [
-      accountMapKey('GUARDIAN', 'guardian@example.com'),
+      'GUARDIAN:guardian@example.com',
       {
         role: 'GUARDIAN',
         email: 'guardian@example.com',
@@ -177,6 +351,7 @@ function installMockBackend() {
       },
     ],
   ])
+  let nextAccountId = 3
 
   vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init = {}) => {
     await delay(REQUEST_DELAY_MS)
@@ -184,13 +359,12 @@ function installMockBackend() {
     const url = typeof input === 'string' ? input : input.url
     const method = (init.method || 'GET').toUpperCase()
     const body = init.body ? JSON.parse(init.body) : {}
-    const authorization = new Headers(init.headers).get('Authorization')
 
     if (url === `${API_BASE_URL}/api/auth/signup` && method === 'POST') {
       const accountKey = accountMapKey(body.role, body.email)
       if (accounts.has(accountKey)) {
         return jsonResponse(
-          { code: 'DUPLICATE_EMAIL', message: '이미 가입한 이메일입니다.', details: {} },
+          { code: 'DUPLICATE_EMAIL', message: '이미 가입된 이메일입니다.', details: {} },
           { status: 409 },
         )
       }
@@ -204,6 +378,7 @@ function installMockBackend() {
         guardianId: body.role === 'GUARDIAN' ? accountId : null,
         accessToken: `api-${body.role.toLowerCase()}-token-${accountId}`,
       }
+
       accounts.set(accountKey, account)
 
       return jsonResponse(
@@ -232,7 +407,10 @@ function installMockBackend() {
     }
 
     if (url === `${API_BASE_URL}/api/app/home` && method === 'GET') {
-      if (!isKnownUserToken(authorization)) {
+      const authorization = new Headers(init.headers).get('Authorization')
+      const isKnownUserToken = authorization === 'Bearer api-user-token' || authorization?.startsWith('Bearer api-user-token-')
+
+      if (!isKnownUserToken) {
         return jsonResponse(
           { code: 'UNAUTHORIZED', message: 'Authorization 헤더가 필요합니다.', details: {} },
           { status: 401 },
@@ -242,107 +420,59 @@ function installMockBackend() {
       return jsonResponse(mockHomeSummary)
     }
 
-    if (url === `${API_BASE_URL}/api/devices` && method === 'GET') {
-      if (!isKnownUserToken(authorization)) {
-        return jsonResponse(
-          { code: 'UNAUTHORIZED', message: 'Authorization 헤더가 필요합니다.', details: {} },
-          { status: 401 },
-        )
-      }
-
-      return jsonResponse({ items: deviceItems })
-    }
-
-    if (url === `${API_BASE_URL}/api/devices` && method === 'POST') {
-      if (!isKnownUserToken(authorization)) {
-        return jsonResponse(
-          { code: 'UNAUTHORIZED', message: 'Authorization 헤더가 필요합니다.', details: {} },
-          { status: 401 },
-        )
-      }
-
-      const device = {
-        deviceId: nextDeviceId,
-        name: body.name,
-        type: body.type,
-        connectionStatus: 'CONNECTED',
-        locationSupported: body.locationSupported,
-        lastEventAt: '2026-06-10T18:30:00+09:00',
-        vendor: body.vendor,
-        vendorDeviceId: body.vendorDeviceId,
-        remoteEnabled: body.remoteEnabled,
-      }
-      nextDeviceId += 1
-      deviceItems.unshift(device)
-      return jsonResponse(device, { status: 201 })
-    }
-
     if (url === `${API_BASE_URL}/api/alerts?limit=20` && method === 'GET') {
-      if (!isKnownUserToken(authorization)) {
-        return jsonResponse(
-          { code: 'UNAUTHORIZED', message: 'Authorization 헤더가 필요합니다.', details: {} },
-          { status: 401 },
-        )
-      }
-
-      return jsonResponse({ items: alertItems })
+      return jsonResponse({ items: alerts })
     }
 
-    if (url.match(new RegExp(`${API_BASE_URL}/api/alerts/\\d+/confirm$`)) && method === 'POST') {
-      if (!isKnownUserToken(authorization)) {
-        return jsonResponse(
-          { code: 'UNAUTHORIZED', message: 'Authorization 헤더가 필요합니다.', details: {} },
-          { status: 401 },
-        )
-      }
-
-      const alertId = Number(url.match(/\/api\/alerts\/(\d+)\/confirm$/)?.[1])
-      const target = alertItems.find((item) => item.alertId === alertId)
-      if (!target) {
-        return jsonResponse(
-          { code: 'NOT_FOUND', message: '알림을 찾을 수 없습니다.', details: {} },
-          { status: 404 },
-        )
-      }
-
-      target.status = 'CONFIRMED'
-      return jsonResponse({
-        alertId,
-        status: 'CONFIRMED',
-        confirmedAt: '2026-06-10T18:31:00+09:00',
-      })
+    const alertActionMatch = url.match(/\/api\/alerts\/(\d+)\/(confirm|replay)$/)
+    if (alertActionMatch && method === 'POST') {
+      const alertId = Number(alertActionMatch[1])
+      const status = alertActionMatch[2] === 'confirm' ? 'CONFIRMED' : 'REPLAYED'
+      const alert = alerts.find((item) => item.alertId === alertId)
+      alerts = alerts.map((item) => (item.alertId === alertId ? { ...item, status } : item))
+      return jsonResponse({ ...alert, status })
     }
 
-    if (url.match(new RegExp(`${API_BASE_URL}/api/alerts/\\d+/replay$`)) && method === 'POST') {
-      if (!isKnownUserToken(authorization)) {
-        return jsonResponse(
-          { code: 'UNAUTHORIZED', message: 'Authorization 헤더가 필요합니다.', details: {} },
-          { status: 401 },
-        )
-      }
-
-      const alertId = Number(url.match(/\/api\/alerts\/(\d+)\/replay$/)?.[1])
-      const target = alertItems.find((item) => item.alertId === alertId)
-      if (!target) {
-        return jsonResponse(
-          { code: 'NOT_FOUND', message: '알림을 찾을 수 없습니다.', details: {} },
-          { status: 404 },
-        )
-      }
-
-      target.status = 'REPLAYED'
-      return jsonResponse({
-        alertId,
-        status: 'REPLAYED',
-        voiceGuide: target.voiceGuide,
-        replayedAt: '2026-06-10T18:32:00+09:00',
-      })
+    if (url === `${API_BASE_URL}/api/emergency-requests` && method === 'POST') {
+      return jsonResponse(
+        {
+          emergencyRequestId: 301,
+          status: 'SENT',
+          message: '보호자에게 긴급 요청을 보냈습니다.',
+          source: 'APP',
+          sentAt: '2026-06-10T14:35:00+09:00',
+          guardianNotified: true,
+        },
+        { status: 201 },
+      )
     }
 
     return jsonResponse(
-      { code: 'NOT_FOUND', message: `테스트 mock API에 없는 경로입니다. ${url}`, details: {} },
+      { code: 'NOT_FOUND', message: `테스트 mock API에 없는 경로입니다: ${url}`, details: {} },
       { status: 404 },
     )
+  })
+}
+
+function installSpeechSynthesisMock() {
+  class MockSpeechSynthesisUtterance {
+    constructor(text) {
+      this.text = text
+    }
+  }
+
+  Object.defineProperty(window, 'SpeechSynthesisUtterance', {
+    configurable: true,
+    value: MockSpeechSynthesisUtterance,
+  })
+  Object.defineProperty(window, 'speechSynthesis', {
+    configurable: true,
+    value: {
+      cancel: vi.fn(),
+      getVoices: vi.fn(() => [{ lang: 'ko-KR', name: 'Korean' }]),
+      resume: vi.fn(),
+      speak: vi.fn(),
+    },
   })
 }
 
@@ -376,10 +506,6 @@ function createLoginResponse(account) {
       accessibilityType: account.accessibilityType,
     },
   }
-}
-
-function isKnownUserToken(authorization) {
-  return authorization === 'Bearer api-user-token' || authorization?.startsWith('Bearer api-user-token-')
 }
 
 function accountMapKey(role, email) {

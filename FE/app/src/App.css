@@ -700,6 +700,95 @@ button:disabled {
   line-height: 1.45;
 }
 
+.warning-recommendation-card {
+  display: grid;
+  gap: 12px;
+  border: 1px solid #bae6fd;
+  border-radius: 10px;
+  padding: 12px;
+  background:
+    radial-gradient(circle at 100% 0%, rgba(186, 230, 253, 0.72), transparent 38%),
+    linear-gradient(145deg, #f8fdff 0%, #f0fdfa 100%);
+}
+
+.warning-recommendation-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.warning-recommendation-header > div {
+  display: grid;
+  gap: 4px;
+}
+
+.warning-recommendation-header strong {
+  color: #172033;
+  font-size: 0.92rem;
+  line-height: 1.4;
+}
+
+.guardian-badge {
+  flex: 0 0 auto;
+  border-radius: 999px;
+  padding: 5px 8px;
+  background: #e2e8f0;
+  color: #475569;
+  font-size: 0.66rem;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.guardian-badge.active {
+  background: #ffe4e6;
+  color: #be123c;
+}
+
+.warning-channel-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.warning-channel-list span {
+  border: 1px solid #a5f3fc;
+  border-radius: 999px;
+  padding: 6px 9px;
+  background: rgba(255, 255, 255, 0.88);
+  color: #155e75;
+  font-size: 0.72rem;
+  font-weight: 900;
+}
+
+.warning-setting-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  margin: 0;
+}
+
+.warning-setting-grid div {
+  min-width: 0;
+  border-radius: 8px;
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.warning-setting-grid dt {
+  color: #64748b;
+  font-size: 0.65rem;
+  font-weight: 900;
+}
+
+.warning-setting-grid dd {
+  margin: 4px 0 0;
+  color: #172033;
+  font-size: 0.72rem;
+  font-weight: 900;
+  line-height: 1.35;
+}
+
 .guardian-notify-note {
   border-radius: 8px;
   padding: 10px;

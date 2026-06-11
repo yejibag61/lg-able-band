@@ -3,6 +3,7 @@ package com.lgableband;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.blankOrNullString;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -135,5 +136,112 @@ class MvpApiControllerTests {
 			.andExpect(jsonPath("$.accessToken", not(blankOrNullString())))
 			.andExpect(jsonPath("$.role").value("GUARDIAN"))
 			.andExpect(jsonPath("$.guardianProfile.relationship").value("FAMILY"));
+	}
+
+	@Test
+	void contextJudgmentCreatesAlertAndCanBeListed() throws Exception {
+		String token = userToken();
+
+		this.mockMvc.perform(post("/api/context/judgments")
+				.header("Authorization", "Bearer " + token)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "userId": 1,
+					  "accessibilityType": "HEARING",
+					  "deviceType": "DOOR_SENSOR",
+					  "deviceName": "현관문 센서",
+					  "eventType": "LONG_OPEN",
+					  "location": "현관",
+					  "durationSec": 300,
+					  "userResponse": "NO_RESPONSE"
+					}
+					"""))
+			.andExpect(status().isCreated())
+			.andExpect(jsonPath("$.riskLevel").value("HIGH"))
+			.andExpect(jsonPath("$.riskScore").value(85))
+			.andExpect(jsonPath("$.notifyGuardian").value(true))
+			.andExpect(jsonPath("$.recommendedChannels[0]").value("BAND_VIBRATION"));
+
+		this.mockMvc.perform(get("/api/context/judgments").header("Authorization", "Bearer " + token))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.items[0].deviceType").value("DOOR_SENSOR"));
+
+		this.mockMvc.perform(get("/api/alerts").header("Authorization", "Bearer " + token))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.items[0].title").value("위험 상황 감지"));
+	}
+
+	@Test
+	void warningRecommendationAndEmergencyHistoryAreAvailable() throws Exception {
+		String token = userToken();
+
+		this.mockMvc.perform(post("/api/warnings/recommendations")
+				.header("Authorization", "Bearer " + token)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "accessibilityType": "HEARING",
+					  "category": "DANGER",
+					  "riskLevel": "HIGH",
+					  "riskScore": 85,
+					  "eventType": "LONG_OPEN"
+					}
+					"""))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.vibrationPattern").value("STRONG_REPEAT"))
+			.andExpect(jsonPath("$.voiceEnabled").value(false))
+			.andExpect(jsonPath("$.notifyGuardian").value(true));
+
+		MvcResult emergency = this.mockMvc.perform(post("/api/emergency-requests")
+				.header("Authorization", "Bearer " + token)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "message": "도움이 필요합니다.",
+					  "source": "APP"
+					}
+					"""))
+			.andExpect(status().isCreated())
+			.andExpect(jsonPath("$.guardianNotified").value(true))
+			.andReturn();
+
+		String emergencyRequestId = emergency.getResponse().getContentAsString()
+			.replaceAll(".*\\\"emergencyRequestId\\\":([0-9]+).*", "$1");
+
+		this.mockMvc.perform(get("/api/emergency-requests").header("Authorization", "Bearer " + token))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.items[0].status").value("SENT"));
+
+		this.mockMvc.perform(get("/api/emergency-requests/" + emergencyRequestId).header("Authorization", "Bearer " + token))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.source").value("APP"));
+
+		this.mockMvc.perform(patch("/api/emergency-requests/" + emergencyRequestId + "/status")
+				.header("Authorization", "Bearer " + token)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "status": "RESOLVED"
+					}
+					"""))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.status").value("RESOLVED"));
+	}
+
+	private String userToken() throws Exception {
+		MvcResult login = this.mockMvc.perform(post("/api/auth/login")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "role": "USER",
+					  "email": "user@example.com",
+					  "password": "password1234"
+					}
+					"""))
+			.andExpect(status().isOk())
+			.andReturn();
+		return login.getResponse().getContentAsString()
+			.replaceAll(".*\\\"accessToken\\\":\\\"([^\\\"]+)\\\".*", "$1");
 	}
 }
