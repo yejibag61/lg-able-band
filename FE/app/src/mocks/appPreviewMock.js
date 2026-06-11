@@ -104,6 +104,10 @@ export const mockAppPreview = {
       typeLabel: '세탁기',
       room: '세탁실',
       connectionStatus: 'CONNECTED',
+      runtime: {
+        statusCode: 'RUNNING',
+        remainingMinutes: 12,
+      },
       status: '연결됨',
       detail: '세탁 완료, 문 열림, 오류 알림을 Able Band로 전달합니다.',
       primarySignal: '세탁 완료 알림',

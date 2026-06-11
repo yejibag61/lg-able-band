@@ -4,6 +4,7 @@ import { getAppPreview, getHomeSummary } from '../services/homeService'
 import { AlertsTab } from './AlertsTab'
 import { DevicesTab } from './DevicesTab'
 import { HomeTab } from './HomeTab'
+import { VoiceChatbot } from './VoiceChatbot'
 
 const statusLabels = {
   SAFE: '안전',
@@ -173,6 +174,7 @@ export function HomeScreen({ session, onLogout }) {
           </button>
         ))}
       </nav>
+      <VoiceChatbot preview={preview} session={session} summary={summary} />
     </main>
   )
 }

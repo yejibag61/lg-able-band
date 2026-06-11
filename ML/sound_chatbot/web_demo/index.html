@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LG Able Band Voice Chatbot Demo</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <main class="app">
+      <section class="hero">
+        <p class="eyebrow">LG Able Band</p>
+        <h1>음성 챗봇 웹 테스트</h1>
+        <p class="summary">
+          웨어러블 디스플레이 없이 브라우저 마이크로 STT, 챗봇 API, TTS 흐름을 먼저 확인합니다.
+        </p>
+      </section>
+
+      <section class="panel controls">
+        <label class="field">
+          <span>Chatbot API</span>
+          <input id="apiUrl" type="text" value="http://127.0.0.1:8002/api/ai/voice-chat" />
+        </label>
+
+        <div class="button-row">
+          <button id="startBtn" type="button">음성 인식 시작</button>
+          <button id="stopBtn" type="button" disabled>중지</button>
+          <button id="sendBtn" type="button">텍스트로 보내기</button>
+        </div>
+
+        <label class="field">
+          <span>인식된 문장 또는 직접 입력</span>
+          <textarea id="userText" rows="3" placeholder="예: 세탁기 몇 분 남았어?"></textarea>
+        </label>
+
+        <div class="chips" aria-label="샘플 문장">
+          <button type="button" data-sample="미확인 알림 있어?">미확인 알림</button>
+          <button type="button" data-sample="위험 알림 있어?">위험 알림</button>
+          <button type="button" data-sample="최근 알림 읽어줘">최근 알림</button>
+          <button type="button" data-sample="방금 알림 다시 말해줘">다시 말하기</button>
+          <button type="button" data-sample="세탁기 몇 분 남았어?">세탁기 시간</button>
+          <button type="button" data-sample="냉장고 문 열려 있어?">냉장고 문</button>
+          <button type="button" data-sample="보호자한테 알려줘">보호자 알림</button>
+        </div>
+      </section>
+
+      <section class="grid">
+        <article class="panel">
+          <h2>상태</h2>
+          <p id="statusText" class="status">대기 중</p>
+        </article>
+
+        <article class="panel">
+          <h2>챗봇 응답</h2>
+          <p id="answerText" class="answer">아직 응답이 없습니다.</p>
+          <dl class="meta">
+            <div>
+              <dt>Intent</dt>
+              <dd id="intentText">-</dd>
+            </div>
+            <div>
+              <dt>Action</dt>
+              <dd id="actionText">-</dd>
+            </div>
+            <div>
+              <dt>Backend</dt>
+              <dd id="backendText">-</dd>
+            </div>
+          </dl>
+        </article>
+      </section>
+
+      <section class="panel">
+        <h2>원본 응답 JSON</h2>
+        <pre id="jsonText">{}</pre>
+      </section>
+    </main>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
