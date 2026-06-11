@@ -10,7 +10,7 @@ from pydantic import BaseModel
 
 
 HOST = "127.0.0.1"
-PORT = int(os.environ.get("EMERGENCY_PORT", "8002"))
+PORT = int(os.environ.get("EMERGENCY_PORT", "8003"))
 
 app = FastAPI(
     title="LG Able Band Emergency AI Server",

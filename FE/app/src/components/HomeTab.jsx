@@ -7,6 +7,7 @@ const severityLabels = {
 
 export function HomeTab({
   emergencyMessage,
+  emergencySubmitting,
   statusLabel,
   summary,
   onEmergencyRequest,
@@ -52,10 +53,11 @@ export function HomeTab({
         <button
           className="sos-button"
           type="button"
-          disabled={!summary.quickActions.canRequestEmergency}
+          aria-busy={emergencySubmitting}
+          disabled={!summary.quickActions.canRequestEmergency || emergencySubmitting}
           onClick={onEmergencyRequest}
         >
-          긴급 지원 요청
+          {emergencySubmitting ? '요청 전송 중' : '긴급 지원 요청'}
         </button>
         {emergencyMessage ? (
           <p className="emergency-message" role="status">

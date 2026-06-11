@@ -220,17 +220,23 @@ describe('App login to home flow', () => {
 
     await user.click(screen.getByRole('button', { name: '도어센서 장시간 열림 상세 보기' }))
     expect(screen.getByRole('heading', { name: '도어센서 장시간 열림' })).toBeTruthy()
-    expect(screen.getByText('현관문이 장시간 열려 있습니다. 문이 닫혔는지 확인하세요.')).toBeTruthy()
-    expect(screen.getByText('현관문을 닫고 외출 전 잠금 상태를 확인하세요.')).toBeTruthy()
-    expect(await screen.findByText('맞춤 알림 추천')).toBeTruthy()
+    expect(screen.getByLabelText('알림 안내').textContent).toContain(
+      '현관문이 장시간 열려 있습니다. 문이 닫혔는지 확인하세요.',
+    )
+    expect(screen.getByLabelText('알림 안내').textContent).toContain(
+      '현관문을 닫고 외출 전 잠금 상태를 확인하세요.',
+    )
+    expect(screen.queryByText('다시 듣기 문구')).toBeNull()
+    expect(screen.queryByText('필요한 조치')).toBeNull()
+    expect(await screen.findByText('전달된 알림')).toBeTruthy()
     expect(screen.getByText('밴드 진동')).toBeTruthy()
     expect(screen.getByText('반복 진동')).toBeTruthy()
-    expect(screen.getByText('보호자 알림 포함')).toBeTruthy()
+    expect(screen.getByText('보호자에게도 전달됨')).toBeTruthy()
     expect(screen.queryByText('BASIC_REPEAT')).toBeNull()
 
     await user.click(screen.getByRole('button', { name: '다시 듣기' }))
     await waitFor(() => {
-      expect(screen.getByRole('status').textContent).toContain('다시 듣기:')
+      expect(screen.getByRole('status').textContent).toContain('알림 안내를 다시 들려드렸습니다.')
     })
     expect(window.speechSynthesis.speak).toHaveBeenCalled()
 
@@ -442,6 +448,8 @@ function installMockBackend() {
           source: 'APP',
           sentAt: '2026-06-10T14:35:00+09:00',
           guardianNotified: true,
+          decisionSource: 'AI',
+          emergencyLevel: 'CRITICAL',
         },
         { status: 201 },
       )

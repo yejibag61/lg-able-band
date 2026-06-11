@@ -23,7 +23,8 @@ import org.springframework.test.web.servlet.MvcResult;
 	"db.port=",
 	"db.name=",
 	"db.user=",
-	"db.password="
+	"db.password=",
+	"emergency.ai.enabled=false"
 })
 @AutoConfigureMockMvc
 class MvpApiControllerTests {
@@ -251,6 +252,8 @@ class MvpApiControllerTests {
 					"""))
 			.andExpect(status().isCreated())
 			.andExpect(jsonPath("$.guardianNotified").value(true))
+			.andExpect(jsonPath("$.decisionSource").value("FALLBACK"))
+			.andExpect(jsonPath("$.emergencyLevel").value("CRITICAL"))
 			.andReturn();
 
 		String emergencyRequestId = emergency.getResponse().getContentAsString()

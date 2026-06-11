@@ -24,6 +24,31 @@
   align-content: start;
 }
 
+.home-loading-screen {
+  display: block;
+  grid-template-rows: none;
+}
+
+.home-loading-group {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: grid;
+  width: calc(100% - 32px);
+  justify-items: center;
+  gap: 18px;
+  color: #445066;
+  font-weight: 800;
+  text-align: center;
+  transform: translate(-50%, -50%);
+}
+
+.home-loading-logo {
+  display: block;
+  width: min(78%, 260px);
+  height: auto;
+}
+
 .app-screen {
   position: relative;
   height: 100vh;
@@ -255,6 +280,10 @@ button:disabled {
 
 .home-header > div {
   min-width: 0;
+}
+
+.home-header .eyebrow + h1 {
+  margin-top: 6px;
 }
 
 .app-header h1 {
@@ -666,9 +695,7 @@ button:disabled {
   margin: 0;
 }
 
-.alert-detail-grid div,
-.voice-guide-card,
-.recommended-action-card {
+.alert-detail-grid div {
   border-radius: 8px;
   padding: 10px;
   background: #f8fafc;
@@ -685,19 +712,6 @@ button:disabled {
   color: #172033;
   font-size: 0.82rem;
   font-weight: 900;
-}
-
-.voice-guide-card,
-.recommended-action-card {
-  display: grid;
-  gap: 4px;
-}
-
-.voice-guide-card strong,
-.recommended-action-card strong {
-  color: #172033;
-  font-size: 0.9rem;
-  line-height: 1.45;
 }
 
 .warning-recommendation-card {
@@ -1430,6 +1444,7 @@ button:disabled {
   width: 58px;
   height: 58px;
   place-items: center;
+  padding: 0;
   border: 1px solid rgba(255, 255, 255, 0.78);
   border-radius: 999px;
   background:
@@ -1437,8 +1452,10 @@ button:disabled {
     linear-gradient(135deg, #f472b6 0%, #8b5cf6 55%, #22d3ee 100%);
   color: #ffffff;
   font: inherit;
-  font-size: 0.9rem;
+  font-size: 1rem;
   font-weight: 1000;
+  line-height: 1;
+  white-space: nowrap;
   box-shadow: 0 16px 34px rgba(79, 70, 229, 0.28);
 }
 

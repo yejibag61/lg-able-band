@@ -13,17 +13,17 @@ pip install -r ML/emergency/requirements.txt
 python ML/emergency/server.py
 ```
 
-기본 주소는 `http://127.0.0.1:8002`입니다. 포트를 변경하려면 `EMERGENCY_PORT` 환경변수만 사용합니다.
+기본 주소는 `http://127.0.0.1:8003`입니다. 포트를 변경하려면 `EMERGENCY_PORT` 환경변수만 사용합니다.
 
 ```powershell
-$env:EMERGENCY_PORT = "8002"
+$env:EMERGENCY_PORT = "8003"
 python ML/emergency/server.py
 ```
 
 ## Health Check
 
 ```http
-GET http://127.0.0.1:8002/health
+GET http://127.0.0.1:8003/health
 ```
 
 응답 예시:
@@ -32,7 +32,7 @@ GET http://127.0.0.1:8002/health
 {
   "service": "lg-able-band-emergency-ai-server",
   "status": "running",
-  "port": 8002,
+  "port": 8003,
   "message": "LG Able Band emergency AI server is running."
 }
 ```
@@ -42,7 +42,7 @@ GET http://127.0.0.1:8002/health
 향후 백엔드 연동 시 사용할 endpoint:
 
 ```http
-POST http://127.0.0.1:8002/api/ai/judge-emergency
+POST http://127.0.0.1:8003/api/ai/judge-emergency
 Content-Type: application/json
 ```
 

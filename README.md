@@ -31,16 +31,18 @@ DB_PASSWORD=your-aiven-password
 cd BE && .\mvnw.cmd spring-boot:run
 cd FE/app && npm install && npm run dev
 cd FE/wearable && npm install && npm run dev
-cd ML && python server.py
+cd ML/context && python server.py
+cd ML/warning && python server.py
+cd ML/emergency && python server.py
 ```
 
 ## Batch Files
 
 - `start-be.bat`: starts the Spring Boot backend
 - `start-fe.bat`: starts both frontend dev servers
-- `start-ml.bat`: starts the lightweight ML test server
+- `start-ml.bat`: starts the context, warning, and emergency AI servers
 - `start-all.bat`: starts BE, FE, and ML together
-- `stop-all.bat`: stops servers listening on ports `8080`, `5173`, `5174`, and `8000`
+- `stop-all.bat`: stops servers listening on ports `8080`, `5173`, `5174`, and `8000`-`8003`
 
 ## Backend Endpoints
 
@@ -54,9 +56,11 @@ cd ML && python server.py
 - Open `http://localhost:5173` after running the backend and frontend
 - `FE/wearable` runs on `http://localhost:5174`
 
-## ML Test Server
+## AI Servers
 
-- `http://localhost:8000/health`
+- Context AI: `http://localhost:8000/health`
+- Warning AI: `http://localhost:8001/health`
+- Emergency AI: `http://localhost:8003/health`
 
 ## Notes
 

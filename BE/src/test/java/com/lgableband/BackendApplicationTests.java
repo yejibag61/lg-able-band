@@ -8,7 +8,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 	"db.port=",
 	"db.name=",
 	"db.user=",
-	"db.password="
+	"db.password=",
+	"emergency.ai.enabled=false"
 })
 class BackendApplicationTests {
 

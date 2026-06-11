@@ -292,18 +292,49 @@ public class MockDataStore {
 	}
 
 	public EmergencyRequest createEmergency(long userId, String message, String source) {
+		return createEmergency(
+			userId,
+			"SENT",
+			message,
+			source,
+			true,
+			"FALLBACK",
+			"CRITICAL",
+			List.of("GUARDIAN_PUSH", "BAND_VIBRATION", "APP_SCREEN"),
+			"SOS_REPEAT",
+			"EMERGENCY_FULL_SCREEN"
+		);
+	}
+
+	public EmergencyRequest createEmergency(
+		long userId,
+		String status,
+		String message,
+		String source,
+		boolean guardianNotified,
+		String decisionSource,
+		String emergencyLevel,
+		List<String> recommendedChannels,
+		String vibrationPattern,
+		String screenMode
+	) {
 		List<Guardian> guardians = guardians(userId);
 		if (guardians.isEmpty()) {
 			throw new ApiException(HttpStatus.BAD_REQUEST, "NO_GUARDIAN", "등록된 보호자가 없습니다.");
 		}
 		EmergencyRequest request = new EmergencyRequest(
 			this.emergencySequence.incrementAndGet(),
-			"SENT",
+			status,
 			message,
 			source,
 			OffsetDateTime.now(),
-			true,
-			guardians
+			guardianNotified,
+			guardianNotified ? guardians : List.of(),
+			decisionSource,
+			emergencyLevel,
+			recommendedChannels,
+			vibrationPattern,
+			screenMode
 		);
 		this.emergenciesByUserId.computeIfAbsent(userId, ignored -> new ArrayList<>()).add(request);
 		return request;
@@ -472,10 +503,36 @@ public class MockDataStore {
 	public record Guardian(long guardianId, String name, String phone, boolean isPrimary, boolean notifyOnDanger, ConnectionStatus connectionStatus) {
 	}
 
-	public record EmergencyRequest(long emergencyRequestId, String status, String message, String source, OffsetDateTime sentAt, boolean guardianNotified, List<Guardian> guardianTargets) {
+	public record EmergencyRequest(
+		long emergencyRequestId,
+		String status,
+		String message,
+		String source,
+		OffsetDateTime sentAt,
+		boolean guardianNotified,
+		List<Guardian> guardianTargets,
+		String decisionSource,
+		String emergencyLevel,
+		List<String> recommendedChannels,
+		String vibrationPattern,
+		String screenMode
+	) {
 
 		public EmergencyRequest withStatus(String status) {
-			return new EmergencyRequest(this.emergencyRequestId, status, this.message, this.source, this.sentAt, this.guardianNotified, this.guardianTargets);
+			return new EmergencyRequest(
+				this.emergencyRequestId,
+				status,
+				this.message,
+				this.source,
+				this.sentAt,
+				this.guardianNotified,
+				this.guardianTargets,
+				this.decisionSource,
+				this.emergencyLevel,
+				this.recommendedChannels,
+				this.vibrationPattern,
+				this.screenMode
+			);
 		}
 	}
 

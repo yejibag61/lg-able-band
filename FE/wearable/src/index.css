@@ -1,5 +1,77 @@
+@font-face {
+  font-family: "LG EI Text";
+  src: url("/fonts/LGEIText-Light.otf") format("opentype");
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "LG EI Text";
+  src: url("/fonts/LGEIText-Regular.otf") format("opentype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "LG EI Text";
+  src: url("/fonts/LGEIText-SemiBold.otf") format("opentype");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "LG EI Text";
+  src: url("/fonts/LGEIText-Bold.otf") format("opentype");
+  font-weight: 700 1000;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "LG EI Headline";
+  src: url("/fonts/LGEIHeadline-Thin.otf") format("opentype");
+  font-weight: 100;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "LG EI Headline";
+  src: url("/fonts/LGEIHeadline-Light.otf") format("opentype");
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "LG EI Headline";
+  src: url("/fonts/LGEIHeadline-Regular.otf") format("opentype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "LG EI Headline";
+  src: url("/fonts/LGEIHeadline-Semibold.otf") format("opentype");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "LG EI Headline";
+  src: url("/fonts/LGEIHeadline-Bold.otf") format("opentype");
+  font-weight: 700 1000;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
-  font-family: "Segoe UI", "Noto Sans KR", sans-serif;
+  font-family: "LG EI Text", "Noto Sans KR", sans-serif;
   line-height: 1.5;
   font-weight: 400;
   color: #111827;
@@ -22,4 +94,8 @@ body {
 
 #root {
   min-height: 100vh;
+}
+
+h1 {
+  font-family: "LG EI Headline", "LG EI Text", "Noto Sans KR", sans-serif;
 }

@@ -6,6 +6,7 @@ export async function createEmergencyRequest(message = '도움이 필요합니�
     body: {
       message,
       source: 'APP',
+      triggerType: 'MANUAL_REQUEST',
     },
   })
 }
