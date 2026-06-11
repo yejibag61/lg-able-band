@@ -274,6 +274,25 @@ describe('App login to home flow', () => {
     expect(screen.getByRole('heading', { name: '메뉴' })).toBeTruthy()
     expect(screen.getByText('접근성 설정')).toBeTruthy()
     expect(screen.getByText('보호자 연결')).toBeTruthy()
+    expect(screen.getByRole('button', { name: '멤버 초대' })).toBeTruthy()
+    await user.click(screen.getByRole('button', { name: '멤버 초대' }))
+    expect(screen.getByRole('heading', { name: '보호자 연결' })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: '긴급 알림을 받을 보호자를 등록해요.' })).toBeTruthy()
+    expect(screen.getByLabelText('이름').value).toBe('김보호')
+    expect(screen.getByLabelText('연락처').value).toBe('010-0000-0000')
+    await user.clear(screen.getByLabelText('이름'))
+    await user.type(screen.getByLabelText('이름'), '정가족')
+    await user.clear(screen.getByLabelText('연락처'))
+    await user.type(screen.getByLabelText('연락처'), '010-2222-3333')
+    await user.click(screen.getByRole('button', { name: '보호자 등록' }))
+    await waitFor(() => {
+      expect(screen.getByRole('status').textContent).toContain('보호자 연결을 저장했습니다.')
+    })
+    expect(screen.getByText('정가족')).toBeTruthy()
+    expect(screen.getByText('010-2222-3333')).toBeTruthy()
+    await user.click(screen.getByRole('button', { name: '메뉴로 돌아가기' }))
+    expect(screen.getByRole('button', { name: '멤버 초대' })).toBeTruthy()
+    expect(screen.getAllByText('가족').length).toBeGreaterThan(0)
     expect(screen.getByRole('button', { name: /생활 신호 설정/i })).toBeTruthy()
 
     await user.click(screen.getByRole('button', { name: /생활 신호 설정/i }))
@@ -292,7 +311,17 @@ describe('App login to home flow', () => {
     await user.type(screen.getByLabelText('비밀번호'), 'password1234')
     await user.click(screen.getByRole('button', { name: '로그인' }))
 
-    expect(await screen.findByRole('heading', { name: '보호자 화면 준비 중' })).toBeTruthy()
+    expect(await screen.findByRole('heading', { name: '보호자 홈' })).toBeTruthy()
+    expect(screen.getByText('긴급 도움 요청')).toBeTruthy()
+    expect(screen.getByText('위험 알림')).toBeTruthy()
+    expect(screen.queryByText('전송됨')).toBeNull()
+    expect(screen.getByRole('button', { name: '사용자에게 연락' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '도움 요청 확인' })).toBeNull()
+    await user.click(screen.getByRole('button', { name: '사용자에게 연락' }))
+    expect(screen.getByRole('heading', { name: '소희님에게 연락합니다.' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '전화 걸기' })).toBeTruthy()
+    expect(screen.getByText('권장 확인 문장')).toBeTruthy()
+    expect(screen.queryByRole('heading', { name: '긴급 요청 상세를 확인해요.' })).toBeNull()
     expect(screen.queryByRole('heading', { name: /able band 홈/i })).toBeNull()
   })
 
@@ -354,6 +383,21 @@ function installMockBackend() {
         linkedUserId: 1,
         relationship: 'FAMILY',
         accessToken: 'api-guardian-token',
+      },
+    ],
+    [
+      'GUARDIAN:guardian2@example.com',
+      {
+        role: 'GUARDIAN',
+        email: 'guardian2@example.com',
+        password: 'password1234',
+        accountId: 4,
+        name: '김추가',
+        phone: '010-1111-2222',
+        guardianId: 4,
+        linkedUserId: null,
+        relationship: 'FAMILY',
+        accessToken: 'api-guardian-token-4',
       },
     ],
   ])
@@ -450,6 +494,57 @@ function installMockBackend() {
           guardianNotified: true,
           decisionSource: 'AI',
           emergencyLevel: 'CRITICAL',
+        },
+        { status: 201 },
+      )
+    }
+
+    if (url === `${API_BASE_URL}/api/guardians/dashboard` && method === 'GET') {
+      return jsonResponse({
+        user: {
+          userId: 1,
+          name: '소희',
+          accessibilityType: 'VISUAL',
+        },
+        dangerAlerts: mockAppPreview.alerts.filter(
+          (alert) => alert.type === 'DANGER' || alert.severity === 'HIGH',
+        ),
+        emergencyRequests: [
+          {
+            emergencyRequestId: 301,
+            status: 'SENT',
+            message: '사용자가 앱에서 긴급 지원을 요청했습니다.',
+            source: 'APP',
+            sentAt: '2026-06-10T14:35:00+09:00',
+            guardianNotified: true,
+          },
+        ],
+        summary: {
+          unreadDangerAlertCount: 2,
+          emergencyRequestCount: 1,
+          activeEmergency: true,
+          safetyMessage: '긴급 도움 요청이 진행 중입니다.',
+        },
+      })
+    }
+
+    if (url === `${API_BASE_URL}/api/guardians/link-by-email` && method === 'POST') {
+      const account = accounts.get(accountMapKey('GUARDIAN', body.email))
+      if (!account) {
+        return jsonResponse(
+          { code: 'RESOURCE_NOT_FOUND', message: '해당 이메일의 보호자 계정을 찾을 수 없습니다.', details: {} },
+          { status: 404 },
+        )
+      }
+
+      return jsonResponse(
+        {
+          guardianId: account.guardianId,
+          name: account.name,
+          phone: account.phone || '',
+          isPrimary: body.isPrimary,
+          notifyOnDanger: body.notifyOnDanger,
+          connectionStatus: 'CONNECTED',
         },
         { status: 201 },
       )

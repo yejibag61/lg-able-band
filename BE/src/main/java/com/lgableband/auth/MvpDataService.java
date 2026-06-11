@@ -180,6 +180,40 @@ public class MvpDataService {
 		);
 	}
 
+	public CurrentGuardian currentGuardian(String authorization) {
+		String token = extractToken(authorization);
+		SessionPrincipal principal = this.dbSessions.get(token);
+		JdbcTemplate jdbcTemplate = jdbcTemplate();
+		if (jdbcTemplate == null || principal == null) {
+			MockDataStore.GuardianProfile guardian = this.mockDataStore.requireGuardianProfile(authorization);
+			MockDataStore.Account account = this.mockDataStore.accountById(guardian.accountId());
+			return new CurrentGuardian(
+				guardian.guardianId(),
+				account.name(),
+				account.email(),
+				guardian.relationship(),
+				guardian.linkedUserId()
+			);
+		}
+		if (principal.role() != AccountRole.GUARDIAN || principal.guardianId() == null) {
+			throw new ApiException(HttpStatus.FORBIDDEN, "FORBIDDEN", "GUARDIAN 계정만 사용할 수 있습니다.");
+		}
+		DbGuardian guardian = findDbGuardian(jdbcTemplate, principal.guardianId());
+		DbAccount account = findDbAccount(jdbcTemplate, principal.accountId());
+		Long linkedUserId = jdbcTemplate.query(
+			"SELECT user_id FROM user_guardian WHERE guardian_id = ? ORDER BY map_id ASC LIMIT 1",
+			(rs, rowNum) -> rs.getLong("user_id"),
+			guardian.guardianId()
+		).stream().findFirst().orElse(null);
+		return new CurrentGuardian(
+			guardian.guardianId(),
+			guardian.name(),
+			account.email(),
+			guardian.relationship(),
+			linkedUserId
+		);
+	}
+
 	public AccessibilityResult updateAccessibility(
 		String authorization,
 		AccessibilityType accessibilityType,
@@ -353,6 +387,21 @@ public class MvpDataService {
 			.orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND", "보호자 프로필을 찾을 수 없습니다."));
 	}
 
+	private DbGuardian findDbGuardian(JdbcTemplate jdbcTemplate, long guardianId) {
+		return jdbcTemplate.query(
+			"SELECT guardian_id, account_id, name, phone, relationship FROM guardian WHERE guardian_id = ?",
+			(rs, rowNum) -> new DbGuardian(
+				rs.getLong("guardian_id"),
+				rs.getLong("account_id"),
+				rs.getString("name"),
+				rs.getString("phone"),
+				rs.getString("relationship")
+			),
+			guardianId
+		).stream().findFirst()
+			.orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND", "보호자 프로필을 찾을 수 없습니다."));
+	}
+
 	private DbAccount findDbAccount(JdbcTemplate jdbcTemplate, long accountId) {
 		return jdbcTemplate.query(
 			"SELECT account_id, role, email, password_hash FROM account WHERE account_id = ?",
@@ -480,6 +529,9 @@ public class MvpDataService {
 	}
 
 	public record CurrentUser(AccountRole role, long userId, String name, String email, AccessibilityType accessibilityType, NotificationPrefs notificationPrefs, boolean guardianLinked) {
+	}
+
+	public record CurrentGuardian(long guardianId, String name, String email, String relationship, Long linkedUserId) {
 	}
 
 	public record AccessibilityResult(AccessibilityType accessibilityType, NotificationPrefs notificationPrefs, OffsetDateTime updatedAt) {

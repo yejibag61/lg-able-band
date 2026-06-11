@@ -8,7 +8,7 @@ import { UwbGuideScreen } from './features/uwb/UwbGuideScreen'
 import {
   confirmAlert,
   createPairingPayload,
-  getCurrentAlert,
+  getCurrentAlerts,
   getInitialUwbSessionId,
   getPairingSession,
   getUwbSession,
@@ -29,14 +29,25 @@ function App() {
     const session = getPairingSession()
     return { ...session, pairingPayload: createPairingPayload(session) }
   })
-  const [alert, setAlert] = useState(null)
+  const [alertQueue, setAlertQueue] = useState([])
+  const [alertIndex, setAlertIndex] = useState(0)
   const [alertStatuses, setAlertStatuses] = useState({})
   const [uwbSession, setUwbSession] = useState(null)
   const [isUwbPolling, setIsUwbPolling] = useState(true)
   const isUwbPollingRef = useRef(true)
   const [statusMessage, setStatusMessage] = useState('')
   const [isBusy, setIsBusy] = useState(false)
+  const [syncedTime, setSyncedTime] = useState(() => new Date())
   const pairingCompleteTimerRef = useRef(null)
+  const selectedAlert = alertQueue[alertIndex] || null
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      setSyncedTime(new Date())
+    }, 1000)
+
+    return () => window.clearInterval(intervalId)
+  }, [])
 
   useEffect(
     () => () => {
@@ -54,13 +65,17 @@ function App() {
 
     async function loadAlert() {
       try {
-        const currentAlert = await getCurrentAlert()
+        const alerts = await getCurrentAlerts()
         if (isMounted) {
-          setAlert(applyStoredAlertStatus(currentAlert, alertStatuses))
+          const nextAlerts = alerts
+            .map((item) => applyStoredAlertStatus(item, alertStatuses))
+            .filter((item) => item.status !== 'CONFIRMED')
+          setAlertQueue(nextAlerts)
+          setAlertIndex((current) => Math.min(current, Math.max(nextAlerts.length - 1, 0)))
         }
       } catch (error) {
         if (isMounted) {
-          setAlert(null)
+          setAlertQueue([])
           setStatusMessage(error.message || '알림을 불러오지 못했습니다.')
         }
       }
@@ -117,14 +132,14 @@ function App() {
   }, [isPaired, isUwbPolling, mode])
 
   async function handleReplay() {
-    if (!alert) {
+    if (!selectedAlert) {
       return
     }
 
     setIsBusy(true)
     try {
-      const replayed = await replayAlert(alert.alertId)
-      triggerVibration(vibrationPatternForAlert(alert))
+      const replayed = await replayAlert(selectedAlert.alertId)
+      triggerVibration(vibrationPatternForAlert(selectedAlert))
       setStatusMessage(`다시 듣기: ${replayed.voiceGuide}`)
     } catch {
       setStatusMessage('다시 듣기를 실행할 수 없습니다.')
@@ -134,20 +149,24 @@ function App() {
   }
 
   async function handleConfirm() {
-    if (!alert) {
+    if (!selectedAlert) {
       return
     }
 
     setIsBusy(true)
     try {
-      const confirmed = await confirmAlert(alert.alertId)
+      const confirmed = await confirmAlert(selectedAlert.alertId)
       triggerVibration('MEDIUM')
       setAlertStatuses((currentStatuses) => ({
         ...currentStatuses,
-        [alert.alertId]: confirmed.status,
+        [selectedAlert.alertId]: confirmed.status,
       }))
-      setAlert((currentAlert) => ({ ...currentAlert, status: confirmed.status }))
-      setStatusMessage('확인 완료')
+      setAlertQueue((currentQueue) => {
+        const nextQueue = currentQueue.filter((item) => item.alertId !== selectedAlert.alertId)
+        setAlertIndex((currentIndex) => Math.min(currentIndex, Math.max(nextQueue.length - 1, 0)))
+        return nextQueue
+      })
+      setStatusMessage('확인한 알림을 삭제했습니다.')
     } catch {
       setStatusMessage('확인 처리에 실패했습니다.')
     } finally {
@@ -168,6 +187,8 @@ function App() {
       const stopped = await stopUwbSession(currentSessionId)
       triggerVibration(stopped.vibrationPattern)
       setUwbSession(stopped)
+      setMode('deviceSelect')
+      setStatusMessage('탐색을 종료했습니다. 다른 가전을 선택할 수 있습니다.')
     } catch {
       setStatusMessage('탐색 종료에 실패했습니다.')
     } finally {
@@ -181,7 +202,11 @@ function App() {
     try {
       const response = await requestEmergencyHelp('손목 웨어러블에서 긴급 요청')
       triggerVibration('LONG_TWICE')
-      setStatusMessage(response.message || '보호자에게 긴급 요청을 보냈습니다.')
+      setStatusMessage(
+        response.message
+          ? `${response.message} 보호자 앱 수신을 확인했습니다.`
+          : '보호자에게 긴급 요청을 보냈습니다. 보호자 앱 수신을 확인했습니다.',
+      )
     } catch (error) {
       setStatusMessage(formatEmergencyErrorMessage(error))
     } finally {
@@ -227,10 +252,15 @@ function App() {
 
         {isPaired && mode === 'alert' ? (
           <CurrentAlertScreen
-            alert={alert}
+            alert={selectedAlert}
+            alertPage={alertIndex + 1}
+            alertTotal={alertQueue.length}
             actionMessage={statusMessage}
             isBusy={isBusy}
+            syncedTime={syncedTime}
             onConfirm={handleConfirm}
+            onNextAlert={() => setAlertIndex((current) => Math.min(current + 1, alertQueue.length - 1))}
+            onPreviousAlert={() => setAlertIndex((current) => Math.max(current - 1, 0))}
             onReplay={handleReplay}
           />
         ) : null}
@@ -269,6 +299,28 @@ function App() {
           </section>
         ) : null}
 
+        {isPaired && mode === 'deviceSelect' ? (
+          <DeviceSelectScreen
+            actionMessage={statusMessage}
+            onSelect={(deviceName) => {
+              setUwbSession((current) => ({
+                ...(current || {}),
+                sessionId: current?.sessionId || getInitialUwbSessionId(),
+                targetDeviceName: deviceName,
+                distanceM: current?.distanceM || 2.4,
+                confidence: current?.confidence || 0.88,
+                navigationStatus: 'ACTIVE',
+                voiceGuide: `${deviceName} 위치 안내를 시작합니다.`,
+                vibrationPattern: 'MEDIUM',
+              }))
+              setStatusMessage('')
+              setMode('uwb')
+              isUwbPollingRef.current = true
+              setIsUwbPolling(true)
+            }}
+          />
+        ) : null}
+
         {isPaired && mode === 'emergency' ? (
           <WearableEmergencyScreen
             actionMessage={statusMessage}
@@ -282,6 +334,30 @@ function App() {
         ) : null}
       </WearableFrame>
     </main>
+  )
+}
+
+function DeviceSelectScreen({ actionMessage, onSelect }) {
+  const devices = ['세탁기', '냉장고', '공기질 센서']
+
+  return (
+    <section className="state-screen device-select-screen" aria-labelledby="device-select-title">
+      <p className="eyebrow">UWB</p>
+      <h1 id="device-select-title">가전 선택</h1>
+      <p>위치를 찾을 가전을 선택하세요.</p>
+      <div className="device-select-grid">
+        {devices.map((device) => (
+          <button className="secondary-action" type="button" key={device} onClick={() => onSelect(device)}>
+            {device}
+          </button>
+        ))}
+      </div>
+      {actionMessage ? (
+        <p className="live-message" role="status">
+          {actionMessage}
+        </p>
+      ) : null}
+    </section>
   )
 }
 

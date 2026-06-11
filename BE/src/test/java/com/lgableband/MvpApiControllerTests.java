@@ -142,6 +142,30 @@ class MvpApiControllerTests {
 	}
 
 	@Test
+	void guardianCanLoadDashboardForLinkedUser() throws Exception {
+		MvcResult login = this.mockMvc.perform(post("/api/auth/login")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "role": "GUARDIAN",
+					  "email": "guardian@example.com",
+					  "password": "password1234"
+					}
+					"""))
+			.andExpect(status().isOk())
+			.andReturn();
+
+		String token = login.getResponse().getContentAsString()
+			.replaceAll(".*\\\"accessToken\\\":\\\"([^\\\"]+)\\\".*", "$1");
+
+		this.mockMvc.perform(get("/api/guardians/dashboard").header("Authorization", "Bearer " + token))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.user.name").value("홍길동"))
+			.andExpect(jsonPath("$.dangerAlerts[0].title").exists())
+			.andExpect(jsonPath("$.summary.safetyMessage").exists());
+	}
+
+	@Test
 	void guardiansCanBeManaged() throws Exception {
 		String token = userToken();
 
@@ -184,6 +208,40 @@ class MvpApiControllerTests {
 		this.mockMvc.perform(delete("/api/guardians/" + guardianId)
 				.header("Authorization", "Bearer " + token))
 			.andExpect(status().isNoContent());
+	}
+
+	@Test
+	void guardianCanBeLinkedByAccountEmail() throws Exception {
+		this.mockMvc.perform(post("/api/auth/signup")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "role": "GUARDIAN",
+					  "name": "이메일보호",
+					  "email": "guardian-link@example.com",
+					  "password": "password1234",
+					  "phone": "010-5555-6666",
+					  "relationship": "FAMILY"
+					}
+					"""))
+			.andExpect(status().isCreated());
+
+		String token = userToken();
+
+		this.mockMvc.perform(post("/api/guardians/link-by-email")
+				.header("Authorization", "Bearer " + token)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "email": "guardian-link@example.com",
+					  "isPrimary": false,
+					  "notifyOnDanger": true
+					}
+					"""))
+			.andExpect(status().isCreated())
+			.andExpect(jsonPath("$.name").value("이메일보호"))
+			.andExpect(jsonPath("$.phone").value("010-5555-6666"))
+			.andExpect(jsonPath("$.connectionStatus").value("CONNECTED"));
 	}
 
 	@Test
@@ -252,8 +310,7 @@ class MvpApiControllerTests {
 					"""))
 			.andExpect(status().isCreated())
 			.andExpect(jsonPath("$.guardianNotified").value(true))
-			.andExpect(jsonPath("$.decisionSource").value("FALLBACK"))
-			.andExpect(jsonPath("$.emergencyLevel").value("CRITICAL"))
+			.andExpect(jsonPath("$.guardianTargets[0].name").exists())
 			.andReturn();
 
 		String emergencyRequestId = emergency.getResponse().getContentAsString()

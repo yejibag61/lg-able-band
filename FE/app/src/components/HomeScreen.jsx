@@ -33,6 +33,7 @@ const MAX_DEVICE_COUNT = 6
 export function HomeScreen({ session, onLogout }) {
   const [activeTab, setActiveTab] = useState('home')
   const [menuScreen, setMenuScreen] = useState('root')
+  const [linkedGuardians, setLinkedGuardians] = useState([])
   const [emergencyMessage, setEmergencyMessage] = useState('')
   const [emergencySubmitting, setEmergencySubmitting] = useState(false)
   const [homeState, setHomeState] = useState({
@@ -51,6 +52,7 @@ export function HomeScreen({ session, onLogout }) {
 
         if (isMounted) {
           setHomeState({ loading: false, error: '', summary, preview })
+          setLinkedGuardians((current) => (current.length > 0 || !preview.guardian ? current : [preview.guardian]))
         }
       } catch {
         if (isMounted) {
@@ -74,6 +76,10 @@ export function HomeScreen({ session, onLogout }) {
   const currentTitle = useMemo(() => {
     if (activeTab === 'menu' && menuScreen === 'livingSignals') {
       return '생활 신호 설정'
+    }
+
+    if (activeTab === 'menu' && menuScreen === 'guardianConnection') {
+      return '보호자 연결'
     }
 
     return tabTitles[activeTab]
@@ -177,8 +183,9 @@ export function HomeScreen({ session, onLogout }) {
         {activeTab === 'menu' && menuScreen === 'root' ? (
           <MenuTab
             accessibility={preview.accessibility}
-            guardian={preview.guardian}
+            guardians={linkedGuardians}
             livingSignals={preview.livingSignals}
+            onOpenGuardianConnection={() => setMenuScreen('guardianConnection')}
             onOpenLivingSignals={() => setMenuScreen('livingSignals')}
             onLogout={onLogout}
             userName={session.account.name}
@@ -188,6 +195,21 @@ export function HomeScreen({ session, onLogout }) {
           <LivingSignalSettingsScreen
             livingSignals={preview.livingSignals}
             onBack={() => setMenuScreen('root')}
+          />
+        ) : null}
+        {activeTab === 'menu' && menuScreen === 'guardianConnection' ? (
+          <GuardianConnectionScreen
+            guardians={linkedGuardians}
+            onBack={() => setMenuScreen('root')}
+            onSaveGuardian={(guardian) => {
+              setLinkedGuardians((current) => [
+                ...current.filter((item) => item.guardianId !== guardian.guardianId),
+                guardian,
+              ])
+            }}
+            onRemoveGuardian={(guardianId) => {
+              setLinkedGuardians((current) => current.filter((item) => item.guardianId !== guardianId))
+            }}
           />
         ) : null}
       </div>
@@ -213,12 +235,30 @@ export function HomeScreen({ session, onLogout }) {
 
 function MenuTab({
   accessibility,
-  guardian,
+  guardians,
   livingSignals,
+  onOpenGuardianConnection,
   onOpenLivingSignals,
   onLogout,
   userName,
 }) {
+  const [guardianInviteMessage, setGuardianInviteMessage] = useState('')
+  const guardianMembers = [
+    {
+      id: 'me',
+      label: '나',
+      name: userName,
+      tone: 'self',
+    },
+    ...guardians.map((member) => ({
+      id: `guardian-${member.guardianId || member.name}`,
+      label: member.relation || '가족',
+      name: member.name,
+      tone: 'guardian',
+      status: member.status || member.connectionStatus || '연결됨',
+    })),
+  ]
+
   return (
     <section className="tab-stack" aria-labelledby="menu-title">
       <div className="content-card hero-card">
@@ -240,12 +280,60 @@ function MenuTab({
         </div>
       </section>
 
-      <section className="soft-card guardian-card">
-        <p className="card-label">보호자 연결</p>
-        <h2>{guardian.name} 연결됨</h2>
-        <p>
-          {guardian.relation} · {guardian.status}
-        </p>
+      <section className="soft-card home-member-card" aria-labelledby="home-member-title">
+        <div className="home-member-header">
+          <div>
+            <p className="card-label">보호자 연결</p>
+            <h2 id="home-member-title">홈 멤버</h2>
+            <p>{guardianMembers.length}명</p>
+          </div>
+          <button
+            className="member-more-button"
+            type="button"
+            aria-label="홈 멤버 관리"
+            onClick={onOpenGuardianConnection}
+          >
+            ›
+          </button>
+        </div>
+
+        <div className="home-member-list" aria-label="홈 멤버 목록">
+          <button
+            className="home-member-item invite"
+            type="button"
+            onClick={onOpenGuardianConnection}
+          >
+            <span className="member-avatar invite-avatar" aria-hidden="true">
+              +
+            </span>
+            <span>멤버 초대</span>
+          </button>
+
+          {guardianMembers.map((member) => (
+            <button
+              className="home-member-item"
+              type="button"
+              key={member.id}
+              onClick={() =>
+                setGuardianInviteMessage(
+                  member.status ? `${member.name} · ${member.status}` : `${member.name} 계정입니다.`,
+                )
+              }
+            >
+              <span className={`member-avatar avatar-${member.tone}`} aria-hidden="true">
+                {member.name.slice(0, 1)}
+                {member.id === 'me' ? <small>집</small> : null}
+              </span>
+              <span>{member.label}</span>
+            </button>
+          ))}
+        </div>
+
+        {guardianInviteMessage ? (
+          <p className="member-status-message" role="status">
+            {guardianInviteMessage}
+          </p>
+        ) : null}
       </section>
 
       <button className="soft-card settings-link-card" type="button" onClick={onOpenLivingSignals}>
@@ -260,6 +348,150 @@ function MenuTab({
       <button className="secondary-button full-button" type="button" onClick={onLogout}>
         로그인으로 돌아가기
       </button>
+    </section>
+  )
+}
+
+function GuardianConnectionScreen({ guardians, onBack, onSaveGuardian, onRemoveGuardian }) {
+  const [form, setForm] = useState({
+    name: '김보호',
+    phone: '010-0000-0000',
+    isPrimary: guardians.length === 0,
+    notifyOnDanger: true,
+  })
+  const [message, setMessage] = useState('')
+
+  function handleChange(field, value) {
+    setForm((current) => ({
+      ...current,
+      [field]: value,
+    }))
+    setMessage('')
+  }
+
+  function handleSubmit(event) {
+    event.preventDefault()
+
+    if (!form.name.trim() || !form.phone.trim()) {
+      setMessage('이름과 연락처를 입력해주세요.')
+      return
+    }
+
+    const guardian = {
+      guardianId: Date.now(),
+      name: form.name.trim(),
+      phone: form.phone.trim(),
+      relation: '가족',
+      isPrimary: form.isPrimary,
+      notifyOnDanger: form.notifyOnDanger,
+      status: '연결됨',
+      connectionStatus: 'CONNECTED',
+    }
+
+    onSaveGuardian(guardian)
+    setMessage('보호자 연결을 저장했습니다.')
+  }
+
+  return (
+    <section className="tab-stack guardian-connection-screen" aria-labelledby="guardian-connection-title">
+      <button className="text-link-button" type="button" onClick={onBack}>
+        메뉴로 돌아가기
+      </button>
+
+      <form className="content-card guardian-form-card" onSubmit={handleSubmit}>
+        <p className="card-label">보호자 연결</p>
+        <h2 id="guardian-connection-title">긴급 알림을 받을 보호자를 등록해요.</h2>
+
+        <label className="field">
+          <span>이름</span>
+          <input
+            type="text"
+            value={form.name}
+            onChange={(event) => handleChange('name', event.target.value)}
+            placeholder="김보호"
+          />
+        </label>
+
+        <label className="field">
+          <span>연락처</span>
+          <input
+            type="tel"
+            value={form.phone}
+            onChange={(event) => handleChange('phone', event.target.value)}
+            placeholder="010-0000-0000"
+          />
+        </label>
+
+        <div className="guardian-option-grid">
+          <label className="guardian-option-card">
+            <input
+              type="checkbox"
+              checked={form.isPrimary}
+              onChange={(event) => handleChange('isPrimary', event.target.checked)}
+            />
+            <span>
+              <strong>대표 보호자</strong>
+              우선 연락
+            </span>
+          </label>
+          <label className="guardian-option-card">
+            <input
+              type="checkbox"
+              checked={form.notifyOnDanger}
+              onChange={(event) => handleChange('notifyOnDanger', event.target.checked)}
+            />
+            <span>
+              <strong>위험 알림</strong>
+              자동 전달
+            </span>
+          </label>
+        </div>
+
+        {message ? (
+          <p className="member-status-message" role="status">
+            {message}
+          </p>
+        ) : null}
+
+        <button className="primary-button full-button" type="submit">
+          보호자 등록
+        </button>
+      </form>
+
+      <section className="content-card connected-guardian-card" aria-labelledby="connected-guardian-title">
+        <div className="section-title-row">
+          <h2 id="connected-guardian-title">연결된 보호자</h2>
+          <span>{guardians.length}명</span>
+        </div>
+
+        {guardians.length > 0 ? (
+          <div className="connected-guardian-list">
+            {guardians.map((guardian) => (
+              <article className="connected-guardian-item" key={guardian.guardianId || guardian.name}>
+                <p>{guardian.isPrimary ? '대표 보호자' : guardian.relation || '보호자'}</p>
+                <strong>{guardian.name}</strong>
+                <span>{guardian.phone || '연락처 미등록'}</span>
+                <div>
+                  <span className="guardian-chip">연결됨</span>
+                  {guardian.notifyOnDanger ? <span className="guardian-chip">긴급 알림 ON</span> : null}
+                </div>
+                <button
+                  className="secondary-button full-button"
+                  type="button"
+                  onClick={() => {
+                    onRemoveGuardian(guardian.guardianId)
+                    setMessage(`${guardian.name} 보호자 연결을 해제했습니다.`)
+                  }}
+                >
+                  연결 해제
+                </button>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <p className="empty-state">아직 연결된 보호자가 없습니다.</p>
+        )}
+      </section>
     </section>
   )
 }

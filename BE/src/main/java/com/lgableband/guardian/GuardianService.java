@@ -3,10 +3,14 @@ package com.lgableband.guardian;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.lgableband.auth.MvpDataService;
 import com.lgableband.common.ApiException;
+import com.lgableband.common.AccountRole;
 import com.lgableband.common.ConnectionStatus;
 import com.lgableband.mock.MockDataStore;
 import java.sql.PreparedStatement;
 import java.sql.Statement;
+import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.http.HttpStatus;
@@ -17,6 +21,7 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class GuardianService {
+	private static final ZoneOffset SERVICE_OFFSET = ZoneOffset.ofHours(9);
 
 	private final ObjectProvider<JdbcTemplate> jdbcTemplateProvider;
 	private final MvpDataService dataService;
@@ -88,6 +93,88 @@ public class GuardianService {
 			request.notifyOnDanger()
 		);
 		return guardian(jdbcTemplate, user.userId(), guardianId);
+	}
+
+	public GuardianDashboardResponse dashboard(String authorization) {
+		MvpDataService.CurrentGuardian guardian = this.dataService.currentGuardian(authorization);
+		JdbcTemplate jdbcTemplate = jdbcTemplate();
+		if (jdbcTemplate == null) {
+			long linkedUserId = guardian.linkedUserId() == null ? 1 : guardian.linkedUserId();
+			MockDataStore.UserProfile user = this.mockDataStore.user(linkedUserId);
+			MockDataStore.Account account = this.mockDataStore.accountById(user.accountId());
+			List<GuardianAlertSummary> alerts = this.mockDataStore.alerts(linkedUserId, null, null, 20).stream()
+				.filter(this::isGuardianImportantAlert)
+				.map(alert -> new GuardianAlertSummary(
+					alert.alertId(),
+					alert.type().name(),
+					alert.severity().name(),
+					alert.title(),
+					alert.message(),
+					alert.deviceName(),
+					alert.occurredAt(),
+					alert.status().name()
+				))
+				.toList();
+			List<GuardianEmergencySummary> emergencies = this.mockDataStore.emergencies(linkedUserId).stream()
+				.map(request -> new GuardianEmergencySummary(
+					request.emergencyRequestId(),
+					request.status(),
+					request.message(),
+					request.source(),
+					request.sentAt(),
+					request.guardianNotified()
+				))
+				.toList();
+
+			return new GuardianDashboardResponse(
+				new GuardianUserSummary(linkedUserId, account.name(), user.accessibilityType().name()),
+				alerts,
+				emergencies,
+				createDashboardSummary(alerts, emergencies)
+			);
+		}
+
+		long linkedUserId = linkedUserId(jdbcTemplate, guardian.guardianId());
+		GuardianUserSummary user = guardianUser(jdbcTemplate, linkedUserId);
+		List<GuardianAlertSummary> alerts = guardianAlerts(jdbcTemplate, linkedUserId);
+		List<GuardianEmergencySummary> emergencies = guardianEmergencies(jdbcTemplate, linkedUserId);
+		return new GuardianDashboardResponse(user, alerts, emergencies, createDashboardSummary(alerts, emergencies));
+	}
+
+	public GuardianSummary linkGuardianByEmail(String authorization, GuardianController.GuardianEmailLinkRequest request) {
+		MvpDataService.CurrentUser user = this.dataService.currentUser(authorization);
+		JdbcTemplate jdbcTemplate = jdbcTemplate();
+		if (jdbcTemplate == null) {
+			return toSummary(this.mockDataStore.linkGuardianByEmail(
+				user.userId(),
+				request.email().trim(),
+				request.isPrimary(),
+				request.notifyOnDanger()
+			));
+		}
+
+		DbGuardianAccount guardianAccount = findGuardianAccountByEmail(jdbcTemplate, request.email().trim());
+		Long duplicatedCount = jdbcTemplate.queryForObject(
+			"SELECT COUNT(*) FROM user_guardian WHERE user_id = ? AND guardian_id = ?",
+			Long.class,
+			user.userId(),
+			guardianAccount.guardianId()
+		);
+		if (duplicatedCount != null && duplicatedCount > 0) {
+			throw new ApiException(HttpStatus.CONFLICT, "DUPLICATED_GUARDIAN", "이미 연결된 보호자입니다.");
+		}
+		if (request.isPrimary()) {
+			clearPrimaryGuardian(jdbcTemplate, user.userId());
+		}
+
+		jdbcTemplate.update(
+			"INSERT INTO user_guardian (user_id, guardian_id, is_primary, notify_on_danger) VALUES (?, ?, ?, ?)",
+			user.userId(),
+			guardianAccount.guardianId(),
+			request.isPrimary(),
+			request.notifyOnDanger()
+		);
+		return guardian(jdbcTemplate, user.userId(), guardianAccount.guardianId());
 	}
 
 	public GuardianSummary updateGuardian(String authorization, long guardianId, GuardianController.GuardianRequest request) {
@@ -165,6 +252,119 @@ public class GuardianService {
 		return keyHolder.getKey().longValue();
 	}
 
+	private DbGuardianAccount findGuardianAccountByEmail(JdbcTemplate jdbcTemplate, String email) {
+		return jdbcTemplate.query(
+			"""
+			SELECT g.guardian_id, g.name, g.phone
+			FROM account a
+			JOIN guardian g ON g.account_id = a.account_id
+			WHERE a.role = ? AND LOWER(a.email) = LOWER(?)
+			""",
+			(rs, rowNum) -> new DbGuardianAccount(
+				rs.getLong("guardian_id"),
+				rs.getString("name"),
+				rs.getString("phone")
+			),
+			AccountRole.GUARDIAN.name(),
+			email
+		).stream().findFirst()
+			.orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND", "해당 이메일의 보호자 계정을 찾을 수 없습니다."));
+	}
+
+	private boolean isGuardianImportantAlert(MockDataStore.Alert alert) {
+		return "DANGER".equals(alert.type().name())
+			|| "EMERGENCY".equals(alert.type().name())
+			|| "HIGH".equals(alert.severity().name())
+			|| "CRITICAL".equals(alert.severity().name());
+	}
+
+	private long linkedUserId(JdbcTemplate jdbcTemplate, long guardianId) {
+		return jdbcTemplate.query(
+			"SELECT user_id FROM user_guardian WHERE guardian_id = ? ORDER BY map_id ASC LIMIT 1",
+			(rs, rowNum) -> rs.getLong("user_id"),
+			guardianId
+		).stream().findFirst()
+			.orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND", "연결된 사용자를 찾을 수 없습니다."));
+	}
+
+	private GuardianUserSummary guardianUser(JdbcTemplate jdbcTemplate, long userId) {
+		return jdbcTemplate.query(
+			"SELECT user_id, name, accessibility_type FROM app_user WHERE user_id = ?",
+			(rs, rowNum) -> new GuardianUserSummary(
+				rs.getLong("user_id"),
+				rs.getString("name"),
+				rs.getString("accessibility_type")
+			),
+			userId
+		).stream().findFirst()
+			.orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND", "사용자를 찾을 수 없습니다."));
+	}
+
+	private List<GuardianAlertSummary> guardianAlerts(JdbcTemplate jdbcTemplate, long userId) {
+		return jdbcTemplate.query(
+			"""
+			SELECT a.alert_id, a.alert_type, a.severity, a.title, a.message, a.occurred_at, a.status,
+			       COALESCE(d.name, '') AS device_name
+			FROM alert a
+			LEFT JOIN device_event de ON de.event_id = a.event_id
+			LEFT JOIN device d ON d.device_id = de.device_id
+			WHERE a.user_id = ?
+			  AND (a.alert_type IN ('DANGER', 'EMERGENCY') OR a.severity IN ('HIGH', 'CRITICAL'))
+			ORDER BY a.occurred_at DESC, a.alert_id DESC
+			LIMIT 20
+			""",
+			(rs, rowNum) -> new GuardianAlertSummary(
+				rs.getLong("alert_id"),
+				rs.getString("alert_type"),
+				rs.getString("severity"),
+				rs.getString("title"),
+				rs.getString("message"),
+				rs.getString("device_name"),
+				toOffsetDateTime(rs.getObject("occurred_at", LocalDateTime.class)),
+				rs.getString("status")
+			),
+			userId
+		);
+	}
+
+	private List<GuardianEmergencySummary> guardianEmergencies(JdbcTemplate jdbcTemplate, long userId) {
+		return jdbcTemplate.query(
+			"""
+			SELECT emergency_id, status, message, source, requested_at
+			FROM emergency_request
+			WHERE user_id = ?
+			ORDER BY requested_at DESC, emergency_id DESC
+			LIMIT 10
+			""",
+			(rs, rowNum) -> new GuardianEmergencySummary(
+				rs.getLong("emergency_id"),
+				rs.getString("status"),
+				rs.getString("message"),
+				rs.getString("source"),
+				toOffsetDateTime(rs.getObject("requested_at", LocalDateTime.class)),
+				true
+			),
+			userId
+		);
+	}
+
+	private GuardianDashboardSummary createDashboardSummary(
+		List<GuardianAlertSummary> alerts,
+		List<GuardianEmergencySummary> emergencies
+	) {
+		long unreadAlerts = alerts.stream().filter(alert -> "UNREAD".equals(alert.status())).count();
+		boolean activeEmergency = emergencies.stream()
+			.anyMatch(request -> !"RESOLVED".equals(request.status()) && !"CANCELED".equals(request.status()));
+		String safetyMessage = activeEmergency
+			? "긴급 도움 요청이 진행 중입니다."
+			: unreadAlerts > 0 ? "확인하지 않은 위험 알림이 있습니다." : "현재 확인 필요한 위험 알림은 없습니다.";
+		return new GuardianDashboardSummary(unreadAlerts, emergencies.size(), activeEmergency, safetyMessage);
+	}
+
+	private OffsetDateTime toOffsetDateTime(LocalDateTime dateTime) {
+		return dateTime == null ? null : dateTime.atOffset(SERVICE_OFFSET);
+	}
+
 	private GuardianSummary guardian(JdbcTemplate jdbcTemplate, long userId, long guardianId) {
 		return jdbcTemplate.query(
 			"""
@@ -221,6 +421,47 @@ public class GuardianService {
 	public record GuardianListResponse(List<GuardianSummary> items) {
 	}
 
+	public record GuardianDashboardResponse(
+		GuardianUserSummary user,
+		List<GuardianAlertSummary> dangerAlerts,
+		List<GuardianEmergencySummary> emergencyRequests,
+		GuardianDashboardSummary summary
+	) {
+	}
+
+	public record GuardianUserSummary(long userId, String name, String accessibilityType) {
+	}
+
+	public record GuardianAlertSummary(
+		long alertId,
+		String type,
+		String severity,
+		String title,
+		String message,
+		String deviceName,
+		OffsetDateTime occurredAt,
+		String status
+	) {
+	}
+
+	public record GuardianEmergencySummary(
+		long emergencyRequestId,
+		String status,
+		String message,
+		String source,
+		OffsetDateTime sentAt,
+		boolean guardianNotified
+	) {
+	}
+
+	public record GuardianDashboardSummary(
+		long unreadDangerAlertCount,
+		long emergencyRequestCount,
+		boolean activeEmergency,
+		String safetyMessage
+	) {
+	}
+
 	public record GuardianSummary(
 		long guardianId,
 		String name,
@@ -229,5 +470,8 @@ public class GuardianService {
 		boolean notifyOnDanger,
 		ConnectionStatus connectionStatus
 	) {
+	}
+
+	private record DbGuardianAccount(long guardianId, String name, String phone) {
 	}
 }

@@ -402,59 +402,6 @@ export function DevicesTab({ devices = [], maxDeviceCount, uwb }) {
         </section>
       )}
 
-      <section className="device-register-card" aria-labelledby="device-register-title">
-        <div className="section-title-row">
-          <div>
-            <p className="card-label">연동 가전</p>
-            <h2 id="device-register-title">가전 추가</h2>
-          </div>
-          <span>{availableDeviceCount}종</span>
-        </div>
-        <button
-          className={isDevicePickerOpen ? 'device-add-button active' : 'device-add-button'}
-          type="button"
-          aria-expanded={isDevicePickerOpen}
-          aria-controls="device-catalog-grid"
-          onClick={handleToggleDevicePicker}
-        >
-          {isDevicePickerOpen ? '추가 가능한 가전 닫기' : '가전 추가하기'}
-        </button>
-
-        {isDevicePickerOpen ? (
-          <section
-            id="device-catalog-grid"
-            className="device-product-grid device-catalog-grid"
-            aria-label="추가 가능한 가전 목록"
-          >
-            {deviceCatalog.map((device) => {
-              const isRegistered = registeredDeviceTypes.has(device.type)
-
-              return (
-                <button
-                  className={
-                    isRegistered ? 'device-product-card already-connected' : 'device-product-card'
-                  }
-                  key={device.templateId}
-                  type="button"
-                  aria-label={
-                    isRegistered ? `${device.name} 이미 연결됨` : `${device.name} 추가하기`
-                  }
-                  disabled={isRegistered}
-                  onClick={() => openCreatePage(device)}
-                >
-                  <DeviceIcon type={device.type} />
-                  <span className="device-catalog-chip">
-                    {isRegistered ? '이미 연결됨' : '추가 가능'}
-                  </span>
-                  <strong>{device.name}</strong>
-                  <small>{device.typeLabel}</small>
-                </button>
-              )
-            })}
-          </section>
-        ) : null}
-      </section>
-
       <section className="content-card device-connected-card" aria-labelledby="connected-devices-title">
         <div className="section-title-row">
           <div>
@@ -553,6 +500,59 @@ export function DevicesTab({ devices = [], maxDeviceCount, uwb }) {
           {connectionMessage}
         </p>
       ) : null}
+
+      <section className="device-register-card" aria-labelledby="device-register-title">
+        <div className="section-title-row">
+          <div>
+            <p className="card-label">연동 가전</p>
+            <h2 id="device-register-title">가전 추가</h2>
+          </div>
+          <span>{availableDeviceCount}종</span>
+        </div>
+        <button
+          className={isDevicePickerOpen ? 'device-add-button active' : 'device-add-button'}
+          type="button"
+          aria-expanded={isDevicePickerOpen}
+          aria-controls="device-catalog-grid"
+          onClick={handleToggleDevicePicker}
+        >
+          {isDevicePickerOpen ? '추가 가능한 가전 닫기' : '가전 추가하기'}
+        </button>
+
+        {isDevicePickerOpen ? (
+          <section
+            id="device-catalog-grid"
+            className="device-product-grid device-catalog-grid"
+            aria-label="추가 가능한 가전 목록"
+          >
+            {deviceCatalog.map((device) => {
+              const isRegistered = registeredDeviceTypes.has(device.type)
+
+              return (
+                <button
+                  className={
+                    isRegistered ? 'device-product-card already-connected' : 'device-product-card'
+                  }
+                  key={device.templateId}
+                  type="button"
+                  aria-label={
+                    isRegistered ? `${device.name} 이미 연결됨` : `${device.name} 추가하기`
+                  }
+                  disabled={isRegistered}
+                  onClick={() => openCreatePage(device)}
+                >
+                  <DeviceIcon type={device.type} />
+                  <span className="device-catalog-chip">
+                    {isRegistered ? '이미 연결됨' : '추가 가능'}
+                  </span>
+                  <strong>{device.name}</strong>
+                  <small>{device.typeLabel}</small>
+                </button>
+              )
+            })}
+          </section>
+        ) : null}
+      </section>
     </section>
   )
 }

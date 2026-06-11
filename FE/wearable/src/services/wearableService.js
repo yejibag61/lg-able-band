@@ -28,14 +28,18 @@ export function createWearableService({
 
   return {
     async getCurrentAlert() {
+      const alerts = await this.getCurrentAlerts()
+      return selectPriorityAlert(alerts)
+    },
+    async getCurrentAlerts() {
       return withFallback({
         apiEnabled,
         fallbackEnabled,
-        fallback: getMockCurrentAlert,
+        fallback: getMockCurrentAlerts,
         request: async () => {
           const response = await request('/api/alerts?status=UNREAD&limit=20', { method: 'GET' })
           const alerts = normalizeListResponse(response).map(normalizeAlert)
-          return selectPriorityAlert(alerts)
+          return sortAlerts(alerts)
         },
       })
     },
@@ -124,6 +128,10 @@ export async function getCurrentAlert() {
   return defaultService.getCurrentAlert()
 }
 
+export async function getCurrentAlerts() {
+  return defaultService.getCurrentAlerts()
+}
+
 export async function confirmAlert(alertId) {
   return defaultService.confirmAlert(alertId)
 }
@@ -195,9 +203,20 @@ function normalizeListResponse(response) {
   return response?.items || []
 }
 
-function getMockCurrentAlert() {
-  const selectedAlert = selectPriorityAlert(mockAlerts)
-  return selectedAlert ? clone(selectedAlert) : null
+function getMockCurrentAlerts() {
+  return sortAlerts(mockAlerts.map(clone))
+}
+
+function sortAlerts(alerts) {
+  const priorityAlert = selectPriorityAlert(alerts)
+  if (!priorityAlert) {
+    return []
+  }
+
+  return [
+    priorityAlert,
+    ...alerts.filter((alert) => alert.alertId !== priorityAlert.alertId),
+  ]
 }
 
 function confirmMockAlert(alertId) {

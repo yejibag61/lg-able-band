@@ -1,6 +1,7 @@
 package com.lgableband.guardian;
 
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -29,12 +30,26 @@ public class GuardianController {
 		return this.guardianService.guardians(authorization);
 	}
 
+	@GetMapping("/dashboard")
+	public GuardianService.GuardianDashboardResponse dashboard(@RequestHeader("Authorization") String authorization) {
+		return this.guardianService.dashboard(authorization);
+	}
+
 	@PostMapping
 	public ResponseEntity<GuardianService.GuardianSummary> addGuardian(
 		@RequestHeader("Authorization") String authorization,
 		@Valid @RequestBody GuardianRequest request
 	) {
 		GuardianService.GuardianSummary guardian = this.guardianService.addGuardian(authorization, request);
+		return ResponseEntity.status(HttpStatus.CREATED).body(guardian);
+	}
+
+	@PostMapping("/link-by-email")
+	public ResponseEntity<GuardianService.GuardianSummary> linkGuardianByEmail(
+		@RequestHeader("Authorization") String authorization,
+		@Valid @RequestBody GuardianEmailLinkRequest request
+	) {
+		GuardianService.GuardianSummary guardian = this.guardianService.linkGuardianByEmail(authorization, request);
 		return ResponseEntity.status(HttpStatus.CREATED).body(guardian);
 	}
 
@@ -59,6 +74,13 @@ public class GuardianController {
 	public record GuardianRequest(
 		@NotBlank String name,
 		@NotBlank String phone,
+		boolean isPrimary,
+		boolean notifyOnDanger
+	) {
+	}
+
+	public record GuardianEmailLinkRequest(
+		@NotBlank @Email String email,
 		boolean isPrimary,
 		boolean notifyOnDanger
 	) {

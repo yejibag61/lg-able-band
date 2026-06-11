@@ -12,8 +12,9 @@ export function WearableEmergencyScreen({
       <p className="eyebrow">Able Band</p>
       <h1 id="emergency-title">긴급 요청</h1>
       <p className="emergency-copy">보호자에게 지금 도움이 필요하다는 알림을 보냅니다.</p>
+      <p className="guardian-sync-note">보내기 후 보호자 앱 수신 상태를 연동 확인합니다.</p>
 
-      <div className="action-row">
+      <div className="action-row emergency-action-row">
         <button className="secondary-action" type="button" disabled={isBusy} onClick={onCancel}>
           취소
         </button>

@@ -155,6 +155,14 @@ public class MockDataStore {
 		return findUserByAccountId(account.accountId());
 	}
 
+	public GuardianProfile requireGuardianProfile(String authorization) {
+		Account account = requireAccount(authorization);
+		if (account.role() != AccountRole.GUARDIAN) {
+			throw new ApiException(HttpStatus.FORBIDDEN, "FORBIDDEN", "GUARDIAN 계정만 사용할 수 있습니다.");
+		}
+		return findGuardianProfileByAccountId(account.accountId());
+	}
+
 	public Account accountById(long accountId) {
 		Account account = this.accounts.get(accountId);
 		if (account == null) {
@@ -186,6 +194,14 @@ public class MockDataStore {
 
 	public List<Device> devices(long userId) {
 		return this.devicesByUserId.getOrDefault(userId, List.of());
+	}
+
+	public UserProfile user(long userId) {
+		UserProfile user = this.users.get(userId);
+		if (user == null) {
+			throw new ApiException(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND", "사용자 프로필을 찾을 수 없습니다.");
+		}
+		return user;
 	}
 
 	public Device addDevice(long userId, String name, DeviceType type, boolean locationSupported) {
@@ -248,6 +264,28 @@ public class MockDataStore {
 			guardians.replaceAll(this::removePrimary);
 		}
 		Guardian guardian = new Guardian(this.guardianSequence.incrementAndGet(), name, phone, primary, notifyOnDanger, ConnectionStatus.CONNECTED);
+		guardians.add(guardian);
+		return guardian;
+	}
+
+	public Guardian linkGuardianByEmail(long userId, String email, boolean primary, boolean notifyOnDanger) {
+		Account account = this.accounts.values().stream()
+			.filter(candidate -> candidate.role() == AccountRole.GUARDIAN)
+			.filter(candidate -> candidate.email().equalsIgnoreCase(email))
+			.findFirst()
+			.orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND", "해당 이메일의 보호자 계정을 찾을 수 없습니다."));
+
+		GuardianProfile profile = findGuardianProfileByAccountId(account.accountId());
+		List<Guardian> guardians = this.guardiansByUserId.computeIfAbsent(userId, ignored -> new ArrayList<>());
+		boolean duplicated = guardians.stream().anyMatch(guardian -> guardian.guardianId() == profile.guardianId());
+		if (duplicated) {
+			throw new ApiException(HttpStatus.CONFLICT, "DUPLICATED_GUARDIAN", "이미 연결된 보호자입니다.");
+		}
+		if (primary) {
+			guardians.replaceAll(this::removePrimary);
+		}
+
+		Guardian guardian = new Guardian(profile.guardianId(), account.name(), profile.phone(), primary, notifyOnDanger, ConnectionStatus.CONNECTED);
 		guardians.add(guardian);
 		return guardian;
 	}
