@@ -107,6 +107,28 @@ describe('App login to home flow', () => {
     })
   })
 
+  it('applies accessibility defaults when the signup disability type changes', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.click(screen.getByRole('button', { name: '회원가입' }))
+
+    expect(screen.getByRole('checkbox', { name: '음성 안내' }).checked).toBe(true)
+    expect(screen.getByRole('checkbox', { name: '진동 안내' }).checked).toBe(true)
+    expect(screen.getByRole('checkbox', { name: '고대비' }).checked).toBe(true)
+    expect(screen.getByRole('checkbox', { name: '큰 글씨' }).checked).toBe(true)
+
+    await user.click(screen.getByRole('radio', { name: '청각장애인' }))
+
+    expect(screen.getByRole('checkbox', { name: '음성 안내' }).checked).toBe(false)
+    expect(screen.getByRole('checkbox', { name: '진동 안내' }).checked).toBe(true)
+    expect(screen.getByRole('checkbox', { name: '고대비' }).checked).toBe(true)
+    expect(screen.getByRole('checkbox', { name: '큰 글씨' }).checked).toBe(true)
+
+    await user.click(screen.getByRole('checkbox', { name: '진동 안내' }))
+    expect(screen.getByRole('checkbox', { name: '진동 안내' }).checked).toBe(false)
+  })
+
   it('lets a newly signed up USER log in with the API account', async () => {
     const user = userEvent.setup()
     render(<App />)
@@ -302,6 +324,39 @@ describe('App login to home flow', () => {
     expect(screen.getByText('주변 소리 감지')).toBeTruthy()
   })
 
+  it('lets a USER update accessibility settings and applies global classes', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.type(screen.getByLabelText('이메일'), 'user@example.com')
+    await user.type(screen.getByLabelText('비밀번호'), 'password1234')
+    await user.click(screen.getByRole('button', { name: '로그인' }))
+    await screen.findByRole('heading', { name: /소희 홈/i })
+
+    const appScreen = document.querySelector('.app-screen')
+    expect(appScreen.classList.contains('high-contrast')).toBe(true)
+    expect(appScreen.classList.contains('large-text')).toBe(true)
+
+    await user.click(screen.getByRole('button', { name: '메뉴' }))
+    expect(screen.getByText('필요한 기능을 누르면 바로 적용됩니다.')).toBeTruthy()
+    await user.click(screen.getByRole('button', { name: '고대비 끄기' }))
+
+    await waitFor(() => {
+      expect(appScreen.classList.contains('high-contrast')).toBe(false)
+      expect(screen.getByRole('status').textContent).toContain('접근성 설정을 저장했습니다.')
+    })
+    expect(screen.getByRole('button', { name: '고대비 켜기' })).toBeTruthy()
+
+    const updateCall = globalThis.fetch.mock.calls.find(
+      ([url, init]) => url.endsWith('/api/users/me/accessibility') && init.method === 'PUT',
+    )
+    expect(JSON.parse(updateCall[1].body).notificationPrefs.highContrast).toBe(false)
+    expect(
+      JSON.parse(window.localStorage.getItem('lg-able-band.accessibilitySettings.user@example.com'))
+        .highContrast,
+    ).toBe(false)
+  })
+
   it('routes GUARDIAN login to guardian placeholder', async () => {
     const user = userEvent.setup()
     render(<App />)
@@ -468,6 +523,30 @@ function installMockBackend() {
       }
 
       return jsonResponse(mockHomeSummary)
+    }
+
+    if (url === `${API_BASE_URL}/api/users/me` && method === 'GET') {
+      return jsonResponse({
+        role: 'USER',
+        userId: 1,
+        name: '소희',
+        email: 'user@example.com',
+        accessibilityType: 'VISUAL',
+        notificationPrefs: {
+          channels: ['VOICE', 'VIBRATION'],
+          highContrast: true,
+          largeText: true,
+        },
+        guardianLinked: true,
+      })
+    }
+
+    if (url === `${API_BASE_URL}/api/users/me/accessibility` && method === 'PUT') {
+      return jsonResponse({
+        accessibilityType: body.accessibilityType,
+        notificationPrefs: body.notificationPrefs,
+        updatedAt: '2026-06-11T12:00:00+09:00',
+      })
     }
 
     if (url === `${API_BASE_URL}/api/alerts?limit=20` && method === 'GET') {

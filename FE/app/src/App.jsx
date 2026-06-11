@@ -5,6 +5,10 @@ import { HomeScreen } from './components/HomeScreen'
 import { LoginScreen } from './components/LoginScreen'
 import { SignupScreen } from './components/SignupScreen'
 import { login, logout, signup } from './services/authService'
+import {
+  getDefaultAccessibilitySettings,
+  storeAccessibilitySettings,
+} from './utils/accessibilitySettings'
 
 function createInitialSignupForm() {
   return {
@@ -14,10 +18,7 @@ function createInitialSignupForm() {
     password: '',
     passwordConfirm: '',
     accessibilityType: 'VISUAL',
-    voiceGuide: true,
-    vibrationGuide: true,
-    highContrast: true,
-    largeText: true,
+    ...getDefaultAccessibilitySettings('VISUAL'),
     phone: '',
     relationship: '',
   }
@@ -83,6 +84,9 @@ function App() {
 
     try {
       const account = await signup(signupForm)
+      if (account.role === 'USER') {
+        storeAccessibilitySettings(account.email, signupForm, account.accessibilityType)
+      }
       setLoginForm({
         role: account.role,
         email: account.email,
@@ -108,6 +112,7 @@ function App() {
     setSignupForm((current) => ({
       ...current,
       [field]: value,
+      ...(field === 'accessibilityType' ? getDefaultAccessibilitySettings(value) : {}),
     }))
     setSignupState((current) => ({ ...current, errors: [] }))
   }
