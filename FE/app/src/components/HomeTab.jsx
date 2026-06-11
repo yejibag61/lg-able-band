@@ -48,7 +48,8 @@ export function HomeTab({
         <div>
           <p className="card-label">긴급 도움 요청</p>
           <h2>{guardianName}에게 바로 알림</h2>
-          <p>버튼을 누르면 보호자에게 현재 상황을 알립니다.</p>
+          <p>버튼을 누르면 SOS AI가 상황을 판단하고 보호자에게 현재 상황을 알립니다.</p>
+          <span className="home-metric-pill danger">SOS AI 연결</span>
         </div>
         <button
           className="sos-button"
