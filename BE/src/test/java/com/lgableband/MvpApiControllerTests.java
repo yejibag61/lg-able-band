@@ -2,9 +2,11 @@ package com.lgableband;
 
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.blankOrNullString;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -136,6 +138,51 @@ class MvpApiControllerTests {
 			.andExpect(jsonPath("$.accessToken", not(blankOrNullString())))
 			.andExpect(jsonPath("$.role").value("GUARDIAN"))
 			.andExpect(jsonPath("$.guardianProfile.relationship").value("FAMILY"));
+	}
+
+	@Test
+	void guardiansCanBeManaged() throws Exception {
+		String token = userToken();
+
+		MvcResult created = this.mockMvc.perform(post("/api/guardians")
+				.header("Authorization", "Bearer " + token)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "name": "박보호",
+					  "phone": "010-2222-3333",
+					  "isPrimary": false,
+					  "notifyOnDanger": true
+					}
+					"""))
+			.andExpect(status().isCreated())
+			.andExpect(jsonPath("$.name").value("박보호"))
+			.andExpect(jsonPath("$.isPrimary").value(false))
+			.andExpect(jsonPath("$.notifyOnDanger").value(true))
+			.andReturn();
+
+		String guardianId = created.getResponse().getContentAsString()
+			.replaceAll(".*\\\"guardianId\\\":([0-9]+).*", "$1");
+
+		this.mockMvc.perform(put("/api/guardians/" + guardianId)
+				.header("Authorization", "Bearer " + token)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "name": "박주보호",
+					  "phone": "010-3333-4444",
+					  "isPrimary": true,
+					  "notifyOnDanger": false
+					}
+					"""))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.name").value("박주보호"))
+			.andExpect(jsonPath("$.isPrimary").value(true))
+			.andExpect(jsonPath("$.notifyOnDanger").value(false));
+
+		this.mockMvc.perform(delete("/api/guardians/" + guardianId)
+				.header("Authorization", "Bearer " + token))
+			.andExpect(status().isNoContent());
 	}
 
 	@Test

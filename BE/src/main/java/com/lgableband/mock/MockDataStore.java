@@ -243,9 +243,52 @@ public class MockDataStore {
 	}
 
 	public Guardian addGuardian(long userId, String name, String phone, boolean primary, boolean notifyOnDanger) {
+		List<Guardian> guardians = this.guardiansByUserId.computeIfAbsent(userId, ignored -> new ArrayList<>());
+		if (primary) {
+			guardians.replaceAll(this::removePrimary);
+		}
 		Guardian guardian = new Guardian(this.guardianSequence.incrementAndGet(), name, phone, primary, notifyOnDanger, ConnectionStatus.CONNECTED);
-		this.guardiansByUserId.computeIfAbsent(userId, ignored -> new ArrayList<>()).add(guardian);
+		guardians.add(guardian);
 		return guardian;
+	}
+
+	public Guardian updateGuardian(long userId, long guardianId, String name, String phone, boolean primary, boolean notifyOnDanger) {
+		List<Guardian> guardians = mutableGuardians(userId);
+		if (primary) {
+			guardians.replaceAll(this::removePrimary);
+		}
+		for (int index = 0; index < guardians.size(); index++) {
+			Guardian current = guardians.get(index);
+			if (current.guardianId() == guardianId) {
+				Guardian updated = new Guardian(guardianId, name, phone, primary, notifyOnDanger, ConnectionStatus.CONNECTED);
+				guardians.set(index, updated);
+				return updated;
+			}
+		}
+		throw new ApiException(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND", "보호자를 찾을 수 없습니다.");
+	}
+
+	public void deleteGuardian(long userId, long guardianId) {
+		List<Guardian> guardians = mutableGuardians(userId);
+		boolean removed = guardians.removeIf(guardian -> guardian.guardianId() == guardianId);
+		if (!removed) {
+			throw new ApiException(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND", "보호자를 찾을 수 없습니다.");
+		}
+	}
+
+	private List<Guardian> mutableGuardians(long userId) {
+		return this.guardiansByUserId.computeIfAbsent(userId, ignored -> new ArrayList<>());
+	}
+
+	private Guardian removePrimary(Guardian guardian) {
+		return new Guardian(
+			guardian.guardianId(),
+			guardian.name(),
+			guardian.phone(),
+			false,
+			guardian.notifyOnDanger(),
+			guardian.connectionStatus()
+		);
 	}
 
 	public EmergencyRequest createEmergency(long userId, String message, String source) {

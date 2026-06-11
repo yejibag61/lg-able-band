@@ -57,6 +57,7 @@ ALERT 1 ── N USER_FEEDBACK
 2. role이 `USER`면 `app_user`를 만든다.
 3. role이 `GUARDIAN`이면 `guardian`을 만든다.
 4. 사용자가 보호자를 등록하면 `guardian`과 `user_guardian`을 만든다.
+   `user_guardian`에는 주 보호자 여부와 위험 알림 수신 여부를 함께 저장한다.
 5. 기기가 연결되면 `device`에 저장한다.
 6. 기기 이벤트가 들어오면 `device_event`에 저장한다.
 7. 사용자에게 보여줄 알림이 필요하면 `alert`를 만든다.
@@ -102,6 +103,7 @@ ALERT 1 ── N USER_FEEDBACK
 - 비밀번호는 반드시 `password_hash`에 해시로 저장한다.
 - ERD의 `USER`는 SQL 예약어/시스템 계정과 헷갈릴 수 있어 `app_user`로 사용한다.
 - `notification_prefs`는 `app_user`의 화면 설정 컬럼과 `user_notification_channel`로 나눠 저장한다.
+- 보호자의 `isPrimary`, `notifyOnDanger` 설정은 사용자별 연결 설정이므로 `user_guardian`에 저장한다.
 - `device_event`는 외부 연동/ML/센서에서 들어온 원천 이벤트에 가깝다.
 - `alert`는 사용자에게 실제로 보여주는 알림이다.
 - `schema-v1.sql`은 초안이다. 운영 DB에 바로 실행하기 전 팀원과 확인한다.

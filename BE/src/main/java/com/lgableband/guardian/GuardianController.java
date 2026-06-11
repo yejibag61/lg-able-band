@@ -1,14 +1,14 @@
 package com.lgableband.guardian;
 
-import com.lgableband.mock.MockDataStore;
-import com.lgableband.mock.MockDataStore.Guardian;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
-import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -18,26 +18,42 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/guardians")
 public class GuardianController {
 
-	private final MockDataStore store;
+	private final GuardianService guardianService;
 
-	public GuardianController(MockDataStore store) {
-		this.store = store;
+	public GuardianController(GuardianService guardianService) {
+		this.guardianService = guardianService;
 	}
 
 	@GetMapping
-	public GuardianListResponse guardians(@RequestHeader("Authorization") String authorization) {
-		long userId = this.store.requireUser(authorization).userId();
-		return new GuardianListResponse(this.store.guardians(userId));
+	public GuardianService.GuardianListResponse guardians(@RequestHeader("Authorization") String authorization) {
+		return this.guardianService.guardians(authorization);
 	}
 
 	@PostMapping
-	public ResponseEntity<Guardian> addGuardian(
+	public ResponseEntity<GuardianService.GuardianSummary> addGuardian(
 		@RequestHeader("Authorization") String authorization,
 		@Valid @RequestBody GuardianRequest request
 	) {
-		long userId = this.store.requireUser(authorization).userId();
-		Guardian guardian = this.store.addGuardian(userId, request.name(), request.phone(), request.isPrimary(), request.notifyOnDanger());
+		GuardianService.GuardianSummary guardian = this.guardianService.addGuardian(authorization, request);
 		return ResponseEntity.status(HttpStatus.CREATED).body(guardian);
+	}
+
+	@PutMapping("/{guardianId}")
+	public GuardianService.GuardianSummary updateGuardian(
+		@RequestHeader("Authorization") String authorization,
+		@PathVariable long guardianId,
+		@Valid @RequestBody GuardianRequest request
+	) {
+		return this.guardianService.updateGuardian(authorization, guardianId, request);
+	}
+
+	@DeleteMapping("/{guardianId}")
+	public ResponseEntity<Void> deleteGuardian(
+		@RequestHeader("Authorization") String authorization,
+		@PathVariable long guardianId
+	) {
+		this.guardianService.deleteGuardian(authorization, guardianId);
+		return ResponseEntity.noContent().build();
 	}
 
 	public record GuardianRequest(
@@ -46,8 +62,5 @@ public class GuardianController {
 		boolean isPrimary,
 		boolean notifyOnDanger
 	) {
-	}
-
-	public record GuardianListResponse(List<Guardian> items) {
 	}
 }
