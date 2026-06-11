@@ -133,7 +133,7 @@ h3 {
 .role-group {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 10px;
+  gap: 10px 12px;
   min-width: 0;
   margin: 0;
   padding: 0;
@@ -146,26 +146,42 @@ h3 {
 
 .role-group legend {
   grid-column: 1 / -1;
+  margin-bottom: 2px;
   color: #3b4658;
   font-weight: 800;
 }
 
 .role-card {
-  display: flex;
+  position: relative;
+  display: grid;
   min-height: 52px;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
+  place-items: center;
   border: 2px solid #d9e1eb;
   border-radius: 8px;
   color: #313b4d;
   font-weight: 800;
+  text-align: center;
+}
+
+.role-card input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 .role-card.selected {
   border-color: #e11d48;
   background: #fff1f4;
   color: #a30f33;
+}
+
+.role-card:has(input:focus-visible) {
+  outline: 3px solid #fb7185;
+  outline-offset: 2px;
 }
 
 .field {

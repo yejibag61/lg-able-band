@@ -1,8 +1,8 @@
-import { useState } from 'react'
+import { useRef } from 'react'
 import { StatusBadge } from '../../components/StatusBadge'
 import { vibrationLabelForAlert } from '../../services/vibrationService'
 import { formatWearableTime } from '../../utils/formatWearableTime'
-import { alertStatusLabels, alertTypeLabels, severityLabels } from './alertLabels'
+import { alertTypeLabels, severityLabels } from './alertLabels'
 
 export function CurrentAlertScreen({
   alert,
@@ -14,13 +14,9 @@ export function CurrentAlertScreen({
   onConfirm,
   onNextAlert,
   onPreviousAlert,
-  onReplay,
 }) {
-  const [isChatbotOpen, setIsChatbotOpen] = useState(false)
-  const [bandSettings, setBandSettings] = useState({
-    sound: true,
-    vibration: true,
-  })
+  const swipeStartXRef = useRef(null)
+  const swipeStartYRef = useRef(null)
   const syncedTimeLabel = formatSyncedTime(syncedTime)
 
   if (!alert) {
@@ -48,13 +44,55 @@ export function CurrentAlertScreen({
   }
 
   const typeLabel = alertTypeLabels[alert.type] || alert.type
-  const statusLabel = alertStatusLabels[alert.status] || alert.status
+  const guardianDeliveryLabel = getGuardianDeliveryLabel(alert)
   const severityLabel = severityLabels[alert.severity] || alert.severity
   const tone = alert.severity === 'CRITICAL' || alert.severity === 'HIGH' ? 'danger' : 'default'
   const vibrationLabel = vibrationLabelForAlert(alert)
+  const canSwipe = alertTotal > 1
+
+  function handleSwipeStart(event) {
+    if (!canSwipe) {
+      return
+    }
+
+    const point = getSwipePoint(event)
+    swipeStartXRef.current = point.x
+    swipeStartYRef.current = point.y
+  }
+
+  function handleSwipeEnd(event) {
+    if (!canSwipe || swipeStartXRef.current === null || swipeStartYRef.current === null) {
+      return
+    }
+
+    const point = getSwipePoint(event)
+    const deltaX = point.x - swipeStartXRef.current
+    const deltaY = point.y - swipeStartYRef.current
+    swipeStartXRef.current = null
+    swipeStartYRef.current = null
+
+    if (Math.abs(deltaX) < 42 || Math.abs(deltaY) > 54) {
+      return
+    }
+
+    if (deltaX < 0 && alertPage < alertTotal) {
+      onNextAlert()
+    }
+
+    if (deltaX > 0 && alertPage > 1) {
+      onPreviousAlert()
+    }
+  }
 
   return (
-    <section className="alert-screen" aria-labelledby="alert-title">
+    <section
+      className="alert-screen"
+      aria-labelledby="alert-title"
+      onMouseDown={handleSwipeStart}
+      onMouseUp={handleSwipeEnd}
+      onTouchEnd={handleSwipeEnd}
+      onTouchStart={handleSwipeStart}
+    >
       <div className="screen-topline">
         <StatusBadge tone={tone}>{typeLabel}</StatusBadge>
         <span>{severityLabel}</span>
@@ -76,8 +114,8 @@ export function CurrentAlertScreen({
           <dd>{alert.locationName}</dd>
         </div>
         <div>
-          <dt>상태</dt>
-          <dd>{statusLabel}</dd>
+          <dt>보호자</dt>
+          <dd>{guardianDeliveryLabel}</dd>
         </div>
         <div>
           <dt>발생</dt>
@@ -93,43 +131,7 @@ export function CurrentAlertScreen({
         </div>
       </div>
 
-      <div className="band-tool-row" aria-label="밴드 알림 도구">
-        <button className="secondary-action mini-action" type="button" onClick={() => setIsChatbotOpen((current) => !current)}>
-          챗봇
-        </button>
-        <label>
-          <input
-            type="checkbox"
-            checked={bandSettings.vibration}
-            onChange={(event) =>
-              setBandSettings((current) => ({ ...current, vibration: event.target.checked }))
-            }
-          />
-          진동
-        </label>
-        <label>
-          <input
-            type="checkbox"
-            checked={bandSettings.sound}
-            onChange={(event) =>
-              setBandSettings((current) => ({ ...current, sound: event.target.checked }))
-            }
-          />
-          소리
-        </label>
-      </div>
-
-      {isChatbotOpen ? (
-        <div className="chatbot-panel" aria-label="도움말 챗봇">
-          <strong>도움말 챗봇</strong>
-          <span>{alert.deviceName} 알림을 확인했어요. 위험하면 보호자에게 보내기 버튼을 눌러주세요.</span>
-        </div>
-      ) : null}
-
       <div className="action-row">
-        <button className="secondary-action" type="button" disabled={isBusy} onClick={onReplay}>
-          다시 듣기
-        </button>
         <button className="primary-action" type="button" disabled={isBusy} onClick={onConfirm}>
           확인
         </button>
@@ -138,23 +140,31 @@ export function CurrentAlertScreen({
       {alertTotal > 1 ? (
         <div className="alert-pager" aria-label="알림 페이지">
           <button
-            className="secondary-action mini-action"
+            className="pager-arrow"
             type="button"
+            aria-label="이전 알림"
             disabled={alertPage <= 1}
             onClick={onPreviousAlert}
           >
-            이전
+            &lt;
           </button>
-          <span>
-            {alertPage}/{alertTotal}
-          </span>
+          <div className="pager-dots" aria-label={`${alertPage}/${alertTotal}`}>
+            {Array.from({ length: alertTotal }, (_, index) => (
+              <span
+                className={index + 1 === alertPage ? 'pager-dot active' : 'pager-dot'}
+                key={`alert-page-${index + 1}`}
+                aria-hidden="true"
+              />
+            ))}
+          </div>
           <button
-            className="secondary-action mini-action"
+            className="pager-arrow"
             type="button"
+            aria-label="다음 알림"
             disabled={alertPage >= alertTotal}
             onClick={onNextAlert}
           >
-            다음
+            &gt;
           </button>
         </div>
       ) : null}
@@ -175,4 +185,32 @@ function formatSyncedTime(value) {
     hour: '2-digit',
     minute: '2-digit',
   })
+}
+
+function getSwipePoint(event) {
+  const touch = event.changedTouches?.[0] || event.touches?.[0]
+
+  if (touch) {
+    return {
+      x: touch.clientX,
+      y: touch.clientY,
+    }
+  }
+
+  return {
+    x: event.clientX,
+    y: event.clientY,
+  }
+}
+
+function getGuardianDeliveryLabel(alert) {
+  if (alert.guardianNotified || alert.requiresGuardianNotify) {
+    return '전달됨'
+  }
+
+  if (alert.type === 'EMERGENCY' || alert.type === 'DANGER' || ['HIGH', 'CRITICAL'].includes(alert.severity)) {
+    return '자동 전달'
+  }
+
+  return '전달 안 함'
 }

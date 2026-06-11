@@ -64,23 +64,40 @@ describe('Wearable MVP', () => {
 
     expect(await screen.findByRole('heading', { name: '가스 위험 감지' })).toBeTruthy()
     expect(screen.getByText('긴급 알림')).toBeTruthy()
-    expect(screen.getByText('1/2')).toBeTruthy()
-    expect(screen.getByLabelText('진동').checked).toBe(true)
-    expect(screen.getByLabelText('소리').checked).toBe(true)
+    expect(screen.getByLabelText('1/2')).toBeTruthy()
+    expect(screen.queryByLabelText('진동')).toBeNull()
+    expect(screen.queryByLabelText('소리')).toBeNull()
+    expect(screen.queryByRole('button', { name: '다시 듣기' })).toBeNull()
 
-    fireEvent.click(screen.getByRole('button', { name: '챗봇' }))
-    expect(screen.getByText('도움말 챗봇')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '음성 챗봇 열기' }))
+    expect(screen.getByLabelText('음성 챗봇')).toBeTruthy()
+    expect(screen.getByText('무엇을 확인할까요?')).toBeTruthy()
+    expect(screen.getByRole('button', { name: '음성 미지원' })).toBeTruthy()
+    expect(screen.getByPlaceholderText('예: 지금 알림 뭐야?')).toBeTruthy()
 
-    fireEvent.click(screen.getByRole('button', { name: '다음' }))
+    fireEvent.click(screen.getByRole('button', { name: '다음 알림' }))
     expect(screen.getByRole('heading', { name: '세탁 완료' })).toBeTruthy()
-    expect(screen.getByText('2/2')).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: '이전' }))
+    expect(screen.getByLabelText('2/2')).toBeTruthy()
+    fireEvent.mouseDown(screen.getByLabelText('알림 페이지').closest('.alert-screen'), {
+      clientX: 220,
+      clientY: 180,
+    })
+    fireEvent.mouseUp(screen.getByLabelText('알림 페이지').closest('.alert-screen'), {
+      clientX: 320,
+      clientY: 184,
+    })
     expect(screen.getByRole('heading', { name: '가스 위험 감지' })).toBeTruthy()
-
-    fireEvent.click(screen.getByRole('button', { name: '다시 듣기' }))
-    expect((await screen.findByRole('status')).textContent).toContain(
-      '가스 위험이 감지되었습니다',
-    )
+    fireEvent.mouseDown(screen.getByLabelText('알림 페이지').closest('.alert-screen'), {
+      clientX: 320,
+      clientY: 184,
+    })
+    fireEvent.mouseUp(screen.getByLabelText('알림 페이지').closest('.alert-screen'), {
+      clientX: 200,
+      clientY: 180,
+    })
+    expect(screen.getByRole('heading', { name: '세탁 완료' })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '이전 알림' }))
+    expect(screen.getByRole('heading', { name: '가스 위험 감지' })).toBeTruthy()
 
     fireEvent.click(screen.getByRole('button', { name: '확인' }))
     expect((await screen.findByRole('status')).textContent).toContain('확인한 알림을 삭제했습니다.')
@@ -96,7 +113,7 @@ describe('Wearable MVP', () => {
     expect(await screen.findByRole('heading', { name: '세탁 완료' })).toBeTruthy()
   })
 
-  it('shows UWB distance and vibration guidance in the 4-inch frame', async () => {
+  it('shows UWB distance, room, and vibration guidance in the 4-inch frame', async () => {
     const user = userEvent.setup()
     render(<App />)
 
@@ -106,10 +123,11 @@ describe('Wearable MVP', () => {
 
     expect(await screen.findByRole('heading', { name: '세탁기 찾기' })).toBeTruthy()
     expect(screen.getByText('2.4m')).toBeTruthy()
-    expect(screen.getByText('중간 간격 진동')).toBeTruthy()
+    expect(screen.getByText('세탁실')).toBeTruthy()
+    expect(screen.getByText('중간 간격 진동 표시 중')).toBeTruthy()
 
     await user.click(screen.getByRole('button', { name: '탐색 종료' }))
-    await waitFor(() => expect(screen.getByRole('heading', { name: '가전 선택' })).toBeTruthy())
+    await waitFor(() => expect(screen.getByRole('heading', { name: '내 가전 목록' })).toBeTruthy())
 
     await act(async () => {
       await new Promise((resolve) => {
@@ -118,8 +136,12 @@ describe('Wearable MVP', () => {
     })
 
     expect(screen.getByText('탐색을 종료했습니다. 다른 가전을 선택할 수 있습니다.')).toBeTruthy()
-    expect(screen.getByRole('button', { name: '냉장고' })).toBeTruthy()
-    expect(screen.queryByText('중간 간격 진동')).toBeNull()
+    expect(screen.getAllByText('UWB').length).toBeGreaterThan(0)
+    expect(screen.getByText('4개')).toBeTruthy()
+    expect(screen.getByRole('button', { name: /안전 전기레인지/ })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /도어센서/ })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'UWB' }).getAttribute('aria-pressed')).toBe('true')
+    expect(screen.queryByText('중간 간격 진동 표시 중')).toBeNull()
   })
 
   it('keeps terminal UWB sessions from polling again', async () => {
@@ -132,7 +154,8 @@ describe('Wearable MVP', () => {
 
     expect(await screen.findByRole('heading', { name: '세탁기 찾기' })).toBeTruthy()
     expect(screen.getAllByText('도착').length).toBeGreaterThan(0)
-    expect(screen.getByText('긴 진동 2회')).toBeTruthy()
+    expect(screen.getByText('세탁실')).toBeTruthy()
+    expect(screen.getByText('긴 진동 2회 표시 중')).toBeTruthy()
     expect(screen.getByRole('button', { name: '탐색 종료' }).disabled).toBe(true)
 
     await act(async () => {
@@ -151,10 +174,6 @@ describe('Wearable MVP', () => {
 
     expect(await screen.findByText('강한 긴급 진동')).toBeTruthy()
     expect(screen.getByLabelText('진동 피드백')).toBeTruthy()
-
-    fireEvent.click(screen.getByRole('button', { name: '다시 듣기' }))
-
-    await waitFor(() => expect(navigator.vibrate).toHaveBeenCalled())
   })
 
   it('keeps alert unconfirmed when confirm fails', async () => {
@@ -169,7 +188,7 @@ describe('Wearable MVP', () => {
     expect((await screen.findByRole('status')).textContent).toContain(
       '확인 처리에 실패했습니다.',
     )
-    expect(screen.getByText('미확인')).toBeTruthy()
+    expect(screen.getByText('자동 전달')).toBeTruthy()
   })
 
   it('shows alert load failure when fallback is disabled', async () => {

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { ModeSwitch } from './components/ModeSwitch'
 import { WearableFrame } from './components/WearableFrame'
+import { VoiceChatbot } from './components/VoiceChatbot'
 import { CurrentAlertScreen } from './features/alerts/CurrentAlertScreen'
 import { WearableEmergencyScreen } from './features/emergency/WearableEmergencyScreen'
 import { PairingQrScreen } from './features/pairing/PairingQrScreen'
@@ -13,10 +14,9 @@ import {
   getPairingSession,
   getUwbSession,
   requestEmergencyHelp,
-  replayAlert,
   stopUwbSession,
 } from './services/wearableService'
-import { triggerVibration, vibrationPatternForAlert } from './services/vibrationService'
+import { triggerVibration } from './services/vibrationService'
 import './App.css'
 
 const DEFAULT_UWB_POLL_INTERVAL_MS = 2000
@@ -131,23 +131,6 @@ function App() {
     }
   }, [isPaired, isUwbPolling, mode])
 
-  async function handleReplay() {
-    if (!selectedAlert) {
-      return
-    }
-
-    setIsBusy(true)
-    try {
-      const replayed = await replayAlert(selectedAlert.alertId)
-      triggerVibration(vibrationPatternForAlert(selectedAlert))
-      setStatusMessage(`다시 듣기: ${replayed.voiceGuide}`)
-    } catch {
-      setStatusMessage('다시 듣기를 실행할 수 없습니다.')
-    } finally {
-      setIsBusy(false)
-    }
-  }
-
   async function handleConfirm() {
     if (!selectedAlert) {
       return
@@ -219,7 +202,7 @@ function App() {
       <WearableFrame>
         {isPaired ? (
           <ModeSwitch
-            activeMode={mode}
+            activeMode={mode === 'deviceSelect' ? 'uwb' : mode}
             onModeChange={(nextMode) => {
               setMode(nextMode)
               setStatusMessage('')
@@ -261,7 +244,6 @@ function App() {
             onConfirm={handleConfirm}
             onNextAlert={() => setAlertIndex((current) => Math.min(current + 1, alertQueue.length - 1))}
             onPreviousAlert={() => setAlertIndex((current) => Math.max(current - 1, 0))}
-            onReplay={handleReplay}
           />
         ) : null}
 
@@ -332,23 +314,76 @@ function App() {
             onRequest={handleEmergencyRequest}
           />
         ) : null}
+
+        {isPaired ? (
+          <VoiceChatbot
+            alert={selectedAlert}
+            alertQueue={alertQueue}
+            mode={mode}
+            statusMessage={statusMessage}
+            uwbSession={uwbSession}
+          />
+        ) : null}
       </WearableFrame>
     </main>
   )
 }
 
 function DeviceSelectScreen({ actionMessage, onSelect }) {
-  const devices = ['세탁기', '냉장고', '공기질 센서']
+  const devices = [
+    {
+      name: '세탁기',
+      status: '연결됨',
+      statusTone: 'connected',
+      icon: '▣',
+      iconTone: 'teal',
+    },
+    {
+      name: 'TV',
+      status: '연결됨',
+      statusTone: 'connected',
+      icon: '▭',
+      iconTone: 'blue',
+    },
+    {
+      name: '안전 전기레인지',
+      status: '주의 필요',
+      statusTone: 'warning',
+      icon: '⌘',
+      iconTone: 'orange',
+    },
+    {
+      name: '도어센서',
+      status: '연결됨',
+      statusTone: 'connected',
+      icon: '▯',
+      iconTone: 'slate',
+    },
+  ]
 
   return (
     <section className="state-screen device-select-screen" aria-labelledby="device-select-title">
-      <p className="eyebrow">UWB</p>
-      <h1 id="device-select-title">가전 선택</h1>
-      <p>위치를 찾을 가전을 선택하세요.</p>
+      <div className="device-select-header">
+        <div>
+          <p className="eyebrow">UWB</p>
+          <h1 id="device-select-title">내 가전 목록</h1>
+        </div>
+        <strong>{devices.length}개</strong>
+      </div>
       <div className="device-select-grid">
         {devices.map((device) => (
-          <button className="secondary-action" type="button" key={device} onClick={() => onSelect(device)}>
-            {device}
+          <button
+            className="device-select-card"
+            type="button"
+            key={device.name}
+            onClick={() => onSelect(device.name)}
+          >
+            <span className={`device-select-icon icon-${device.iconTone}`} aria-hidden="true">
+              {device.icon}
+            </span>
+            <span className={`device-status-dot status-${device.statusTone}`} aria-hidden="true" />
+            <span className="device-select-name">{device.name}</span>
+            <span className="device-select-status">{device.status}</span>
           </button>
         ))}
       </div>

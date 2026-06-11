@@ -25,6 +25,7 @@ export function UwbGuideScreen({ session, actionMessage = '', isBusy, onStandby,
   const confidence = Math.round(session.confidence * 100)
   const canStop = session.navigationStatus === 'ACTIVE'
   const lowConfidence = session.navigationStatus === 'FAILED' || confidence < 40
+  const locationLabel = getRoomLabel(session)
 
   return (
     <section className="uwb-screen" aria-labelledby="uwb-title">
@@ -53,8 +54,8 @@ export function UwbGuideScreen({ session, actionMessage = '', isBusy, onStandby,
 
       <dl className="compact-meta">
         <div>
-          <dt>진동</dt>
-          <dd>{vibrationLabel}</dd>
+          <dt>위치</dt>
+          <dd>{locationLabel}</dd>
         </div>
         <div>
           <dt>상태</dt>
@@ -80,4 +81,26 @@ export function UwbGuideScreen({ session, actionMessage = '', isBusy, onStandby,
       </button>
     </section>
   )
+}
+
+function getRoomLabel(session) {
+  if (session.locationName || session.roomName || session.room) {
+    return session.locationName || session.roomName || session.room
+  }
+
+  const targetName = session.targetDeviceName || ''
+
+  if (targetName.includes('세탁')) {
+    return '세탁실'
+  }
+
+  if (targetName.includes('냉장고')) {
+    return '주방'
+  }
+
+  if (targetName.includes('공기질') || targetName.includes('TV')) {
+    return '거실'
+  }
+
+  return '집 안'
 }
