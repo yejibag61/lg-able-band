@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import jsQR from 'jsqr'
 import { LivingSignalSettingsScreen } from '../features/living-signal'
 import { getAppPreview, getHomeSummary } from '../services/homeService'
 import { createEmergencyRequest } from '../services/emergencyService'
@@ -18,8 +17,8 @@ const statusLabels = {
 
 const tabs = [
   { id: 'home', label: '홈' },
-  { id: 'alerts', label: '알림' },
   { id: 'devices', label: '기기' },
+  { id: 'alerts', label: '알림' },
   { id: 'menu', label: '메뉴' },
 ]
 
@@ -156,9 +155,7 @@ export function HomeScreen({ session, onLogout }) {
 
   async function handleLinkGuardian(form) {
     const guardian = normalizeGuardianForView(await linkGuardianByEmail(form))
-
     setLinkedGuardians((current) => upsertGuardian(current, guardian))
-
     return guardian
   }
 
@@ -419,7 +416,9 @@ function MenuTab({
 }
 
 function WearablePairingScannerScreen({ onBack }) {
-  const [scannerMessage, setScannerMessage] = useState('웨어러블 화면의 QR 코드를 프레임 안에 맞춰주세요.')
+  const [scannerMessage, setScannerMessage] = useState(
+    '웨어러블 화면의 QR 코드를 프레임 안에 맞춰주세요.',
+  )
   const [scanStatus, setScanStatus] = useState('ready')
   const [detectedValue, setDetectedValue] = useState('')
   const videoRef = useRef(null)
@@ -472,12 +471,17 @@ function WearablePairingScannerScreen({ onBack }) {
         await videoRef.current.play()
       }
 
-      const detector = window.BarcodeDetector ? new window.BarcodeDetector({ formats: ['qr_code'] }) : null
+      const detector = window.BarcodeDetector
+        ? new window.BarcodeDetector({ formats: ['qr_code'] })
+        : null
+
       activeScanRef.current = true
       setScannerMessage('카메라가 켜졌습니다. QR 코드를 프레임 안에 맞춰주세요.')
       scanQrFrame(detector)
     } catch {
-      setScannerMessage('카메라 권한이 필요합니다. 브라우저 권한을 허용한 뒤 다시 시도해주세요.')
+      setScannerMessage(
+        '카메라 권한이 필요합니다. 브라우저 권한을 허용한 뒤 다시 시도해주세요.',
+      )
       setScanStatus('blocked')
     }
   }
@@ -500,18 +504,15 @@ function WearablePairingScannerScreen({ onBack }) {
         stopScanResources()
         return
       }
+
       context.drawImage(video, 0, 0, canvas.width, canvas.height)
 
       try {
         const codes = detector ? await detector.detect(canvas) : []
-        const imageData = detector ? null : context.getImageData(0, 0, canvas.width, canvas.height)
-        const fallbackCode = imageData ? jsQR(imageData.data, imageData.width, imageData.height) : null
-        const rawValue = codes[0]?.rawValue || fallbackCode?.data
+        const rawValue = codes[0]?.rawValue
 
-        if (rawValue) {
-          if (handleQrDetected(rawValue)) {
-            return
-          }
+        if (rawValue && handleQrDetected(rawValue)) {
+          return
         }
       } catch {
         setScannerMessage('QR을 읽는 중 문제가 생겼습니다. 카메라를 다시 켜주세요.')
@@ -528,14 +529,18 @@ function WearablePairingScannerScreen({ onBack }) {
     const pairing = parseWearablePairingPayload(rawValue)
 
     if (!pairing) {
-      setScannerMessage('Able Band 연동 QR이 아닙니다. 웨어러블 첫 화면의 QR을 다시 비춰주세요.')
+      setScannerMessage(
+        'Able Band 연동 QR이 아닙니다. 웨어러블 첫 화면의 QR을 다시 비춰주세요.',
+      )
       return false
     }
 
     stopScanResources()
     setScanStatus('paired')
     setDetectedValue(rawValue)
-    setScannerMessage(`${pairing.deviceName} ${pairing.pairingCode}를 인식했습니다. 웨어러블 연동이 완료되었습니다.`)
+    setScannerMessage(
+      `${pairing.deviceName} ${pairing.pairingCode}를 인식했습니다. 웨어러블 연동이 완료되었습니다.`,
+    )
     return true
   }
 
@@ -554,7 +559,9 @@ function WearablePairingScannerScreen({ onBack }) {
       <section className="content-card wearable-scanner-card">
         <p className="card-label">웨어러블 연동</p>
         <h2 id="wearable-scanner-title">밴드 QR을 스캔해주세요.</h2>
-        <p>웨어러블의 “휴대폰으로 연동” 화면에 표시된 QR 코드를 카메라로 비춰주세요.</p>
+        <p>
+          웨어러블의 첫 화면 또는 연동 화면에 표시된 QR 코드를 카메라로 비춰주세요.
+        </p>
 
         <div className={`qr-scanner-preview scanner-${scanStatus}`} aria-label="QR 카메라 스캔 영역">
           <video ref={videoRef} className="scanner-video" muted playsInline aria-hidden="true" />
@@ -571,7 +578,7 @@ function WearablePairingScannerScreen({ onBack }) {
           </div>
           <div className="scanner-bottom-bar">
             <span />
-            <strong>QR을 프레임에 맞춰주세요</strong>
+            <strong>QR을 프레임에 맞춰주세요.</strong>
             <span />
           </div>
         </div>
@@ -579,7 +586,9 @@ function WearablePairingScannerScreen({ onBack }) {
         <p className="member-status-message" role="status">
           {scannerMessage}
         </p>
-        {detectedValue ? <p className="scanner-result">연동 정보: {formatPairingResult(detectedValue)}</p> : null}
+        {detectedValue ? (
+          <p className="scanner-result">연동 정보: {formatPairingResult(detectedValue)}</p>
+        ) : null}
 
         <div className="scanner-action-row">
           <button className="secondary-button compact-button" type="button" onClick={handleStartScan}>
@@ -599,7 +608,11 @@ function parseWearablePairingPayload(rawValue) {
     const url = new URL(rawValue)
     const params = url.searchParams
 
-    if (url.protocol !== 'lg-able-band:' || url.hostname !== 'pair' || params.get('source') !== 'wearable') {
+    if (
+      url.protocol !== 'lg-able-band:' ||
+      url.hostname !== 'pair' ||
+      params.get('source') !== 'wearable'
+    ) {
       return null
     }
 

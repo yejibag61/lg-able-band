@@ -1,7 +1,7 @@
 package com.lgableband;
 
-import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.blankOrNullString;
+import static org.hamcrest.Matchers.not;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
@@ -242,6 +242,83 @@ class MvpApiControllerTests {
 			.andExpect(jsonPath("$.name").value("이메일보호"))
 			.andExpect(jsonPath("$.phone").value("010-5555-6666"))
 			.andExpect(jsonPath("$.connectionStatus").value("CONNECTED"));
+	}
+
+	@Test
+	void livingSignalsCanBeLoadedAndUpdated() throws Exception {
+		String token = userToken();
+
+		this.mockMvc.perform(get("/api/living-signals").header("Authorization", "Bearer " + token))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.threshold").exists())
+			.andExpect(jsonPath("$.workflow[0]").exists())
+			.andExpect(jsonPath("$.sounds[0].registeredSoundName").exists());
+
+		MvcResult created = this.mockMvc.perform(post("/api/living-signals/sounds")
+				.header("Authorization", "Bearer " + token)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "registeredSoundName": "우리 집 초인종",
+					  "soundType": "doorbell",
+					  "notes": "현관 앞에서 들리는 기본 초인종입니다.",
+					  "recordings": [
+					    {
+					      "label": "doorbell-sample-1",
+					      "createdAt": "2026-06-11T13:20:00+09:00",
+					      "durationSec": 1.8,
+					      "audioDataUrl": "data:audio/wav;base64,AAAA",
+					      "embedding": [0.11, 0.22, 0.33, 0.44]
+					    }
+					  ]
+					}
+					"""))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.registeredSoundName").value("우리 집 초인종"))
+			.andExpect(jsonPath("$.soundType").value("doorbell"))
+			.andExpect(jsonPath("$.recordings[0].label").value("doorbell-sample-1"))
+			.andReturn();
+
+		String soundId = created.getResponse().getContentAsString()
+			.replaceAll(".*\\\"soundId\\\":([0-9]+).*", "$1");
+
+		this.mockMvc.perform(put("/api/living-signals/sounds/" + soundId)
+				.header("Authorization", "Bearer " + token)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "registeredSoundName": "수정된 초인종",
+					  "soundType": "doorbell",
+					  "notes": "현관 초인종 샘플을 업데이트했습니다.",
+					  "recordings": [
+					    {
+					      "label": "doorbell-sample-2",
+					      "createdAt": "2026-06-11T13:25:00+09:00",
+					      "durationSec": 2.0,
+					      "audioDataUrl": "data:audio/wav;base64,BBBB",
+					      "embedding": [0.21, 0.31, 0.41, 0.51]
+					    }
+					  ]
+					}
+					"""))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.registeredSoundName").value("수정된 초인종"))
+			.andExpect(jsonPath("$.recordings[0].label").value("doorbell-sample-2"));
+
+		this.mockMvc.perform(put("/api/living-signals/threshold")
+				.header("Authorization", "Bearer " + token)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "threshold": 0.85
+					}
+					"""))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.threshold").value(0.85));
+
+		this.mockMvc.perform(delete("/api/living-signals/sounds/" + soundId)
+				.header("Authorization", "Bearer " + token))
+			.andExpect(status().isOk());
 	}
 
 	@Test

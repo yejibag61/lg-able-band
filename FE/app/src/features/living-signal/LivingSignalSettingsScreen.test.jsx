@@ -37,6 +37,87 @@ function createFakeAudioHandlers() {
   }
 }
 
+function createFakeDataHandlers() {
+  let state = {
+    threshold: livingSignalMock.threshold,
+    workflow: livingSignalMock.workflow,
+    detections: livingSignalMock.detections,
+    sounds: livingSignalMock.sounds.map((sound) => ({
+      ...sound,
+      recordings: sound.recordings.map((recording) => ({
+        ...recording,
+        embedding: [...recording.embedding],
+      })),
+    })),
+  }
+  let nextSoundId = 100
+  let nextRecordingId = 1000
+
+  return {
+    async loadState() {
+      return structuredClone(state)
+    },
+    async createSound(sound) {
+      const createdSound = {
+        soundId: nextSoundId,
+        registeredSoundName: sound.registeredSoundName,
+        soundType: sound.soundType,
+        soundTypeLabel:
+          sound.soundType === 'appliance_done' ? '가전 완료음' : sound.soundType,
+        notes: sound.notes,
+        updatedAt: '2026-06-10T16:00:00+09:00',
+        recordings: sound.recordings.map((recording) => ({
+          recordingId: nextRecordingId++,
+          ...recording,
+        })),
+      }
+      nextSoundId += 1
+      state = {
+        ...state,
+        sounds: [createdSound, ...state.sounds],
+      }
+      return createdSound
+    },
+    async updateSound(soundId, sound) {
+      const updatedSound = {
+        soundId,
+        registeredSoundName: sound.registeredSoundName,
+        soundType: sound.soundType,
+        soundTypeLabel:
+          sound.soundType === 'apartment_announcement'
+            ? '아파트 방송'
+            : sound.soundType === 'doorbell'
+              ? '초인종'
+              : sound.soundType,
+        notes: sound.notes,
+        updatedAt: '2026-06-10T16:00:00+09:00',
+        recordings: sound.recordings.map((recording) => ({
+          recordingId: nextRecordingId++,
+          ...recording,
+        })),
+      }
+      state = {
+        ...state,
+        sounds: state.sounds.map((item) => (item.soundId === soundId ? updatedSound : item)),
+      }
+      return updatedSound
+    },
+    async deleteSound(soundId) {
+      state = {
+        ...state,
+        sounds: state.sounds.filter((item) => item.soundId !== soundId),
+      }
+    },
+    async updateThreshold(threshold) {
+      state = {
+        ...state,
+        threshold,
+      }
+      return { threshold }
+    },
+  }
+}
+
 describe('LivingSignalSettingsScreen', () => {
   beforeEach(() => {
     localStorage.clear()
@@ -55,6 +136,7 @@ describe('LivingSignalSettingsScreen', () => {
         livingSignals={livingSignalMock}
         onBack={() => {}}
         audioHandlers={createFakeAudioHandlers()}
+        dataHandlers={createFakeDataHandlers()}
       />,
     )
 
@@ -81,6 +163,7 @@ describe('LivingSignalSettingsScreen', () => {
         livingSignals={livingSignalMock}
         onBack={() => {}}
         audioHandlers={createFakeAudioHandlers()}
+        dataHandlers={createFakeDataHandlers()}
       />,
     )
 
@@ -109,6 +192,7 @@ describe('LivingSignalSettingsScreen', () => {
         livingSignals={livingSignalMock}
         onBack={() => {}}
         audioHandlers={createFakeAudioHandlers()}
+        dataHandlers={createFakeDataHandlers()}
       />,
     )
 

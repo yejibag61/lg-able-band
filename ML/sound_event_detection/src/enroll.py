@@ -6,6 +6,7 @@ from pathlib import Path
 
 import numpy as np
 
+from desktop_audio import print_input_devices, record_microphone_audio
 from embedding import (
     build_embedding_model,
     build_feature_extractor,
@@ -104,12 +105,29 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--audio-path",
         nargs="+",
-        required=True,
+        default=None,
         help="One or more wav/mp3 files that represent the same registered sound.",
     )
     parser.add_argument(
+        "--record-seconds",
+        type=float,
+        default=None,
+        help="Record from the desktop microphone for this many seconds before enrollment.",
+    )
+    parser.add_argument(
+        "--device-index",
+        type=int,
+        default=None,
+        help="Optional desktop microphone input device index.",
+    )
+    parser.add_argument(
+        "--list-input-devices",
+        action="store_true",
+        help="Print available desktop microphone devices and exit.",
+    )
+    parser.add_argument(
         "--name",
-        required=True,
+        default=None,
         help="Registered sound name, such as 'Our Apartment Broadcast'.",
     )
     parser.add_argument(
@@ -129,8 +147,32 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
+
+    if args.list_input_devices:
+        print_input_devices()
+        return
+
+    if not args.name:
+        raise SystemExit("Provide --name unless you are only using --list-input-devices.")
+
+    audio_paths: list[str | Path] = list(args.audio_path or [])
+    if args.record_seconds is not None:
+        config = load_config(args.config)
+        test_audio_dir = ensure_directory(resolve_project_path(config["data"]["test_audio_dir"]))
+        recorded_path = record_microphone_audio(
+            output_dir=test_audio_dir,
+            sample_rate=int(config["data"]["sample_rate"]),
+            duration_seconds=args.record_seconds,
+            label_prefix=f"desktop-enroll-{slugify_name(args.name)}",
+            device_index=args.device_index,
+        )
+        audio_paths.append(recorded_path)
+
+    if not audio_paths:
+        raise SystemExit("Provide --audio-path or --record-seconds.")
+
     results = register_sound(
-        audio_paths=args.audio_path,
+        audio_paths=audio_paths,
         registered_sound_name=args.name,
         sound_type=args.sound_type,
         notes=args.notes,

@@ -4,7 +4,7 @@ import { GuardianPlaceholder } from './components/GuardianPlaceholder'
 import { HomeScreen } from './components/HomeScreen'
 import { LoginScreen } from './components/LoginScreen'
 import { SignupScreen } from './components/SignupScreen'
-import { login, logout, signup } from './services/authService'
+import { getStoredSession, login, logout, signup } from './services/authService'
 import {
   getDefaultAccessibilitySettings,
   storeAccessibilitySettings,
@@ -24,9 +24,21 @@ function createInitialSignupForm() {
   }
 }
 
+function createInitialSession() {
+  return getStoredSession()
+}
+
+function createInitialScreen(session) {
+  if (!session) {
+    return 'login'
+  }
+
+  return session.role === 'USER' ? 'userHome' : 'guardianHome'
+}
+
 function App() {
-  const [screen, setScreen] = useState('login')
-  const [session, setSession] = useState(null)
+  const [session, setSession] = useState(createInitialSession)
+  const [screen, setScreen] = useState(() => createInitialScreen(createInitialSession()))
   const [loginForm, setLoginForm] = useState({
     role: 'USER',
     email: '',

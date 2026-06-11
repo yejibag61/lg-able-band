@@ -6,6 +6,7 @@ from pathlib import Path
 
 import numpy as np
 
+from desktop_audio import print_input_devices, record_microphone_audio
 from embedding import (
     build_embedding_model,
     build_feature_extractor,
@@ -31,7 +32,24 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Match a new audio file against registered user enrollment sounds."
     )
-    parser.add_argument("--audio-path", required=True, help="Path to a wav or mp3 file.")
+    parser.add_argument("--audio-path", default=None, help="Path to a wav or mp3 file.")
+    parser.add_argument(
+        "--record-seconds",
+        type=float,
+        default=None,
+        help="Record from the desktop microphone for this many seconds before inference.",
+    )
+    parser.add_argument(
+        "--device-index",
+        type=int,
+        default=None,
+        help="Optional desktop microphone input device index.",
+    )
+    parser.add_argument(
+        "--list-input-devices",
+        action="store_true",
+        help="Print available desktop microphone devices and exit.",
+    )
     parser.add_argument("--threshold", type=float, default=None, help="Override similarity threshold.")
     parser.add_argument("--top-k", type=int, default=None, help="How many ranked candidates to include.")
     parser.add_argument("--save-json", action="store_true", help="Save the result JSON under outputs/reports.")
@@ -169,8 +187,27 @@ def run_inference(
 
 def main() -> None:
     args = parse_args()
+    if args.list_input_devices:
+        print_input_devices()
+        return
+
+    audio_path_value = args.audio_path
+    if args.record_seconds is not None:
+        config = load_config(args.config)
+        test_audio_dir = resolve_project_path(config["data"]["test_audio_dir"])
+        audio_path_value = record_microphone_audio(
+            output_dir=test_audio_dir,
+            sample_rate=int(config["data"]["sample_rate"]),
+            duration_seconds=args.record_seconds,
+            label_prefix="desktop-inference",
+            device_index=args.device_index,
+        )
+
+    if audio_path_value is None:
+        raise SystemExit("Provide --audio-path or --record-seconds.")
+
     result = run_inference(
-        audio_path_value=args.audio_path,
+        audio_path_value=audio_path_value,
         threshold=args.threshold,
         top_k=args.top_k,
         config_path=args.config,

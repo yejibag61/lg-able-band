@@ -66,6 +66,42 @@ CREATE TABLE IF NOT EXISTS user_guardian (
 	CONSTRAINT fk_user_guardian_guardian_id FOREIGN KEY (guardian_id) REFERENCES guardian (guardian_id) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS living_signal_profile (
+	user_id BIGINT NOT NULL,
+	similarity_threshold DECIMAL(4,2) NOT NULL DEFAULT 0.80,
+	created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+	updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+	PRIMARY KEY (user_id),
+	CONSTRAINT fk_living_signal_profile_user_id FOREIGN KEY (user_id) REFERENCES app_user (user_id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS living_signal_sound (
+	sound_id BIGINT NOT NULL AUTO_INCREMENT,
+	user_id BIGINT NOT NULL,
+	registered_sound_name VARCHAR(150) NOT NULL,
+	sound_type VARCHAR(50) NOT NULL,
+	notes VARCHAR(1000) NULL,
+	created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+	updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+	PRIMARY KEY (sound_id),
+	KEY ix_living_signal_sound_user_id (user_id),
+	CONSTRAINT fk_living_signal_sound_user_id FOREIGN KEY (user_id) REFERENCES app_user (user_id) ON DELETE CASCADE,
+	CONSTRAINT ck_living_signal_sound_type CHECK (sound_type IN ('apartment_announcement', 'doorbell', 'fire_alarm', 'appliance_done', 'background_noise'))
+);
+
+CREATE TABLE IF NOT EXISTS living_signal_recording (
+	recording_id BIGINT NOT NULL AUTO_INCREMENT,
+	sound_id BIGINT NOT NULL,
+	label VARCHAR(150) NOT NULL,
+	duration_sec DECIMAL(6,2) NOT NULL,
+	audio_data_url LONGTEXT NULL,
+	embedding_json JSON NULL,
+	created_at DATETIME(6) NOT NULL,
+	PRIMARY KEY (recording_id),
+	KEY ix_living_signal_recording_sound_id (sound_id),
+	CONSTRAINT fk_living_signal_recording_sound_id FOREIGN KEY (sound_id) REFERENCES living_signal_sound (sound_id) ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS device (
 	device_id BIGINT NOT NULL AUTO_INCREMENT,
 	user_id BIGINT NOT NULL,

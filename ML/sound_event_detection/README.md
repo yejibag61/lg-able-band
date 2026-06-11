@@ -1,19 +1,23 @@
 # Able Band Sound Event Matching
 
-`ML/sound_event_detection/` is a standalone Python module for a user-personalized sound matching system.
+`ML/sound_event_detection/` is a standalone Python module for user-personalized alert-sound matching.
 
-The user records a real alert sound, gives it a name and a type, and the system later recognizes similar sounds by comparing embeddings.
+Instead of predicting only from a fixed class set, this module lets a user:
+
+1. register a real alert sound with a custom name and type
+2. store one or more enrollment examples
+3. compare a new sound against those saved examples with cosine similarity
 
 ## Project Overview
 
 Example flow:
 
-1. The user records an apartment broadcast start chime.
-2. The user registers the name `우리 아파트 방송음`.
+1. A user records an apartment broadcast start chime.
+2. The user registers it as `Our Apartment Broadcast`.
 3. The user stores the type `apartment_announcement`.
 4. Later, a similar sound is recorded again.
 5. The module compares it against registered enrollment sounds.
-6. If similarity is high enough, it returns that registered sound.
+6. If the similarity is high enough, it returns that registered sound.
 
 ## Fixed Classification vs User Enrollment Matching
 
@@ -45,7 +49,7 @@ For each enrollment clip, the module stores:
 
 Multiple enrollment clips can belong to the same sound name, and one type can contain many different user-defined sounds.
 
-## Embedding + Cosine Similarity Matching
+## Embedding and Cosine Similarity Matching
 
 The module uses a pretrained audio model as a feature extractor.
 
@@ -70,8 +74,10 @@ ML/
     configs/
       config.yaml
     src/
+      desktop_audio.py
       enroll.py
       inference.py
+      evaluate.py
       embedding.py
       registry.py
       utils.py
@@ -91,6 +97,13 @@ py -3.12 -m venv .venv
 .venv\Scripts\activate
 pip install -r requirements.txt
 ```
+
+Desktop microphone testing on a PC now uses:
+
+- `sounddevice`
+- `soundfile`
+
+If Windows asks for microphone permission, allow Python or your terminal app to access the microphone.
 
 ## Prepare Audio Files
 
@@ -112,24 +125,62 @@ Registered enrollment copies are automatically stored under:
 
 - `data/enrollments/`
 
-## Register A Sound
+## Register a Sound
 
-Example command:
+Register from an existing audio file:
 
 ```bash
-python src/enroll.py --audio-path data/test_audio/apartment_chime.wav --name "우리 아파트 방송음" --type apartment_announcement
+python src/enroll.py --audio-path data/test_audio/apartment_chime.wav --name "Our Apartment Broadcast" --type apartment_announcement
 ```
 
-Multiple enrollment examples for the same sound:
+Register multiple examples for the same sound:
 
 ```bash
-python src/enroll.py --audio-path data/test_audio/bell1.mp3 data/test_audio/bell2.mp3 --name "현관 초인종" --type doorbell
+python src/enroll.py --audio-path data/test_audio/bell1.mp3 data/test_audio/bell2.mp3 --name "Front Door Bell" --type doorbell
+```
+
+Register directly from the desktop microphone:
+
+```bash
+python src/enroll.py --record-seconds 4 --name "Desktop Doorbell" --type doorbell
+```
+
+List available PC microphones:
+
+```bash
+python src/enroll.py --list-input-devices
+```
+
+Use a specific PC microphone:
+
+```bash
+python src/enroll.py --record-seconds 4 --device-index 1 --name "Desktop Doorbell" --type doorbell
 ```
 
 ## Run Inference
 
+Run inference from an existing audio file:
+
 ```bash
 python src/inference.py --audio-path data/test_audio/new_sound.wav
+```
+
+Run inference from the desktop microphone:
+
+```bash
+python src/inference.py --record-seconds 4
+```
+
+List available PC microphones:
+
+```bash
+python src/inference.py --list-input-devices
+```
+
+Use a specific PC microphone:
+
+```bash
+python src/inference.py --record-seconds 4 --device-index 1
 ```
 
 Example output:
@@ -137,7 +188,7 @@ Example output:
 ```json
 {
   "predicted": true,
-  "registered_sound_name": "우리 아파트 방송음",
+  "registered_sound_name": "Our Apartment Broadcast",
   "sound_type": "apartment_announcement",
   "similarity": 0.87,
   "threshold": 0.8
@@ -173,6 +224,17 @@ General rule:
 - higher threshold: fewer false matches, more misses
 - lower threshold: more matches, higher confusion risk
 
+## Desktop Test Flow
+
+For quick PC testing before phone integration:
+
+1. register one or more sounds with `--record-seconds`
+2. play the same alert sound again near the computer microphone
+3. run inference with `--record-seconds`
+4. check the predicted sound name and similarity score
+
+Recorded desktop test clips are saved under `data/test_audio/`, so you can reuse them later.
+
 ## Able Band Service Connection
 
 This module is independent for now, but it is designed for later integration.
@@ -184,14 +246,14 @@ Suggested service flow:
 3. backend calls enrollment or inference logic
 4. backend returns the matched sound name, type, and similarity
 
-## Future Backend / App IO Contract
+## Future Backend and App IO Contract
 
 Enrollment input:
 
 ```json
 {
   "audio_file": "uploaded wav/mp3",
-  "registered_sound_name": "우리 아파트 방송음",
+  "registered_sound_name": "Our Apartment Broadcast",
   "sound_type": "apartment_announcement"
 }
 ```
@@ -209,7 +271,7 @@ Inference output:
 ```json
 {
   "predicted": true,
-  "registered_sound_name": "우리 아파트 방송음",
+  "registered_sound_name": "Our Apartment Broadcast",
   "sound_type": "apartment_announcement",
   "similarity": 0.87,
   "threshold": 0.8

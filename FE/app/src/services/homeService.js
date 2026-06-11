@@ -4,7 +4,12 @@ import { mockAppPreview } from '../mocks/appPreviewMock'
 import { getAlerts } from './alertService'
 
 export async function getHomeSummary() {
-  return normalizeHomeSummary(await apiRequest('/api/app/home'))
+  try {
+    return normalizeHomeSummary(await apiRequest('/api/app/home'))
+  } catch {
+    // Keep the home screen usable while the backend home API is unavailable.
+    return normalizeHomeSummary(structuredClone(mockHomeSummary))
+  }
 }
 
 export async function getAppPreview() {

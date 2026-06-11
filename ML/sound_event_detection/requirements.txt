@@ -7,3 +7,5 @@ matplotlib>=3.8.0
 PyYAML>=6.0.1
 tqdm>=4.66.0
 numpy>=1.26.0
+sounddevice>=0.4.7
+soundfile>=0.12.1

@@ -11,17 +11,29 @@ import {
   countTotalRecordings,
   createDetectionEvent,
   createRecordingEntry,
-  createSoundEntry,
   getSoundTypeLabel,
-  loadLivingSignalState,
-  saveLivingSignalState,
 } from './livingSignalUtils'
+import {
+  createLivingSignalSound,
+  deleteLivingSignalSound,
+  getLivingSignalState,
+  updateLivingSignalSound,
+  updateLivingSignalThreshold,
+} from './livingSignalService'
 import './livingSignal.css'
 
 const defaultAudioHandlers = {
   createAmbientDetectionSession,
   createEnrollmentSession,
   isMicrophoneSupported,
+}
+
+const defaultDataHandlers = {
+  loadState: getLivingSignalState,
+  createSound: createLivingSignalSound,
+  updateSound: updateLivingSignalSound,
+  deleteSound: deleteLivingSignalSound,
+  updateThreshold: updateLivingSignalThreshold,
 }
 
 function formatTime(dateTime) {
@@ -42,12 +54,6 @@ function formatSeconds(value) {
 }
 
 function createInitialState(livingSignals) {
-  const storedState = loadLivingSignalState()
-
-  if (storedState) {
-    return storedState
-  }
-
   return cloneLivingSignalState(livingSignals)
 }
 
@@ -56,6 +62,7 @@ export function LivingSignalSettingsScreen({
   onBack,
   showBackButton = true,
   audioHandlers = defaultAudioHandlers,
+  dataHandlers = defaultDataHandlers,
 }) {
   const initialState = useMemo(() => createInitialState(livingSignals), [livingSignals])
   const [sounds, setSounds] = useState(initialState.sounds)
@@ -77,19 +84,69 @@ export function LivingSignalSettingsScreen({
     lastMatch: null,
     info: '감지를 시작하면 휴대폰 마이크로 주변 소리를 듣고 등록된 알림음과 비교합니다.',
   })
+  const [syncError, setSyncError] = useState('')
 
   const enrollmentSessionRef = useRef(null)
   const ambientSessionRef = useRef(null)
+  const isHydratingRef = useRef(true)
+  const thresholdReadyRef = useRef(false)
   const totalRecordings = useMemo(() => countTotalRecordings(sounds), [sounds])
 
   useEffect(() => {
-    saveLivingSignalState({
-      threshold,
-      workflow: initialState.workflow,
-      sounds,
-      detections,
-    })
-  }, [detections, initialState.workflow, sounds, threshold])
+    let isMounted = true
+
+    async function loadState() {
+      try {
+        const remoteState = await dataHandlers.loadState(initialState)
+
+        if (!isMounted) {
+          return
+        }
+
+        isHydratingRef.current = true
+        setSounds(remoteState.sounds)
+        setThreshold(remoteState.threshold)
+        setDetections(remoteState.detections || [])
+        setSyncError('')
+      } catch (error) {
+        if (!isMounted) {
+          return
+        }
+
+        setSyncError(error.message || '생활 신호 설정을 불러오지 못했습니다.')
+      } finally {
+        if (isMounted) {
+          isHydratingRef.current = false
+          thresholdReadyRef.current = true
+        }
+      }
+    }
+
+    loadState()
+
+    return () => {
+      isMounted = false
+    }
+  }, [dataHandlers, initialState])
+
+  useEffect(() => {
+    if (isHydratingRef.current || !thresholdReadyRef.current) {
+      return undefined
+    }
+
+    const timerId = window.setTimeout(async () => {
+      try {
+        await dataHandlers.updateThreshold(threshold)
+        setSyncError('')
+      } catch (error) {
+        setSyncError(error.message || '감지 기준 저장에 실패했습니다.')
+      }
+    }, 300)
+
+    return () => {
+      window.clearTimeout(timerId)
+    }
+  }, [dataHandlers, threshold])
 
   useEffect(() => {
     return () => {
@@ -151,6 +208,17 @@ export function LivingSignalSettingsScreen({
       [field]: value,
       error: '',
     }))
+  }
+
+  function normalizeSound(sound) {
+    return {
+      ...sound,
+      soundTypeLabel: sound.soundTypeLabel || getSoundTypeLabel(sound.soundType),
+      recordings: (sound.recordings || []).map((recording) => ({
+        ...recording,
+        embedding: [...(recording.embedding || [])],
+      })),
+    }
   }
 
   async function startEnrollmentRecording() {
@@ -297,7 +365,7 @@ export function LivingSignalSettingsScreen({
     }))
   }
 
-  function saveSound() {
+  async function saveSound() {
     const trimmedName = editor.name.trim()
     const trimmedNotes = editor.notes.trim()
 
@@ -317,38 +385,44 @@ export function LivingSignalSettingsScreen({
       return
     }
 
-    if (editor.mode === 'create') {
-      setSounds((current) => [
-        createSoundEntry({
-          registeredSoundName: trimmedName,
-          soundType: editor.soundType,
-          notes: trimmedNotes,
-          recordings: [createRecordingEntry(recordingState.sample)],
-        }),
-        ...current,
-      ])
-    } else {
-      setSounds((current) =>
-        current.map((sound) => {
-          if (sound.soundId !== editor.soundId) {
-            return sound
-          }
+    const nextRecordings =
+      editor.mode === 'create'
+        ? [createRecordingEntry(recordingState.sample)]
+        : (() => {
+            const currentSound = sounds.find((sound) => sound.soundId === editor.soundId)
+            if (!recordingState.sample) {
+              return currentSound?.recordings || []
+            }
+            return sampleSaveMode === 'replace'
+              ? [createRecordingEntry(recordingState.sample)]
+              : [...(currentSound?.recordings || []), createRecordingEntry(recordingState.sample)]
+          })()
 
-          return {
-            ...sound,
-            registeredSoundName: trimmedName,
-            soundType: editor.soundType,
-            soundTypeLabel: getSoundTypeLabel(editor.soundType),
-            notes: trimmedNotes,
-            updatedAt: new Date().toISOString(),
-            recordings: recordingState.sample
-              ? sampleSaveMode === 'replace'
-                ? [createRecordingEntry(recordingState.sample)]
-                : [...sound.recordings, createRecordingEntry(recordingState.sample)]
-              : sound.recordings,
-          }
-        }),
-      )
+    const payload = {
+      registeredSoundName: trimmedName,
+      soundType: editor.soundType,
+      notes: trimmedNotes,
+      recordings: nextRecordings,
+    }
+
+    try {
+      if (editor.mode === 'create') {
+        const createdSound = await dataHandlers.createSound(payload)
+        setSounds((current) => [normalizeSound(createdSound), ...current])
+      } else {
+        const updatedSound = await dataHandlers.updateSound(editor.soundId, payload)
+        setSounds((current) =>
+          current.map((sound) => (sound.soundId === editor.soundId ? normalizeSound(updatedSound) : sound)),
+        )
+      }
+
+      setSyncError('')
+    } catch (error) {
+      setEditor((current) => ({
+        ...current,
+        error: error.message || '생활 신호 저장에 실패했습니다.',
+      }))
+      return
     }
 
     if (listenerState.isListening) {
@@ -358,7 +432,7 @@ export function LivingSignalSettingsScreen({
     closeEditorPage()
   }
 
-  function deleteSound(soundId) {
+  async function deleteSound(soundId) {
     const target = sounds.find((sound) => sound.soundId === soundId)
 
     if (!target) {
@@ -369,7 +443,14 @@ export function LivingSignalSettingsScreen({
       return
     }
 
-    setSounds((current) => current.filter((sound) => sound.soundId !== soundId))
+    try {
+      await dataHandlers.deleteSound(soundId)
+      setSounds((current) => current.filter((sound) => sound.soundId !== soundId))
+      setSyncError('')
+    } catch (error) {
+      setSyncError(error.message || '생활 신호 삭제에 실패했습니다.')
+      return
+    }
 
     if (listenerState.isListening) {
       stopAmbientListening()
@@ -517,6 +598,7 @@ export function LivingSignalSettingsScreen({
         </section>
 
         {editor.error ? <p className="living-signal-warning">{editor.error}</p> : null}
+        {syncError ? <p className="living-signal-warning">{syncError}</p> : null}
 
         <button className="living-signal-save" type="button" onClick={saveSound}>
           {screenMode === 'create' ? '추가 완료' : '수정 완료'}
@@ -633,6 +715,7 @@ export function LivingSignalSettingsScreen({
 
         <p className="living-signal-info">{listenerState.info}</p>
         {listenerState.error ? <p className="living-signal-warning">{listenerState.error}</p> : null}
+        {syncError ? <p className="living-signal-warning">{syncError}</p> : null}
 
         {listenerState.lastMatch?.predicted ? (
           <p className="living-signal-result">{listenerState.lastMatch.registeredSoundName} 감지</p>
