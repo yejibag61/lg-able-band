@@ -1,11 +1,13 @@
 import {
   confirmAlert,
   createPairingPayload,
+  createWearableService,
   getCurrentAlert,
   getPairingSession,
   getUwbSession,
   normalizeUwbSession,
   replayAlert,
+  requestEmergencyHelp,
 } from './wearableService'
 
 describe('wearableService', () => {
@@ -59,5 +61,109 @@ describe('wearableService', () => {
     expect(mockShape.navigationStatus).toBe('ACTIVE')
     expect(arrivedMockShape.navigationStatus).toBe('ARRIVED')
     expect(arrivedMockShape.vibrationPattern).toBe('LONG_TWICE')
+  })
+
+  it('fetches current alert from final api shape', async () => {
+    const apiFetch = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      headers: new Headers({ 'Content-Type': 'application/json' }),
+      json: async () => ({
+        items: [
+          {
+            alertId: 777,
+            type: 'DANGER',
+            severity: 'HIGH',
+            title: '화재 위험',
+            message: '주방 온도가 높습니다.',
+            deviceName: '온도 센서',
+            occurredAt: '2026-06-10T15:00:00+09:00',
+            status: 'UNREAD',
+          },
+        ],
+      }),
+    }))
+    const service = createWearableService({
+      baseUrl: 'http://api.test',
+      fetchImpl: apiFetch,
+      fallbackEnabled: false,
+    })
+
+    const alert = await service.getCurrentAlert()
+
+    expect(apiFetch).toHaveBeenCalledWith(
+      'http://api.test/api/alerts?status=UNREAD&limit=20',
+      expect.objectContaining({ method: 'GET' }),
+    )
+    expect(alert.alertId).toBe(777)
+    expect(alert.voiceGuide).toContain('주방 온도가 높습니다.')
+  })
+
+  it('falls back to mock when wearable api is unavailable', async () => {
+    const service = createWearableService({
+      baseUrl: 'http://api.test',
+      fetchImpl: vi.fn(async () => {
+        throw new Error('network down')
+      }),
+      fallbackEnabled: true,
+    })
+
+    const alert = await service.getCurrentAlert()
+
+    expect(alert.alertId).toBe(301)
+  })
+
+  it('sends final api confirm request body', async () => {
+    const apiFetch = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      headers: new Headers({ 'Content-Type': 'application/json' }),
+      json: async () => ({
+        alertId: 301,
+        status: 'CONFIRMED',
+        confirmedAt: '2026-06-10T14:43:00+09:00',
+      }),
+    }))
+    const service = createWearableService({
+      baseUrl: 'http://api.test',
+      fetchImpl: apiFetch,
+      fallbackEnabled: false,
+    })
+
+    const confirmed = await service.confirmAlert(301)
+
+    expect(apiFetch).toHaveBeenCalledWith(
+      'http://api.test/api/alerts/301/confirm',
+      expect.objectContaining({
+        body: JSON.stringify({ responseType: 'CONFIRMED' }),
+        method: 'POST',
+      }),
+    )
+    expect(confirmed.status).toBe('CONFIRMED')
+  })
+
+  it('surfaces emergency api business errors instead of fallback success', async () => {
+    const service = createWearableService({
+      baseUrl: 'http://api.test',
+      fetchImpl: vi.fn(async () => ({
+        ok: false,
+        status: 409,
+        headers: new Headers({ 'Content-Type': 'application/json' }),
+        json: async () => ({ code: 'NO_GUARDIAN' }),
+      })),
+      fallbackEnabled: true,
+    })
+
+    await expect(service.requestEmergencyHelp('도움이 필요합니다.')).rejects.toMatchObject({
+      code: 'NO_GUARDIAN',
+    })
+  })
+
+  it('requests emergency help from the wearable', async () => {
+    const response = await requestEmergencyHelp('도움이 필요합니다.')
+
+    expect(response.status).toBe('SENT')
+    expect(response.source).toBe('WEARABLE')
+    expect(response.message).toContain('긴급 요청')
   })
 })

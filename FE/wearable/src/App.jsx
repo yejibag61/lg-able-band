@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { ModeSwitch } from './components/ModeSwitch'
 import { WearableFrame } from './components/WearableFrame'
 import { CurrentAlertScreen } from './features/alerts/CurrentAlertScreen'
+import { WearableEmergencyScreen } from './features/emergency/WearableEmergencyScreen'
 import { PairingQrScreen } from './features/pairing/PairingQrScreen'
 import { UwbGuideScreen } from './features/uwb/UwbGuideScreen'
 import {
@@ -11,9 +12,11 @@ import {
   getInitialUwbSessionId,
   getPairingSession,
   getUwbSession,
+  requestEmergencyHelp,
   replayAlert,
   stopUwbSession,
 } from './services/wearableService'
+import { triggerVibration, vibrationPatternForAlert } from './services/vibrationService'
 import './App.css'
 
 const DEFAULT_UWB_POLL_INTERVAL_MS = 2000
@@ -21,6 +24,7 @@ const DEFAULT_UWB_POLL_INTERVAL_MS = 2000
 function App() {
   const [isPaired, setIsPaired] = useState(false)
   const [mode, setMode] = useState('alert')
+  const [pairingStatus, setPairingStatus] = useState(getInitialPairingStatus)
   const [pairing] = useState(() => {
     const session = getPairingSession()
     return { ...session, pairingPayload: createPairingPayload(session) }
@@ -32,6 +36,14 @@ function App() {
   const isUwbPollingRef = useRef(true)
   const [statusMessage, setStatusMessage] = useState('')
   const [isBusy, setIsBusy] = useState(false)
+  const pairingCompleteTimerRef = useRef(null)
+
+  useEffect(
+    () => () => {
+      window.clearTimeout(pairingCompleteTimerRef.current)
+    },
+    [],
+  )
 
   useEffect(() => {
     if (!isPaired || mode !== 'alert') {
@@ -41,9 +53,16 @@ function App() {
     let isMounted = true
 
     async function loadAlert() {
-      const currentAlert = await getCurrentAlert()
-      if (isMounted) {
-        setAlert(applyStoredAlertStatus(currentAlert, alertStatuses))
+      try {
+        const currentAlert = await getCurrentAlert()
+        if (isMounted) {
+          setAlert(applyStoredAlertStatus(currentAlert, alertStatuses))
+        }
+      } catch (error) {
+        if (isMounted) {
+          setAlert(null)
+          setStatusMessage(error.message || '알림을 불러오지 못했습니다.')
+        }
       }
     }
 
@@ -105,6 +124,7 @@ function App() {
     setIsBusy(true)
     try {
       const replayed = await replayAlert(alert.alertId)
+      triggerVibration(vibrationPatternForAlert(alert))
       setStatusMessage(`다시 듣기: ${replayed.voiceGuide}`)
     } catch {
       setStatusMessage('다시 듣기를 실행할 수 없습니다.')
@@ -121,6 +141,7 @@ function App() {
     setIsBusy(true)
     try {
       const confirmed = await confirmAlert(alert.alertId)
+      triggerVibration('MEDIUM')
       setAlertStatuses((currentStatuses) => ({
         ...currentStatuses,
         [alert.alertId]: confirmed.status,
@@ -145,9 +166,24 @@ function App() {
       isUwbPollingRef.current = false
       setIsUwbPolling(false)
       const stopped = await stopUwbSession(currentSessionId)
+      triggerVibration(stopped.vibrationPattern)
       setUwbSession(stopped)
     } catch {
       setStatusMessage('탐색 종료에 실패했습니다.')
+    } finally {
+      setIsBusy(false)
+    }
+  }
+
+  async function handleEmergencyRequest() {
+    setIsBusy(true)
+    setStatusMessage('긴급 요청을 보내는 중입니다.')
+    try {
+      const response = await requestEmergencyHelp('손목 웨어러블에서 긴급 요청')
+      triggerVibration('LONG_TWICE')
+      setStatusMessage(response.message || '보호자에게 긴급 요청을 보냈습니다.')
+    } catch (error) {
+      setStatusMessage(formatEmergencyErrorMessage(error))
     } finally {
       setIsBusy(false)
     }
@@ -173,9 +209,18 @@ function App() {
         {!isPaired ? (
           <PairingQrScreen
             pairing={pairing}
+            status={pairingStatus}
             onPairComplete={() => {
-              setIsPaired(true)
-              setMode('alert')
+              setPairingStatus('success')
+              window.clearTimeout(pairingCompleteTimerRef.current)
+              pairingCompleteTimerRef.current = window.setTimeout(() => {
+                setIsPaired(true)
+                setMode('alert')
+              }, 80)
+            }}
+            onResetPairing={() => {
+              window.clearTimeout(pairingCompleteTimerRef.current)
+              setPairingStatus('waiting')
             }}
           />
         ) : null}
@@ -195,16 +240,45 @@ function App() {
             session={uwbSession}
             actionMessage={statusMessage}
             isBusy={isBusy}
+            onStandby={() => {
+              setMode('idle')
+              setStatusMessage('')
+            }}
             onStop={handleStopUwb}
           />
         ) : null}
 
         {isPaired && mode === 'idle' ? (
-          <section className="state-screen" aria-label="웨어러블 대기">
+          <section className="state-screen standby-screen" aria-label="웨어러블 대기">
             <p className="eyebrow">Able Band</p>
-            <h1>대기 중입니다.</h1>
+            <h1>손목에서 대기 중</h1>
             <p>알림이나 위치 안내가 시작되면 바로 표시합니다.</p>
+            <dl className="standby-meta">
+              <div>
+                <dt>배터리</dt>
+                <dd>배터리 82%</dd>
+              </div>
+              <div>
+                <dt>연동</dt>
+                <dd>휴대폰 연결됨</dd>
+              </div>
+            </dl>
+            <button className="primary-action" type="button" onClick={() => setMode('emergency')}>
+              긴급 요청
+            </button>
           </section>
+        ) : null}
+
+        {isPaired && mode === 'emergency' ? (
+          <WearableEmergencyScreen
+            actionMessage={statusMessage}
+            isBusy={isBusy}
+            onCancel={() => {
+              setMode('idle')
+              setStatusMessage('')
+            }}
+            onRequest={handleEmergencyRequest}
+          />
         ) : null}
       </WearableFrame>
     </main>
@@ -223,6 +297,26 @@ function applyStoredAlertStatus(alert, alertStatuses) {
 function getUwbPollIntervalMs() {
   const override = Number(window.__ABLE_BAND_UWB_POLL_MS__)
   return Number.isFinite(override) && override > 0 ? override : DEFAULT_UWB_POLL_INTERVAL_MS
+}
+
+function getInitialPairingStatus() {
+  const requestedStatus = new URLSearchParams(window.location.search).get('pairing')
+  if (requestedStatus === 'expired' || requestedStatus === 'invalid') {
+    return requestedStatus
+  }
+
+  return 'waiting'
+}
+
+function formatEmergencyErrorMessage(error) {
+  const messages = {
+    NO_GUARDIAN: '연결된 보호자가 없습니다. 휴대폰 앱에서 보호자를 먼저 연결해주세요.',
+    DELIVERY_FAILED: '보호자에게 알림을 보내지 못했습니다. 잠시 후 다시 시도해주세요.',
+    UNAUTHORIZED: '연동 인증이 만료되었습니다. 휴대폰에서 다시 연동해주세요.',
+    SERVER_ERROR: '긴급 요청을 보내지 못했습니다. 잠시 후 다시 시도해주세요.',
+  }
+
+  return messages[error?.code] || error?.message || messages.SERVER_ERROR
 }
 
 export default App

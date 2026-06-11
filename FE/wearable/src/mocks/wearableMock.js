@@ -21,6 +21,7 @@ export const mockAlerts = [
     locationName: '주방',
     occurredAt: '2026-06-10T14:42:00+09:00',
     status: 'UNREAD',
+    vibrationPattern: 'STRONG',
   },
   {
     alertId: 302,
@@ -33,8 +34,23 @@ export const mockAlerts = [
     locationName: '세탁실',
     occurredAt: '2026-06-10T14:20:00+09:00',
     status: 'UNREAD',
+    vibrationPattern: 'SLOW',
   },
 ]
+
+export const mockEmergencyResponse = {
+  emergencyRequestId: 501,
+  status: 'SENT',
+  source: 'WEARABLE',
+  message: '보호자에게 긴급 요청을 보냈습니다.',
+  guardianTargets: [
+    {
+      guardianId: 1,
+      name: '김보호',
+      deliveryStatus: 'SENT',
+    },
+  ],
+}
 
 export const mockUwbSessions = [
   {
