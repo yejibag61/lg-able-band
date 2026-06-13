@@ -2,4 +2,11 @@ fastapi
 uvicorn
 pydantic
 requests
-# joblib is optional and only needed when trained classifier files are added.
+pandas
+feedparser
+beautifulsoup4
+python-dotenv
+xmltodict
+openpyxl
+scikit-learn
+joblib

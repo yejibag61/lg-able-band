@@ -1,9 +1,13 @@
 """Simple integration requests for a running info-agent server."""
 
 import os
+import sys
 
 import requests
 
+
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 BASE_URL = os.environ.get("INFO_AGENT_BASE_URL", "http://127.0.0.1:8010")
 TEST_CASES = [
