@@ -28,7 +28,7 @@ const deviceCatalog = [
     type: 'TV',
     typeLabel: 'TV',
     room: '거실',
-    detail: '전원 상태, 볼륨, 채널 변경 안내를 확인합니다.',
+    detail: '전원 상태, 볼륨, 채널 변경 안내를 확인할 수 있습니다.',
     primarySignal: '전원/볼륨 상태 안내',
     locationSupported: false,
     remoteEnabled: true,
@@ -67,7 +67,7 @@ const deviceCatalog = [
     type: 'AIR_SENSOR',
     typeLabel: '공기질 센서',
     room: '거실',
-    detail: '공기질, 습도, 미세먼지 상태를 생활 알림으로 전달합니다.',
+    detail: '공기질, 온습도, 미세먼지 상태를 생활 알림으로 전달합니다.',
     primarySignal: '공기질 상태 안내',
     locationSupported: true,
     remoteEnabled: false,
@@ -100,9 +100,7 @@ export function DevicesTab({ devices = [], maxDeviceCount, uwb }) {
   )
 
   const [connectedDevices, setConnectedDevices] = useState(initialDevices)
-  const [selectedDeviceId, setSelectedDeviceId] = useState(
-    initialDevices[0]?.deviceId ?? null,
-  )
+  const [selectedDeviceId, setSelectedDeviceId] = useState(initialDevices[0]?.deviceId ?? null)
   const [connectionMessage, setConnectionMessage] = useState('')
   const [isDevicePickerOpen, setIsDevicePickerOpen] = useState(false)
   const [screenMode, setScreenMode] = useState('list')
@@ -129,9 +127,11 @@ export function DevicesTab({ devices = [], maxDeviceCount, uwb }) {
     () => new Set(connectedDevices.map((device) => device.type)),
     [connectedDevices],
   )
+
   const availableDeviceCount = deviceCatalog.filter(
     (device) => !registeredDeviceTypes.has(device.type),
   ).length
+
   const uwbTarget = getUwbTarget(connectedDevices, selectedDevice, uwb)
   const uwbGuide = uwbTarget ? createUwbGuide(uwbTarget, uwb) : null
 
@@ -164,7 +164,7 @@ export function DevicesTab({ devices = [], maxDeviceCount, uwb }) {
 
   function openCreatePage(template) {
     if (registeredDeviceTypes.has(template.type)) {
-      setConnectionMessage(`${template.name}은 이미 연결된 가전입니다.`)
+      setConnectionMessage(`${template.name}는 이미 연결된 가전입니다.`)
       setIsDevicePickerOpen(false)
       return
     }
@@ -198,7 +198,7 @@ export function DevicesTab({ devices = [], maxDeviceCount, uwb }) {
     if (!draft.name.trim()) {
       setSubmitState({
         saving: false,
-        error: '가전 이름을 입력해주세요.',
+        error: '가전 이름을 입력해 주세요.',
       })
       return
     }
@@ -206,7 +206,7 @@ export function DevicesTab({ devices = [], maxDeviceCount, uwb }) {
     if (!draft.vendorDeviceId.trim()) {
       setSubmitState({
         saving: false,
-        error: 'vendorDeviceId를 입력해주세요.',
+        error: 'vendorDeviceId를 입력해 주세요.',
       })
       return
     }
@@ -224,7 +224,6 @@ export function DevicesTab({ devices = [], maxDeviceCount, uwb }) {
       })
 
       const nextDevice = enrichDevice(savedDevice, catalogByType)
-
       setConnectedDevices((current) => [
         nextDevice,
         ...current.filter((item) => item.deviceId !== nextDevice.deviceId),
@@ -232,7 +231,7 @@ export function DevicesTab({ devices = [], maxDeviceCount, uwb }) {
       setSelectedDeviceId(nextDevice.deviceId)
       setIsDevicePickerOpen(false)
       setScreenMode('list')
-      setConnectionMessage(`${nextDevice.name}를 연결했어요.`)
+      setConnectionMessage(`${nextDevice.name}를 연결했습니다.`)
       setSubmitState({ saving: false, error: '' })
     } catch (error) {
       setSubmitState({
@@ -255,7 +254,9 @@ export function DevicesTab({ devices = [], maxDeviceCount, uwb }) {
           <div className="device-add-hero">
             <p className="card-label">가전 추가</p>
             <h2 id="device-add-title">{template?.name || '가전'} 연결</h2>
-            <p>선택한 가전을 계정에 연결하고, 이후 알림과 UWB 안내에 사용할 수 있게 저장합니다.</p>
+            <p>
+              선택한 가전을 계정에 연결하고, 이후 알림과 UWB 안내를 사용할 수 있게 등록합니다.
+            </p>
           </div>
 
           <div className="device-add-preview-card">
@@ -272,7 +273,7 @@ export function DevicesTab({ devices = [], maxDeviceCount, uwb }) {
               type="text"
               value={draft.name}
               onChange={(event) => updateDraft('name', event.target.value)}
-              placeholder="예: 세탁기"
+              placeholder="예: 우리집 세탁기"
             />
           </label>
 
@@ -305,7 +306,7 @@ export function DevicesTab({ devices = [], maxDeviceCount, uwb }) {
             />
             <div>
               <strong>UWB 위치 안내 사용</strong>
-              <p>해당 가전을 UWB 찾기 대상으로 함께 저장합니다.</p>
+              <p>이 가전을 UWB 찾기 대상으로 등록합니다.</p>
             </div>
           </label>
 
@@ -317,7 +318,7 @@ export function DevicesTab({ devices = [], maxDeviceCount, uwb }) {
             />
             <div>
               <strong>원격 제어 사용</strong>
-              <p>원격 상태 조회와 연동 기능을 함께 저장합니다.</p>
+              <p>원격 상태 조회와 연동 기능을 사용할 수 있게 등록합니다.</p>
             </div>
           </label>
 
@@ -344,12 +345,15 @@ export function DevicesTab({ devices = [], maxDeviceCount, uwb }) {
     <section className="tab-stack device-tab" aria-labelledby="devices-title">
       <div className="content-card device-hero-card">
         <div>
-          <p className="card-label">LG ThinQ 연결</p>
+          <p className="card-label">LG ThinQ 연동</p>
           <h2 id="devices-title">우리 집 가전을 연결해요.</h2>
-          <p>세탁기, TV, 안전 전기레인지, 도어센서, 공기질 센서, 냉장고를 한 화면에서 관리합니다.</p>
+          <p>
+            세탁기, TV, 전기레인지, 도어센서, 공기질 센서, 냉장고를 한 화면에서 관리할
+            수 있습니다.
+          </p>
         </div>
         <button className="device-find-button" type="button" onClick={handleFindNearbyDevices}>
-          주변 제품 찾기
+          주변 기기 찾기
         </button>
       </div>
 
@@ -395,10 +399,10 @@ export function DevicesTab({ devices = [], maxDeviceCount, uwb }) {
           <div className="section-title-row">
             <div>
               <p className="card-label">UWB 위치 안내</p>
-              <h2>연결된 위치 안내 가전이 없습니다</h2>
+              <h2>연결된 UWB 대상 기기가 없습니다</h2>
             </div>
           </div>
-          <p>UWB를 지원하는 가전을 연결하면 이곳에서 위치 안내를 시작할 수 있습니다.</p>
+          <p>UWB를 지원하는 가전을 연결하면 이 화면에서 위치 안내를 시작할 수 있습니다.</p>
         </section>
       )}
 
@@ -427,9 +431,7 @@ export function DevicesTab({ devices = [], maxDeviceCount, uwb }) {
                 onClick={() => handleSelectConnectedDevice(device.deviceId)}
               >
                 <DeviceIcon type={device.type} />
-                <span
-                  className={`connection-dot connection-${device.connectionStatus.toLowerCase()}`}
-                />
+                <span className={`connection-dot connection-${device.connectionStatus.toLowerCase()}`} />
                 <strong>{device.name}</strong>
                 <small>{connectionLabels[device.connectionStatus] || device.connectionStatus}</small>
               </button>
@@ -437,7 +439,7 @@ export function DevicesTab({ devices = [], maxDeviceCount, uwb }) {
           </div>
         ) : (
           <p className="empty-state">
-            아직 연결된 가전이 없습니다. 위의 `가전 추가하기`로 먼저 연결해주세요.
+            아직 연결된 가전이 없습니다. 아래의 가전 추가하기로 먼저 연결해 주세요.
           </p>
         )}
       </section>
@@ -504,7 +506,7 @@ export function DevicesTab({ devices = [], maxDeviceCount, uwb }) {
       <section className="device-register-card" aria-labelledby="device-register-title">
         <div className="section-title-row">
           <div>
-            <p className="card-label">연동 가전</p>
+            <p className="card-label">연동 가능한 가전</p>
             <h2 id="device-register-title">가전 추가</h2>
           </div>
           <span>{availableDeviceCount}종</span>
@@ -604,10 +606,7 @@ function getUwbTarget(devices, selectedDevice, uwb) {
     return null
   }
 
-  if (
-    selectedDevice?.connectionStatus === 'CONNECTED' &&
-    selectedDevice.locationSupported
-  ) {
+  if (selectedDevice?.connectionStatus === 'CONNECTED' && selectedDevice.locationSupported) {
     return selectedDevice
   }
 

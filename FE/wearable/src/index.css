@@ -71,7 +71,9 @@
 }
 
 :root {
-  font-family: "LG EI Text", "Noto Sans KR", sans-serif;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "SF Pro KR", "SF Pro Text",
+    "Segoe UI", "Noto Sans KR", sans-serif;
   line-height: 1.5;
   font-weight: 400;
   color: #111827;
@@ -97,5 +99,7 @@ body {
 }
 
 h1 {
-  font-family: "LG EI Headline", "LG EI Text", "Noto Sans KR", sans-serif;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "SF Pro KR", "SF Pro Text",
+    "Segoe UI", "Noto Sans KR", sans-serif;
 }

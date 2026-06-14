@@ -23,7 +23,7 @@ export function HomeTab({
       <section className="home-guide-card" aria-label="Able Band 상태 안내">
         <span className="guide-indicator" aria-hidden="true" />
         <div>
-          <p className="card-label">실시간 케어</p>
+          <p className="card-label">실시간 안내</p>
           <h2>Able Band가 실시간 안전 상태를 확인 중입니다.</h2>
         </div>
       </section>
@@ -46,9 +46,9 @@ export function HomeTab({
 
       <section className="emergency-card">
         <div>
-          <p className="card-label">긴급 도움 요청</p>
+          <p className="card-label">긴급 지원 요청</p>
           <h2>{guardianName}에게 바로 알림</h2>
-          <p>버튼을 누르면 보호자에게 현재 상황을 알립니다.</p>
+          <p>버튼을 누르면 보호자에게 현재 상황을 즉시 전달합니다.</p>
         </div>
         <button
           className="sos-button"
@@ -57,7 +57,7 @@ export function HomeTab({
           disabled={!summary.quickActions.canRequestEmergency || emergencySubmitting}
           onClick={onEmergencyRequest}
         >
-          {emergencySubmitting ? '요청 전송 중' : '긴급 지원 요청'}
+          {emergencySubmitting ? '요청 전송 중...' : '긴급 지원 요청'}
         </button>
         {emergencyMessage ? (
           <p className="emergency-message" role="status">
@@ -88,7 +88,7 @@ export function HomeTab({
                   <p>{alert.message}</p>
                   <small>
                     {alert.deviceName} · {alert.occurredAt.slice(11, 16)} ·{' '}
-                    {alert.status === 'UNREAD' ? '미확인' : '확인함'}
+                    {alert.status === 'UNREAD' ? '미확인' : '확인 완료'}
                   </small>
                 </div>
               </article>
@@ -113,7 +113,7 @@ export function HomeTab({
         </div>
         <div className="device-stat-grid" aria-label="기기 상태 요약">
           <span className="device-stat">주의 필요 {summary.deviceSummary.warningCount}개</span>
-          <span className="device-stat">UWB 가능 {summary.deviceSummary.uwbSupportedCount}개</span>
+          <span className="device-stat">UWB 지원 {summary.deviceSummary.uwbSupportedCount}개</span>
         </div>
       </section>
     </>

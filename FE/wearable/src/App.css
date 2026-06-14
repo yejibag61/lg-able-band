@@ -882,7 +882,7 @@ button:focus-visible {
   }
 }
 
-@container wearable (max-width: 520px) {
+@container wearable (max-width: 380px) {
   .wearable-screen {
     border-radius: 12px;
     row-gap: 8px;
@@ -1063,5 +1063,564 @@ button:focus-visible {
 
   .emergency-copy {
     font-size: 0.72rem;
+  }
+}
+
+/* App-aligned wearable refinement */
+:root {
+  --wearable-bg: #f3f4f6;
+  --wearable-surface: #ffffff;
+  --wearable-surface-soft: #f8f9fb;
+  --wearable-border: #e8ebef;
+  --wearable-border-strong: #d9dee5;
+  --wearable-text: #181b20;
+  --wearable-text-soft: #5c6675;
+  --wearable-text-muted: #97a0ab;
+  --wearable-primary: #e11d48;
+  --wearable-primary-soft: #fff4f7;
+  --wearable-primary-strong: #b81b42;
+  --wearable-shadow-sm: 0 8px 18px rgba(17, 24, 39, 0.05);
+  --wearable-shadow-md: 0 14px 28px rgba(17, 24, 39, 0.08);
+}
+
+.app-root {
+  background:
+    radial-gradient(circle at top center, rgba(255, 255, 255, 0.75) 0%, rgba(255, 255, 255, 0) 30%),
+    var(--wearable-bg);
+  color: var(--wearable-text);
+}
+
+.wearable-shell {
+  width: min(calc(100vw - 16px), 452px, 51vh);
+  aspect-ratio: 452 / 884;
+  border-color: #17191d;
+  background: #17191d;
+  box-shadow: 0 18px 42px rgba(17, 24, 39, 0.18);
+}
+
+.wearable-screen {
+  display: grid;
+  grid-template-rows: 1fr;
+  align-items: center;
+  row-gap: 10px;
+  border-radius: 20px;
+  padding: 24px 18px;
+  background: linear-gradient(180deg, #ffffff 0%, #f7f8fa 100%);
+}
+
+.mode-switch {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 3;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--wearable-border);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.95);
+}
+
+.wearable-screen > section {
+  width: 100%;
+}
+
+.mode-button {
+  min-height: 32px;
+  border-radius: 10px;
+  color: var(--wearable-text-soft);
+  font-size: 0.78rem;
+  font-weight: 500;
+}
+
+.mode-button.active {
+  background: var(--wearable-primary-soft);
+  color: var(--wearable-primary-strong);
+}
+
+.pairing-screen,
+.alert-screen,
+.uwb-screen,
+.emergency-screen,
+.state-screen,
+.device-select-screen {
+  gap: 10px;
+  min-height: 100%;
+}
+
+.pairing-screen {
+  grid-template-columns: 1fr !important;
+  grid-template-rows: auto auto !important;
+  justify-items: center;
+  align-content: center !important;
+  gap: 14px;
+}
+
+.pairing-copy,
+.alert-copy {
+  gap: 6px;
+}
+
+.pairing-copy {
+  justify-items: center;
+  text-align: center;
+}
+
+.eyebrow {
+  color: #7c8693;
+  font-size: 0.72rem;
+  font-weight: 430;
+}
+
+h1 {
+  color: var(--wearable-text);
+  font-size: 1.58rem;
+  font-weight: 540;
+  line-height: 1.12;
+  letter-spacing: -0.03em;
+}
+
+.pairing-copy p:not(.eyebrow),
+.alert-copy p,
+.guide-copy,
+.emergency-copy,
+.screen-message,
+.pairing-state-screen p:not(.eyebrow):not(.pairing-state-icon) {
+  color: var(--wearable-text-soft);
+  font-size: 0.9rem;
+  font-weight: 420;
+  line-height: 1.55;
+}
+
+.qr-panel,
+.compact-meta div,
+.vibration-card,
+.chatbot-panel,
+.voice-chatbot-panel,
+.device-select-card,
+.standby-meta div,
+.uwb-main,
+.uwb-distance,
+.vibration-feedback,
+.pairing-state-screen,
+.live-status,
+.live-message,
+.guardian-sync-note {
+  border: 1px solid var(--wearable-border);
+  border-radius: 16px;
+  background: var(--wearable-surface);
+  box-shadow: var(--wearable-shadow-sm);
+}
+
+.qr-panel {
+  gap: 12px;
+  padding: 14px;
+  justify-items: center;
+}
+
+.qr-code {
+  width: 188px;
+  height: 188px;
+}
+
+.pairing-meta {
+  gap: 4px;
+  color: var(--wearable-text-soft);
+  font-size: 0.78rem;
+  font-weight: 430;
+}
+
+.pairing-meta strong {
+  color: var(--wearable-text);
+  font-size: 1rem;
+  font-weight: 520;
+}
+
+.pairing-status,
+.status-badge {
+  border-radius: 999px;
+  font-size: 0.74rem;
+  font-weight: 500;
+}
+
+.pairing-status {
+  border: 1px solid #f0d7df;
+  background: var(--wearable-primary-soft);
+  color: var(--wearable-primary-strong);
+}
+
+.pairing-state-screen {
+  gap: 8px;
+  padding: 12px;
+  box-shadow: none;
+}
+
+.pairing-state-icon {
+  width: 52px;
+  height: 52px;
+  background: var(--wearable-primary-soft);
+  color: var(--wearable-primary-strong);
+  font-size: 0.92rem;
+  font-weight: 540;
+}
+
+.pairing-state-icon.warning {
+  background: #f7f8fa;
+  color: var(--wearable-text-soft);
+}
+
+.primary-action,
+.secondary-action,
+.mini-action,
+.voice-close-button,
+.voice-chatbot-actions button,
+.voice-sample-row button {
+  border-radius: 14px;
+  font-weight: 500;
+}
+
+.primary-action,
+.secondary-action {
+  min-height: 44px;
+  font-size: 0.88rem;
+}
+
+.primary-action {
+  background: var(--wearable-primary);
+  color: #ffffff;
+  box-shadow: 0 10px 22px rgba(225, 29, 72, 0.16);
+}
+
+.secondary-action,
+.voice-close-button,
+.voice-chatbot-actions button,
+.voice-sample-row button {
+  border: 1px solid var(--wearable-border-strong);
+  background: #ffffff;
+  color: var(--wearable-text);
+}
+
+.alert-topline,
+.screen-topline {
+  color: var(--wearable-text-soft);
+  font-size: 0.76rem;
+  font-weight: 430;
+}
+
+.status-badge {
+  color: var(--wearable-text-soft);
+}
+
+.status-critical,
+.status-danger,
+.status-caution,
+.status-life,
+.status-location,
+.status-default,
+.status-neutral,
+.status-guide {
+  background: var(--wearable-primary-soft);
+  color: var(--wearable-primary-strong);
+}
+
+.compact-meta dt,
+.vibration-card span,
+.uwb-distance p,
+.device-select-status,
+.voice-chatbot-answer span,
+.guardian-sync-note,
+.standby-meta dt {
+  color: var(--wearable-text-soft);
+  font-size: 0.7rem;
+  font-weight: 430;
+}
+
+.compact-meta dd,
+.device-select-name,
+.vibration-card strong,
+.voice-chatbot-answer strong,
+.device-select-header strong,
+.uwb-main strong,
+.uwb-distance strong,
+.standby-meta dd,
+.vibration-feedback strong {
+  color: var(--wearable-text);
+  font-weight: 520;
+}
+
+.compact-meta dd {
+  font-size: 0.82rem;
+}
+
+.live-status,
+.live-message,
+.guardian-sync-note,
+.chatbot-panel {
+  padding: 8px 10px;
+  color: var(--wearable-text-soft);
+  font-size: 0.74rem;
+  font-weight: 430;
+}
+
+.chatbot-panel {
+  gap: 4px;
+  background: var(--wearable-surface-soft);
+}
+
+.chatbot-panel span {
+  color: var(--wearable-text-soft);
+  font-size: 0.7rem;
+  line-height: 1.4;
+}
+
+.voice-chatbot-fab {
+  background: var(--wearable-primary);
+  color: #ffffff;
+  box-shadow: 0 12px 24px rgba(225, 29, 72, 0.18);
+}
+
+.voice-chatbot-panel {
+  gap: 8px;
+  border-radius: 18px;
+  border-color: var(--wearable-border);
+  padding: 10px;
+  box-shadow: var(--wearable-shadow-md);
+}
+
+.voice-chatbot-header h2 {
+  color: var(--wearable-text);
+  font-size: 0.94rem;
+  font-weight: 520;
+}
+
+.voice-chatbot-status,
+.voice-chatbot-error,
+.voice-chatbot-answer {
+  border: 1px solid var(--wearable-border);
+  border-radius: 14px;
+  background: #ffffff;
+}
+
+.voice-chatbot-status,
+.voice-chatbot-error {
+  padding: 7px 8px;
+  font-size: 0.7rem;
+  font-weight: 430;
+}
+
+.voice-chatbot-status {
+  color: var(--wearable-text-soft);
+}
+
+.voice-chatbot-error {
+  color: var(--wearable-primary-strong);
+  background: var(--wearable-primary-soft);
+}
+
+.voice-chatbot-field {
+  gap: 6px;
+  color: var(--wearable-text-soft);
+  font-size: 0.72rem;
+  font-weight: 430;
+}
+
+.voice-chatbot-field textarea {
+  border: 1px solid var(--wearable-border-strong);
+  border-radius: 14px;
+  padding: 10px;
+  background: #ffffff;
+  color: var(--wearable-text);
+}
+
+.pager-arrow {
+  color: var(--wearable-text-soft);
+  font-weight: 520;
+}
+
+.pager-dot.active {
+  background: var(--wearable-primary);
+}
+
+.device-select-header h1 {
+  margin-top: 0;
+  font-size: 1.14rem;
+  font-weight: 530;
+}
+
+.device-select-header strong {
+  color: var(--wearable-text-soft);
+  font-size: 0.82rem;
+  font-weight: 460;
+}
+
+.device-select-card {
+  min-height: 114px;
+  border-radius: 18px;
+  padding: 14px;
+  box-shadow: none;
+}
+
+.device-select-card:focus-visible,
+.device-select-card:hover {
+  border-color: #f0d0d8;
+  box-shadow: 0 0 0 2px rgba(225, 29, 72, 0.08);
+}
+
+.device-select-icon,
+.icon-teal,
+.icon-blue,
+.icon-orange,
+.icon-slate {
+  background: #f5f6f8;
+  color: #5b6472;
+  font-weight: 540;
+}
+
+.device-status-dot {
+  border-color: #ffffff;
+}
+
+.device-status-dot.status-connected,
+.device-status-dot.status-warning {
+  background: var(--wearable-primary);
+}
+
+.guide-copy {
+  font-weight: 420;
+}
+
+.uwb-main,
+.uwb-distance,
+.vibration-feedback {
+  align-items: center;
+  padding: 10px 12px;
+  background: #ffffff;
+}
+
+.uwb-main strong,
+.uwb-distance strong {
+  color: var(--wearable-text);
+  font-size: 1.82rem;
+}
+
+.vibration-feedback {
+  gap: 8px;
+  border-color: #f0d7df;
+  background: var(--wearable-primary-soft);
+}
+
+.vibration-feedback span:not(.vibration-pulse),
+.vibration-feedback strong {
+  color: var(--wearable-primary-strong);
+}
+
+.vibration-guide {
+  border-color: var(--wearable-border);
+  background: #ffffff;
+}
+
+.vibration-guide span:not(.vibration-pulse),
+.vibration-guide strong {
+  color: var(--wearable-text-soft);
+}
+
+.vibration-pulse,
+.vibration-guide .vibration-pulse {
+  background: var(--wearable-primary);
+  box-shadow: 0 0 0 0 rgba(225, 29, 72, 0.28);
+}
+
+.standby-meta {
+  gap: 8px;
+}
+
+.standby-meta div {
+  padding: 9px 10px;
+  box-shadow: none;
+}
+
+.emergency-mark {
+  width: 54px;
+  height: 54px;
+  background: var(--wearable-primary);
+  font-weight: 540;
+  box-shadow: 0 14px 28px rgba(225, 29, 72, 0.18);
+}
+
+button:focus-visible {
+  outline: 3px solid rgba(225, 29, 72, 0.28);
+  outline-offset: 2px;
+}
+
+@container wearable (max-width: 380px) {
+  .wearable-screen {
+    grid-template-rows: 1fr;
+    border-radius: 14px;
+    row-gap: 8px;
+    padding: 20px 14px 16px;
+    background: linear-gradient(180deg, #ffffff 0%, #f7f8fa 100%);
+  }
+
+  .mode-switch {
+    top: 10px;
+    right: 10px;
+    border-radius: 12px;
+  }
+
+  .mode-button {
+    min-width: 54px;
+    min-height: 26px;
+    border-radius: 9px;
+    font-size: 0.66rem;
+  }
+
+  h1 {
+    font-size: 1.34rem;
+  }
+
+  .pairing-screen {
+    gap: 12px;
+  }
+
+  .qr-panel,
+  .compact-meta div,
+  .vibration-card,
+  .device-select-card,
+  .standby-meta div,
+  .uwb-main,
+  .uwb-distance,
+  .vibration-feedback {
+    border-radius: 14px;
+  }
+
+  .primary-action,
+  .secondary-action {
+    min-height: 40px;
+    font-size: 0.84rem;
+  }
+
+  .alert-screen,
+  .uwb-screen,
+  .emergency-screen,
+  .state-screen {
+    gap: 8px;
+  }
+
+  .alert-topline,
+  .screen-topline {
+    font-size: 0.7rem;
+  }
+
+  .status-badge {
+    font-size: 0.68rem;
+  }
+
+  .pairing-copy p:not(.eyebrow),
+  .alert-copy p,
+  .guide-copy,
+  .live-status,
+  .live-message,
+  .emergency-copy {
+    font-size: 0.76rem;
+    line-height: 1.4;
   }
 }

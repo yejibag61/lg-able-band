@@ -72,11 +72,16 @@
 
 :root {
   font-family:
-    "LG EI Text",
+    -apple-system,
+    BlinkMacSystemFont,
+    "Apple SD Gothic Neo",
+    "SF Pro KR",
+    "SF Pro Text",
+    "Segoe UI",
     "Noto Sans KR",
     sans-serif;
-  color: #121826;
-  background: #dfe7f2;
+  color: #191f28;
+  background: #eef2f6;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -96,6 +101,7 @@ body,
 }
 
 body {
+  background: #eef2f6;
   overflow-x: hidden;
 }
 
@@ -112,8 +118,12 @@ h1,
 h2,
 h3 {
   font-family:
-    "LG EI Headline",
-    "LG EI Text",
+    -apple-system,
+    BlinkMacSystemFont,
+    "Apple SD Gothic Neo",
+    "SF Pro KR",
+    "SF Pro Display",
+    "Segoe UI",
     "Noto Sans KR",
     sans-serif;
 }

@@ -20,7 +20,6 @@ import {
   updateLivingSignalSound,
   updateLivingSignalThreshold,
 } from './livingSignalService'
-import './livingSignal.css'
 
 const defaultAudioHandlers = {
   createAmbientDetectionSession,
@@ -639,8 +638,8 @@ export function LivingSignalSettingsScreen({
           <div className="living-signal-list">
             {sounds.map((sound) => (
               <article className="living-signal-item" key={sound.soundId}>
-                <div className="living-signal-item-main">
-                  <div>
+                <div className="living-signal-item-header">
+                  <div className="living-signal-item-copy">
                     <p className="living-signal-type">{sound.soundTypeLabel}</p>
                     <h4>{sound.registeredSoundName}</h4>
                     {sound.notes ? <p className="living-signal-note">{sound.notes}</p> : null}
@@ -660,6 +659,7 @@ export function LivingSignalSettingsScreen({
                 </div>
 
                 <div className="living-signal-recordings">
+                  <span className="living-signal-recordings-label">등록 샘플</span>
                   {sound.recordings.map((recording) => (
                     <div className="living-signal-recording-row" key={recording.recordingId}>
                       <div>

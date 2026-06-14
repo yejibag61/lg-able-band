@@ -142,7 +142,6 @@ describe('App login to home flow', () => {
     await user.click(screen.getByRole('button', { name: '로그인' }))
 
     expect(await screen.findByRole('heading', { name: /소희 홈/i })).toBeTruthy()
-    expect(screen.getByRole('button', { name: '로그아웃' })).toBeTruthy()
     expect(screen.getByText('Able Band가 실시간 안전 상태를 확인 중입니다.')).toBeTruthy()
     expect(screen.getByText('오늘의 안전 상태')).toBeTruthy()
     expect(screen.getByRole('button', { name: '긴급 지원 요청' })).toBeTruthy()
@@ -287,6 +286,7 @@ describe('App login to home flow', () => {
 
     expect(await screen.findByRole('heading', { name: /소희 홈/i })).toBeTruthy()
     expect(screen.queryByRole('heading', { name: /able band 로그인/i })).toBeNull()
+    await user.click(screen.getByRole('button', { name: '메뉴' }))
     expect(screen.getByRole('button', { name: '로그아웃' })).toBeTruthy()
 
     await user.click(screen.getByRole('button', { name: '로그아웃' }))

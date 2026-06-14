@@ -37,8 +37,9 @@ function createInitialScreen(session) {
 }
 
 function App() {
-  const [session, setSession] = useState(createInitialSession)
-  const [screen, setScreen] = useState(() => createInitialScreen(createInitialSession()))
+  const initialSession = createInitialSession()
+  const [session, setSession] = useState(initialSession)
+  const [screen, setScreen] = useState(() => createInitialScreen(initialSession))
   const [loginForm, setLoginForm] = useState({
     role: 'USER',
     email: '',
@@ -99,6 +100,7 @@ function App() {
       if (account.role === 'USER') {
         storeAccessibilitySettings(account.email, signupForm, account.accessibilityType)
       }
+
       setLoginForm({
         role: account.role,
         email: account.email,

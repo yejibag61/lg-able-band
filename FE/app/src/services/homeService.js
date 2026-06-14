@@ -8,7 +8,6 @@ export async function getHomeSummary() {
   try {
     return normalizeHomeSummary(await apiRequest('/api/app/home'))
   } catch {
-    // Keep the home screen usable while the backend home API is unavailable.
     return normalizeHomeSummary(structuredClone(mockHomeSummary))
   }
 }
@@ -20,7 +19,7 @@ export async function getAppPreview() {
     const alerts = await getAlerts()
     preview.alerts = alerts.map((alert) => normalizeAlert(alert, preview.alerts))
   } catch {
-    // Keep the separate preview fixture available while the backend is offline.
+    // Keep the preview usable while the backend alert API is unavailable.
   }
 
   try {
@@ -43,7 +42,8 @@ function normalizeAlert(alert, fixtures) {
       name: alert.deviceName,
     },
     voiceGuide: alert.voiceGuide || alert.message,
-    recommendedAction: alert.recommendedAction || fixture.recommendedAction || '현재 상황을 확인해 주세요.',
+    recommendedAction:
+      alert.recommendedAction || fixture.recommendedAction || '현재 상황을 확인해 주세요.',
     requiresGuardianNotify:
       alert.requiresGuardianNotify ?? fixture.requiresGuardianNotify ?? alert.severity === 'CRITICAL',
   }

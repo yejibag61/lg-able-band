@@ -13,7 +13,7 @@ export function SignupScreen({
       <section className="login-hero">
         <p className="eyebrow">LG Able Band</p>
         <h1 id="signup-title">Able Band 회원가입</h1>
-        <p className="hero-copy">역할에 맞는 기본 정보를 입력해주세요.</p>
+        <p className="hero-copy">역할에 맞는 기본 정보를 입력해 주세요.</p>
       </section>
 
       <form className="login-panel signup-panel" onSubmit={onSubmit} noValidate>
@@ -80,7 +80,7 @@ export function SignupScreen({
             type="password"
             value={form.passwordConfirm}
             onChange={(event) => onChange('passwordConfirm', event.target.value)}
-            placeholder="비밀번호를 한 번 더 입력"
+            placeholder="비밀번호를 다시 입력해 주세요"
             autoComplete="new-password"
           />
         </label>

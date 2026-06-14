@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import jsQR from 'jsqr'
-import { LivingSignalSettingsScreen } from '../features/living-signal'
+import { LivingSignalSettingsScreen } from '../features/living-signal/LivingSignalSettingsScreen'
 import { getAppPreview, getHomeSummary } from '../services/homeService'
 import { createEmergencyRequest } from '../services/emergencyService'
 import { deleteGuardian, getGuardians, linkGuardianByEmail } from '../services/guardianService'
@@ -145,10 +145,12 @@ export function HomeScreen({ session, onLogout }) {
     }
 
     setEmergencySubmitting(true)
-    setEmergencyMessage('긴급 요청을 보내는 중입니다.')
+    setEmergencyMessage('긴급 요청을 전송하고 있습니다.')
+
     try {
       const request = await createEmergencyRequest()
       setEmergencyMessage(formatEmergencyRequestMessage(request))
+
       try {
         const { summary, preview } = await loadHomeData()
         setHomeState({ loading: false, error: '', summary, preview })
@@ -156,7 +158,7 @@ export function HomeScreen({ session, onLogout }) {
         setEmergencyMessage((current) => `${current} 홈 정보는 새로고침하지 못했습니다.`)
       }
     } catch (error) {
-      setEmergencyMessage(error.message || '긴급 요청을 보내지 못했습니다.')
+      setEmergencyMessage(error.message || '긴급 요청 전송에 실패했습니다.')
     } finally {
       setEmergencySubmitting(false)
     }
@@ -208,13 +210,16 @@ export function HomeScreen({ session, onLogout }) {
     <main className="phone-screen home-screen app-screen" aria-labelledby="home-title">
       <header className="home-header app-header">
         <div>
-          <p className="eyebrow">LG Able Band</p>
+          <span className="home-brand-logo-frame" aria-hidden="true">
+            <img
+              className="home-brand-logo"
+              src="/LG_Able_Band_wordmark_transparent.png"
+              alt="LG Able Band"
+            />
+          </span>
           <h1 id="home-title">{displayTitle}</h1>
           {activeTab === 'home' ? <p className="header-summary">{todayMessage}</p> : null}
         </div>
-        <button className="logout-button" type="button" onClick={onLogout}>
-          로그아웃
-        </button>
       </header>
 
       <div className="app-content">
@@ -274,7 +279,12 @@ export function HomeScreen({ session, onLogout }) {
             onBack={() => setMenuScreen('root')}
             onPairingComplete={async () => {
               const { summary: nextSummary, preview: nextPreview } = await loadHomeData()
-              setHomeState({ loading: false, error: '', summary: nextSummary, preview: nextPreview })
+              setHomeState({
+                loading: false,
+                error: '',
+                summary: nextSummary,
+                preview: nextPreview,
+              })
             }}
           />
         ) : null}
@@ -330,17 +340,17 @@ function MenuTab({
     <section className="tab-stack" aria-labelledby="menu-title">
       <div className="content-card hero-card">
         <p className="card-label">빠른 설정</p>
-        <h2 id="menu-title">자주 바꾸는 설정만 모았어요.</h2>
-        <p>{userName}님의 접근성, 보호자, 생활 신호 기능을 확인합니다.</p>
+        <h2 id="menu-title">자주 바꾸는 설정만 모아 두었어요.</h2>
+        <p>{userName}님의 연결 상태와 보호자, 생활 신호 기능을 여기에서 확인할 수 있습니다.</p>
       </div>
 
       <section className="content-card">
         <div className="section-title-row">
           <h2>접근성 설정</h2>
-          <span>{accessibility.textSize}</span>
+          <span>{formatTextSize(accessibility.textSize)}</span>
         </div>
         <div className="settings-grid">
-          <span>{accessibility.disabilityType}</span>
+          <span>{formatAccessibilityType(accessibility.disabilityType)}</span>
           <span>{accessibility.voiceGuide ? '음성 안내 ON' : '음성 안내 OFF'}</span>
           <span>{accessibility.vibrationGuide ? '진동 안내 ON' : '진동 안내 OFF'}</span>
           <span>{accessibility.highContrast ? '고대비 ON' : '고대비 OFF'}</span>
@@ -351,25 +361,21 @@ function MenuTab({
         <div className="home-member-header">
           <div>
             <p className="card-label">보호자 연결</p>
-            <h2 id="home-member-title">홈 멤버</h2>
+            <h2 id="home-member-title">내 멤버</h2>
             <p>{guardianMembers.length}명</p>
           </div>
           <button
             className="member-more-button"
             type="button"
-            aria-label="홈 멤버 관리"
+            aria-label="내 멤버 관리"
             onClick={onOpenGuardianConnection}
           >
-            ›
+            관리
           </button>
         </div>
 
-        <div className="home-member-list" aria-label="홈 멤버 목록">
-          <button
-            className="home-member-item invite"
-            type="button"
-            onClick={onOpenGuardianConnection}
-          >
+        <div className="home-member-list" aria-label="내 멤버 목록">
+          <button className="home-member-item invite" type="button" onClick={onOpenGuardianConnection}>
             <span className="member-avatar invite-avatar" aria-hidden="true">
               +
             </span>
@@ -389,7 +395,7 @@ function MenuTab({
             >
               <span className={`member-avatar avatar-${member.tone}`} aria-hidden="true">
                 {member.name.slice(0, 1)}
-                {member.id === 'me' ? <small>집</small> : null}
+                {member.id === 'me' ? <small>본인</small> : null}
               </span>
               <span>{member.label}</span>
             </button>
@@ -416,15 +422,15 @@ function MenuTab({
 
       <button className="soft-card settings-link-card" type="button" onClick={onOpenLivingSignals}>
         <p className="card-label">생활 신호 설정</p>
-        <h2>등록된 생활 알림음을 관리해요.</h2>
+        <h2>등록된 생활 알림음을 관리하세요.</h2>
         <p>
           현재 {livingSignals.summary.registeredSoundCount}개 신호, 샘플{' '}
-          {livingSignals.summary.enrolledClipCount}개가 등록되어 있어요.
+          {livingSignals.summary.enrolledClipCount}개가 등록되어 있습니다.
         </p>
       </button>
 
       <button className="secondary-button full-button" type="button" onClick={onLogout}>
-        로그인으로 돌아가기
+        로그아웃
       </button>
     </section>
   )
@@ -432,7 +438,7 @@ function MenuTab({
 
 function WearablePairingScannerScreen({ onBack, onPairingComplete }) {
   const [scannerMessage, setScannerMessage] = useState(
-    '웨어러블 화면의 QR 코드를 프레임 안에 맞춰주세요.',
+    '웨어러블 화면의 QR 코드를 프레임 안에 맞춰 주세요.',
   )
   const [scanStatus, setScanStatus] = useState('ready')
   const [detectedValue, setDetectedValue] = useState('')
@@ -475,7 +481,7 @@ function WearablePairingScannerScreen({ onBack, onPairingComplete }) {
     setDetectedValue('')
 
     if (!navigator.mediaDevices?.getUserMedia) {
-      setScannerMessage('이 환경에서는 카메라를 사용할 수 없어 스캔 화면만 표시합니다.')
+      setScannerMessage('이 환경에서는 카메라를 사용할 수 없어 스캔 화면만 표시됩니다.')
       setScanStatus('blocked')
       return
     }
@@ -500,7 +506,7 @@ function WearablePairingScannerScreen({ onBack, onPairingComplete }) {
 
         activeScanRef.current = true
         setHasCameraPreview(true)
-        setScannerMessage('카메라가 켜졌습니다. QR 코드를 프레임 안에 맞춰주세요.')
+        setScannerMessage('카메라가 켜졌습니다. QR 코드를 프레임 안에 맞춰 주세요.')
         scanQrFrame(detector)
         return
       } catch (error) {
@@ -526,7 +532,7 @@ function WearablePairingScannerScreen({ onBack, onPairingComplete }) {
       canvas.height = video.videoHeight
       const context = canvas.getContext('2d', { willReadFrequently: true })
       if (!context) {
-        setScannerMessage('카메라 화면을 읽을 수 없습니다. 다시 시도해주세요.')
+        setScannerMessage('카메라 화면을 읽을 수 없습니다. 다시 시도해 주세요.')
         setScanStatus('blocked')
         stopScanResources()
         return
@@ -541,7 +547,7 @@ function WearablePairingScannerScreen({ onBack, onPairingComplete }) {
           return
         }
       } catch {
-        setScannerMessage('QR을 읽는 중 문제가 생겼습니다. 카메라를 다시 켜주세요.')
+        setScannerMessage('QR을 읽는 중 문제가 발생했습니다. 카메라를 다시 켜 주세요.')
         setScanStatus('blocked')
         stopScanResources()
         return
@@ -556,7 +562,7 @@ function WearablePairingScannerScreen({ onBack, onPairingComplete }) {
 
     if (!pairing) {
       setScannerMessage(
-        'Able Band 연동 QR이 아닙니다. 웨어러블 첫 화면의 QR을 다시 비춰주세요.',
+        'Able Band 연동용 QR이 아닙니다. 웨어러블 첫 화면의 QR을 다시 비춰 주세요.',
       )
       return false
     }
@@ -573,7 +579,7 @@ function WearablePairingScannerScreen({ onBack, onPairingComplete }) {
       await onPairingComplete?.(result)
     } catch (error) {
       setScanStatus('invalid')
-      setScannerMessage(error.message || '웨어러블 연동을 완료하지 못했습니다. QR을 다시 확인해주세요.')
+      setScannerMessage(error.message || '웨어러블 연동에 실패했습니다. QR을 다시 확인해 주세요.')
     }
 
     return true
@@ -582,7 +588,7 @@ function WearablePairingScannerScreen({ onBack, onPairingComplete }) {
   function handleStopScan() {
     stopScanResources()
     setScanStatus('ready')
-    setScannerMessage('스캔을 중지했습니다. 다시 시작하려면 카메라를 켜주세요.')
+    setScannerMessage('스캔을 중지했습니다. 다시 시작하려면 카메라를 켜 주세요.')
   }
 
   return (
@@ -595,7 +601,7 @@ function WearablePairingScannerScreen({ onBack, onPairingComplete }) {
         <p className="card-label">웨어러블 연동</p>
         <h2 id="wearable-scanner-title">밴드 QR을 스캔해주세요.</h2>
         <p>
-          웨어러블의 첫 화면 또는 연동 화면에 표시된 QR 코드를 카메라로 비춰주세요.
+          웨어러블 첫 화면 또는 연동 화면에 표시된 QR 코드를 카메라로 비춰 주세요.
         </p>
 
         <div className={`qr-scanner-preview scanner-${scanStatus}`} aria-label="QR 카메라 스캔 영역">
@@ -620,7 +626,7 @@ function WearablePairingScannerScreen({ onBack, onPairingComplete }) {
           </div>
           <div className="scanner-bottom-bar">
             <span />
-            <strong>QR을 프레임에 맞춰주세요.</strong>
+            <strong>QR을 프레임 안에 맞춰 주세요</strong>
             <span />
           </div>
         </div>
@@ -770,22 +776,22 @@ function isTouchCameraDevice() {
 
 function formatCameraErrorMessage(error) {
   if (error instanceof Error && error.name === 'NotAllowedError') {
-    return '카메라 권한이 필요합니다. 브라우저 권한을 허용한 뒤 다시 시도해주세요.'
+    return '카메라 권한이 필요합니다. 브라우저 권한을 허용한 뒤 다시 시도해 주세요.'
   }
 
   if (error instanceof Error && error.name === 'NotReadableError') {
-    return '카메라가 다른 앱에서 사용 중일 수 있습니다. 회의 앱을 닫고 다시 시도해주세요.'
+    return '카메라가 다른 앱에서 사용 중입니다. 다른 앱을 종료한 뒤 다시 시도해 주세요.'
   }
 
   if (error instanceof Error && error.name === 'NotFoundError') {
-    return '사용 가능한 카메라를 찾지 못했습니다. 노트북 카메라 연결 상태를 확인해주세요.'
+    return '사용 가능한 카메라를 찾지 못했습니다. 카메라 연결 상태를 확인해 주세요.'
   }
 
   if (error instanceof Error && error.message === 'NO_VIDEO_FRAME') {
-    return '카메라가 켜졌지만 영상이 들어오지 않습니다. 다른 앱의 카메라 사용을 끄거나 노트북 카메라 설정을 확인해주세요.'
+    return '카메라는 켜졌지만 화면을 읽을 수 없습니다. 다른 카메라 앱을 종료한 뒤 다시 시도해 주세요.'
   }
 
-  return '카메라를 시작하지 못했습니다. 브라우저 권한과 노트북 카메라 상태를 확인해주세요.'
+  return '카메라를 시작하지 못했습니다. 브라우저 권한과 카메라 상태를 확인해 주세요.'
 }
 
 function parseWearablePairingPayload(rawValue) {
@@ -907,12 +913,12 @@ function GuardianConnectionScreen({
     const email = form.email.trim()
 
     if (!email) {
-      setMessage({ tone: 'error', text: '보호자 계정 이메일을 입력해주세요.' })
+      setMessage({ tone: 'error', text: '보호자 계정 이메일을 입력해 주세요.' })
       return
     }
 
     if (!isValidEmail(email)) {
-      setMessage({ tone: 'error', text: '올바른 이메일 형식으로 입력해주세요.' })
+      setMessage({ tone: 'error', text: '올바른 이메일 형식으로 입력해 주세요.' })
       return
     }
 
@@ -935,7 +941,7 @@ function GuardianConnectionScreen({
     } catch (error) {
       setMessage({
         tone: 'error',
-        text: error.message || '보호자 연결을 저장하지 못했습니다.',
+        text: error.message || '보호자 연결에 실패했습니다.',
       })
     } finally {
       setSubmitting(false)
@@ -958,7 +964,7 @@ function GuardianConnectionScreen({
     } catch (error) {
       setMessage({
         tone: 'error',
-        text: error.message || '보호자 연결을 해제하지 못했습니다.',
+        text: error.message || '보호자 연결 해제에 실패했습니다.',
       })
     } finally {
       setDeletingGuardianId(null)
@@ -973,7 +979,7 @@ function GuardianConnectionScreen({
 
       <form className="content-card guardian-form-card" onSubmit={handleSubmit}>
         <p className="card-label">보호자 연결</p>
-        <h2 id="guardian-connection-title">긴급 알림을 받을 보호자를 등록해요.</h2>
+        <h2 id="guardian-connection-title">긴급 알림을 받을 보호자를 등록해 주세요.</h2>
 
         <label className="field">
           <span>보호자 이메일</span>
@@ -1108,11 +1114,35 @@ function formatEmergencyRequestMessage(request) {
     return '긴급 요청을 보냈습니다.'
   }
 
-  return request?.message || '긴급 요청을 접수했습니다.'
+  return request?.message || '긴급 요청이 접수되었습니다.'
 }
 
 function formatConnectionStatus(status) {
   return connectionStatusLabels[status] || status || '연결됨'
+}
+
+function formatAccessibilityType(type) {
+  if (type === 'VISUAL' || type === '시각') {
+    return '시각 안내'
+  }
+
+  if (type === 'HEARING' || type === '청각') {
+    return '청각 안내'
+  }
+
+  return type || '기본 안내'
+}
+
+function formatTextSize(textSize) {
+  if (!textSize) {
+    return '기본 글씨'
+  }
+
+  if (textSize === 'LARGE') {
+    return '큰 글씨'
+  }
+
+  return textSize
 }
 
 function isValidEmail(email) {

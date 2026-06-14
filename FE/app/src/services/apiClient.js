@@ -36,7 +36,7 @@ export async function apiRequest(path, options = {}) {
       body: body === undefined ? undefined : JSON.stringify(body),
     })
   } catch {
-    throw new Error('백엔드 서버에 연결할 수 없습니다. 서버가 실행 중인지 확인해주세요.')
+    throw new Error('백엔드 서버에 연결할 수 없습니다. 서버가 실행 중인지 확인해 주세요.')
   }
 
   const data = await parseResponse(response)

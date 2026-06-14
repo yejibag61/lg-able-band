@@ -19,7 +19,7 @@ const severityLabels = {
 const statusLabels = {
   UNREAD: '미확인',
   CONFIRMED: '확인 완료',
-  REPLAYED: '다시 들음',
+  REPLAYED: '다시 듣기',
   ESCALATED: '보호자 전달',
 }
 
@@ -50,7 +50,7 @@ const vibrationLabels = {
 }
 
 const screenModeLabels = {
-  SIMPLE_TEXT: '간단한 안내 화면',
+  SIMPLE_TEXT: '간단 안내 화면',
   LARGE_TEXT: '큰 글씨 화면',
   HIGH_CONTRAST: '고대비 화면',
   HIGH_CONTRAST_LARGE_TEXT: '고대비 큰 글씨 화면',
@@ -63,10 +63,12 @@ export function AlertsTab({ accessibilityType, alerts }) {
   const [selectedAlertId, setSelectedAlertId] = useState(null)
   const [feedbackMessage, setFeedbackMessage] = useState('')
   const [warningRecommendation, setWarningRecommendation] = useState(null)
+
   const selectedAlert =
     selectedAlertId === null
       ? null
       : alertItems.find((alert) => alert.alertId === selectedAlertId) || alertItems[0]
+
   const filteredAlerts = useMemo(
     () => alertItems.filter((alert) => filterAlert(alert, activeFilter)),
     [activeFilter, alertItems],
@@ -76,6 +78,7 @@ export function AlertsTab({ accessibilityType, alerts }) {
     setSelectedAlertId(alertId)
     setFeedbackMessage('')
     setWarningRecommendation(null)
+
     const alert = alertItems.find((item) => item.alertId === alertId)
     if (alert) {
       setWarningRecommendation(await getWarningRecommendation(alert, accessibilityType))
@@ -87,18 +90,19 @@ export function AlertsTab({ accessibilityType, alerts }) {
       await confirmAlert(alertId)
       setAlertItems((currentAlerts) => currentAlerts.filter((alert) => alert.alertId !== alertId))
       setSelectedAlertId(null)
-      setFeedbackMessage('확인 완료 처리했습니다.')
+      setFeedbackMessage('알림을 확인 처리했습니다.')
     } catch (error) {
-      setFeedbackMessage(error.message || '알림을 확인 처리하지 못했습니다.')
+      setFeedbackMessage(error.message || '알림 확인 처리에 실패했습니다.')
     }
   }
 
   async function handleReplayAlert(alert) {
     const guide = createAlertGuide(alert)
     const speechStarted = speakAlert(guide)
+
     setFeedbackMessage(
       speechStarted
-        ? '알림 안내를 다시 들려드렸습니다.'
+        ? '알림 안내를 다시 들려드리고 있습니다.'
         : '이 브라우저에서는 음성 안내를 사용할 수 없습니다.',
     )
 
@@ -111,12 +115,12 @@ export function AlertsTab({ accessibilityType, alerts }) {
                 ...item,
                 status: 'REPLAYED',
               }
-          : item,
+            : item,
         ),
       )
     } catch (error) {
       if (!speechStarted) {
-        setFeedbackMessage(error.message || '알림을 다시 재생하지 못했습니다.')
+        setFeedbackMessage(error.message || '알림 다시 듣기에 실패했습니다.')
       }
     }
   }
@@ -295,7 +299,7 @@ function WarningRecommendationCard({ recommendation }) {
           <strong>이 알림은 아래 방식으로 전달되었습니다.</strong>
         </div>
         <span className={recommendation.notifyGuardian ? 'guardian-badge active' : 'guardian-badge'}>
-          {recommendation.notifyGuardian ? '보호자에게도 전달됨' : '사용자에게 전달됨'}
+          {recommendation.notifyGuardian ? '보호자에게도 전달됨' : '사용자에게만 전달됨'}
         </span>
       </div>
 
@@ -311,12 +315,12 @@ function WarningRecommendationCard({ recommendation }) {
           <dd>{vibrationLabels[recommendation.vibrationPattern] || recommendation.vibrationPattern}</dd>
         </div>
         <div>
-          <dt>표시된 화면</dt>
+          <dt>표시 화면</dt>
           <dd>{screenModeLabels[recommendation.screenMode] || recommendation.screenMode}</dd>
         </div>
         <div>
           <dt>음성 안내</dt>
-          <dd>{recommendation.voiceEnabled ? '사용됨' : '사용되지 않음'}</dd>
+          <dd>{recommendation.voiceEnabled ? '사용함' : '사용하지 않음'}</dd>
         </div>
       </dl>
     </section>

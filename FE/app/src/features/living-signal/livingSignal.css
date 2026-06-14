@@ -17,7 +17,7 @@
 
 .living-signal-screen {
   display: grid;
-  gap: 14px;
+  gap: 8px;
   color: #121826;
 }
 
@@ -28,7 +28,7 @@
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 12px;
+  gap: 8px;
 }
 
 .living-signal-top-row {
@@ -41,8 +41,8 @@
 .living-signal-history,
 .living-signal-mic-section {
   display: grid;
-  gap: 12px;
-  padding: 16px;
+  gap: 8px;
+  padding: 12px;
   border: 1px solid #dfe6ef;
   border-radius: 16px;
   background: #ffffff;
@@ -50,7 +50,7 @@
 }
 
 .living-signal-header {
-  gap: 8px;
+  gap: 4px;
   background:
     radial-gradient(circle at 100% 0%, rgba(255, 228, 236, 0.75), transparent 34%),
     linear-gradient(180deg, #ffffff 0%, #fff8fa 100%);
@@ -149,13 +149,13 @@
 
 .living-signal-list {
   display: grid;
-  gap: 12px;
+  gap: 8px;
 }
 
 .living-signal-item {
   display: grid;
-  gap: 12px;
-  padding: 14px;
+  gap: 8px;
+  padding: 10px;
   border: 1px solid #e6ebf2;
   border-radius: 16px;
   background:
@@ -171,7 +171,7 @@
 .living-signal-item-main > div:first-child {
   min-width: 0;
   display: grid;
-  gap: 6px;
+  gap: 3px;
 }
 
 .living-signal-item-main h4 {
@@ -192,7 +192,7 @@
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-end;
-  gap: 8px;
+  gap: 5px;
 }
 
 .living-signal-item-actions button,
@@ -208,14 +208,14 @@
 .living-signal-recordings,
 .living-signal-detection-list {
   display: grid;
-  gap: 8px;
+  gap: 5px;
 }
 
 .living-signal-recording-row,
 .living-signal-detection-item {
   display: grid;
-  gap: 8px;
-  padding: 12px;
+  gap: 5px;
+  padding: 9px;
   border: 1px solid #edf2f7;
   border-radius: 14px;
   background: #f8fafc;
@@ -235,7 +235,7 @@
 
 .living-signal-field {
   display: grid;
-  gap: 7px;
+  gap: 5px;
   color: #334155;
   font-weight: 800;
 }
@@ -246,7 +246,7 @@
   width: 100%;
   border: 1px solid #cbd5e1;
   border-radius: 12px;
-  padding: 12px 13px;
+  padding: 10px 12px;
   font: inherit;
   color: #111827;
   background: #fbfdff;
@@ -254,7 +254,7 @@
 
 .living-signal-threshold {
   display: grid;
-  gap: 8px;
+  gap: 5px;
   color: #334155;
   font-weight: 800;
 }
@@ -279,8 +279,8 @@
 
 .living-signal-sample-preview {
   display: grid;
-  gap: 8px;
-  padding: 12px;
+  gap: 5px;
+  padding: 9px;
   border: 1px solid #edf2f7;
   border-radius: 14px;
   background: #f8fafc;
@@ -289,7 +289,7 @@
 .living-signal-warning,
 .living-signal-result {
   margin: 0;
-  padding: 11px 12px;
+  padding: 9px 10px;
   border-radius: 12px;
   font-weight: 800;
 }
@@ -312,14 +312,14 @@
 .living-signal-empty {
   border: 1px dashed #d6dce5;
   border-radius: 14px;
-  padding: 18px 14px;
+  padding: 12px 10px;
   background: #fafbfd;
   text-align: center;
 }
 
 .living-signal-sample-mode {
   display: grid;
-  gap: 8px;
+  gap: 5px;
   color: #475569;
   font-size: 0.88rem;
   font-weight: 800;
@@ -328,12 +328,12 @@
 .living-signal-sample-mode-buttons {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 5px;
 }
 
 .living-signal-sample-mode-buttons button {
-  min-height: 36px;
-  padding: 0 12px;
+  min-height: 34px;
+  padding: 0 11px;
   border: 1px solid #d7e0ea;
   border-radius: 999px;
   background: #ffffff;
@@ -351,9 +351,9 @@
 .living-signal-recording-indicator {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   width: fit-content;
-  padding: 8px 10px;
+  padding: 7px 9px;
   border-radius: 999px;
   background: #fff1f2;
   color: #be123c;
@@ -441,4 +441,45 @@
   .living-signal-record-buttons {
     justify-content: flex-start;
   }
+}
+
+/* Living signal weight cleanup */
+.living-signal-screen h2,
+.living-signal-screen h3,
+.living-signal-screen h4,
+.living-signal-screen strong,
+.living-signal-screen b {
+  font-weight: 520 !important;
+}
+
+.living-signal-kicker,
+.living-signal-type,
+.living-signal-page-badge,
+.living-signal-warning,
+.living-signal-result,
+.living-signal-recording-indicator,
+.living-signal-back,
+.living-signal-add-link,
+.living-signal-close,
+.living-signal-item-actions button,
+.living-signal-record-buttons button,
+.living-signal-start,
+.living-signal-stop,
+.living-signal-save,
+.living-signal-sample-mode,
+.living-signal-sample-mode-buttons button {
+  font-weight: 500 !important;
+}
+
+.living-signal-note,
+.living-signal-meta,
+.living-signal-info,
+.living-signal-empty,
+.living-signal-detection-item span,
+.living-signal-sample-preview span,
+.living-signal-field,
+.living-signal-threshold,
+.living-signal-section-row span,
+.living-signal-muted {
+  font-weight: 430 !important;
 }
