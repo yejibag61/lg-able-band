@@ -77,6 +77,7 @@ class ChatbotRouterTests {
 
 			assertThat(response.get("intent")).isEqualTo("INFO_AGENT_QUERY");
 			assertThat(response.get("action")).isEqualTo("SHOW_INFO_CARD");
+			assertThat(response.get("responseType")).isEqualTo("INFO_CARD");
 			assertThat(response.get("answerText")).isEqualTo("장애인의료비지원 정보입니다.");
 			assertThat(response.get("voiceText")).isEqualTo("장애인의료비지원 안내입니다.");
 			assertThat(response.get("infoCard")).isInstanceOf(Map.class);
@@ -89,6 +90,42 @@ class ChatbotRouterTests {
 	void existingCommandKeywordsTakePriorityOverInformationKeywords() throws Exception {
 		try (Servers servers = Servers.start()) {
 			servers.router().route(request("최근 알림 지원 내용을 읽어줘", "NONE"));
+
+			assertThat(servers.soundRequests()).isEqualTo(1);
+			assertThat(servers.infoRequests()).isZero();
+		}
+	}
+
+	@Test
+	void routesShortFollowupToInfoAgentWithLastInfoAgentTitle() throws Exception {
+		try (Servers servers = Servers.start()) {
+			Map<String, Object> response = servers.router().route(followupRequest("담당 기관 문의 방법은?"));
+
+			assertThat(response.get("responseType")).isEqualTo("FOLLOWUP_ANSWER");
+			assertThat(response.get("intent")).isEqualTo("INFO_AGENT_FOLLOWUP");
+			assertThat(response.get("action")).isEqualTo("ANSWER_FOLLOWUP");
+			assertThat(response.get("infoCard")).isNull();
+			assertThat(response.get("answerText")).isEqualTo("장애인의료비지원 문의는 관할 주민센터에서 확인해 주세요.");
+			assertThat(servers.infoRequestBody()).contains("\"query\":\"장애인의료비지원 담당 기관 문의 방법은?\"");
+			assertThat(servers.infoRequestBody()).contains("\"isFollowup\":true");
+			assertThat(servers.soundRequests()).isZero();
+		}
+	}
+
+	@Test
+	void keepsExplicitSoundCommandAheadOfInfoAgentFollowupContext() throws Exception {
+		try (Servers servers = Servers.start()) {
+			servers.router().route(followupRequest("세탁기 신청 상태 알려줘"));
+
+			assertThat(servers.soundRequests()).isEqualTo(1);
+			assertThat(servers.infoRequests()).isZero();
+		}
+	}
+
+	@Test
+	void doesNotRouteShortFollowupWithoutInfoAgentContext() throws Exception {
+		try (Servers servers = Servers.start()) {
+			servers.router().route(request("담당 기관 문의 방법은?", "VISUAL"));
 
 			assertThat(servers.soundRequests()).isEqualTo(1);
 			assertThat(servers.infoRequests()).isZero();
@@ -116,6 +153,22 @@ class ChatbotRouterTests {
 			"text", text,
 			"user", Map.of("accessibilityType", accessibilityType),
 			"context", Map.of()
+		);
+	}
+
+	private static Map<String, Object> followupRequest(String text) {
+		return Map.of(
+			"sessionId", "test",
+			"text", text,
+			"user", Map.of("accessibilityType", "VISUAL"),
+			"context", Map.of(
+				"lastInfoAgent", Map.of(
+					"title", "장애인의료비지원",
+					"category", "의료/건강",
+					"priority", "MEDIUM",
+					"source", "복지로"
+				)
+			)
 		);
 	}
 
@@ -148,9 +201,29 @@ class ChatbotRouterTests {
 			info.createContext("/api/info-agent/query", exchange -> {
 				holder[0].infoRequests[0]++;
 				holder[0].infoRequestBody[0] = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+				if (holder[0].infoRequestBody[0].contains("\"isFollowup\":true")) {
+					respond(exchange, """
+						{
+						  "success": true,
+						  "responseType": "FOLLOWUP_ANSWER",
+						  "voiceMessage": "장애인의료비지원 문의는 관할 주민센터에서 확인해 주세요.",
+						  "classification": {"category":"의료/건강","accessibilityTarget":"ALL","priority":"MEDIUM"},
+						  "appCard": null,
+						  "followupAnswer": {
+						    "type": "CONTACT",
+						    "topic": "장애인의료비지원",
+						    "answer": "장애인의료비지원 문의는 관할 주민센터에서 확인해 주세요.",
+						    "source": "복지로"
+						  },
+						  "sourceDocuments": []
+						}
+						""");
+					return;
+				}
 				respond(exchange, """
 					{
 					  "success": true,
+					  "responseType": "INFO_CARD",
 					  "notificationTabMessage": "장애인의료비지원 정보입니다.",
 					  "voiceMessage": "장애인의료비지원 안내입니다.",
 					  "bandMessage": "의료비 지원",

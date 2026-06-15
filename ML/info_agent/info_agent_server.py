@@ -1,7 +1,7 @@
 """FastAPI server for the integrated LG Able Band information agent."""
 
 import os
-from typing import Optional
+from typing import Any, Optional
 
 import uvicorn
 from fastapi import FastAPI
@@ -23,6 +23,7 @@ class InfoAgentQueryRequest(BaseModel):
     query: str
     userAccessibilityType: Optional[str] = "ALL"
     topK: Optional[int] = 5
+    context: Optional[dict[str, Any]] = None
 
 
 app = FastAPI(
@@ -56,6 +57,7 @@ def query_info_agent(request: InfoAgentQueryRequest):
             user_accessibility_type=request.userAccessibilityType,
             top_k=request.topK or 5,
             safe_mode=True,
+            context=request.context,
         )
     except Exception as error:
         return JSONResponse(

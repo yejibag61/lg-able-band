@@ -50,6 +50,7 @@ def build_error_response(
     return {
         "success": False,
         "agentType": AGENT_TYPE,
+        "responseType": "NO_RESULT",
         "query": query,
         "userAccessibilityType": user_accessibility_type,
         "error": {
@@ -79,6 +80,7 @@ def run_info_agent(
     user_accessibility_type: str = "ALL",
     top_k: int = 5,
     safe_mode: bool = True,
+    context: dict[str, Any] | None = None,
 ) -> dict:
     """Run the complete information-agent pipeline through response_builder."""
     normalized_type = normalize_accessibility_type(user_accessibility_type)
@@ -93,6 +95,7 @@ def run_info_agent(
             query=normalized_query,
             user_accessibility_type=normalized_type,
             top_k=normalized_top_k,
+            context=context,
         )
         return {
             "success": True,

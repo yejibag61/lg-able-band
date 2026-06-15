@@ -40,14 +40,23 @@ describe('VoiceChatbot info agent response', () => {
     await user.type(screen.getByLabelText('인식된 문장'), '폭염 때 어떻게 해야 해?')
     await user.click(screen.getByRole('button', { name: '텍스트로 보내기' }))
 
+    expect(await screen.findByLabelText('AI가 답변을 준비 중입니다')).toBeTruthy()
+    expect(screen.getByRole('button', { name: '텍스트로 보내기' }).disabled).toBe(true)
     expect(await screen.findByRole('article', { name: 'AI 접근성 정보 카드' })).toBeTruthy()
+    expect(screen.queryByLabelText('AI가 답변을 준비 중입니다')).toBeNull()
     expect(screen.getByText('장애인 폭염 대처 방법')).toBeTruthy()
     expect(screen.getByText('재난/안전')).toBeTruthy()
     expect(screen.getByText('중요도 URGENT')).toBeTruthy()
-    expect(screen.getByText('폭염 위험. 외출 자제')).toBeTruthy()
+    expect(screen.queryByText('폭염 위험. 외출 자제')).toBeNull()
+    expect(screen.queryByText(/전달 방식/)).toBeNull()
+    expect(screen.queryByText(/알림탭:/)).toBeNull()
     expect(screen.getByText('보호자에게 공유할 수 있어요.')).toBeTruthy()
     expect(screen.getByRole('button', { name: '보호자에게 이 정보 공유하기' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'AI 접근성 정보 저장하기' })).toBeTruthy()
     expect(screen.getByRole('link', { name: '자세히 보기' }).target).toBe('_blank')
+    expect(screen.queryByText('INFO_AGENT_QUERY · SHOW_INFO_CARD')).toBeNull()
+    expect(screen.getByRole('button', { name: '지금 어떻게 해야 해?' })).toBeTruthy()
+    expect(screen.queryByLabelText('추천 질문')).toBeNull()
 
     await user.click(screen.getByRole('button', { name: 'AI 접근성 정보 다시 듣기' }))
 
@@ -56,6 +65,74 @@ describe('VoiceChatbot info agent response', () => {
         text: '폭염 위험 안내입니다. 즉시 안전 수칙을 확인하세요.',
       }),
     )
+  })
+
+  it('sends info agent followups with hidden title context', async () => {
+    const user = userEvent.setup()
+    mockVoiceChatResponses(
+      {
+        intent: 'INFO_AGENT_QUERY',
+        action: 'SHOW_INFO_CARD',
+        answerText: '장애인 의료비 지원 정보입니다.',
+        voiceText: '장애인 의료비 지원 정보입니다.',
+        infoCard: {
+          title: '장애인의료비지원',
+          summary: '의료비를 지원합니다.',
+          source: '복지로',
+        },
+        classification: {
+          category: '의료/건강',
+          priority: 'MEDIUM',
+        },
+      },
+      {
+        responseType: 'FOLLOWUP_ANSWER',
+        intent: 'INFO_AGENT_FOLLOWUP',
+        action: 'ANSWER_FOLLOWUP',
+        answerText: '담당 기관은 주민센터입니다.',
+        voiceText: '담당 기관은 주민센터입니다.',
+        infoCard: null,
+        followupAnswer: {
+          type: 'CONTACT',
+          topic: '장애인의료비지원',
+          answer: '담당 기관은 주민센터입니다.',
+          source: '복지로',
+        },
+        classification: {
+          category: '의료/건강',
+          priority: 'MEDIUM',
+        },
+      },
+    )
+
+    render(<VoiceChatbot preview={{}} session={{}} summary={{}} />)
+    await user.click(screen.getByRole('button', { name: '음성 챗봇 열기' }))
+    await user.type(screen.getByLabelText('인식된 문장'), '장애인 의료비 지원 알려줘')
+    await user.click(screen.getByRole('button', { name: '텍스트로 보내기' }))
+    const followupButton = await screen.findByRole(
+      'button',
+      { name: '담당 기관 문의 방법은?' },
+      { timeout: 3000 },
+    )
+    await waitFor(() => {
+      expect(followupButton.disabled).toBe(false)
+    })
+    await user.click(followupButton)
+
+    await waitFor(() => {
+      expect(latestVoiceChatRequestBody()).toEqual(expect.objectContaining({
+        text: '장애인의료비지원 담당 기관 문의 방법은?',
+        context: expect.objectContaining({
+          lastInfoAgent: expect.objectContaining({
+            title: '장애인의료비지원',
+            category: '의료/건강',
+          }),
+        }),
+      }))
+    })
+    expect(screen.getAllByRole('article', { name: 'AI 접근성 정보 카드' })).toHaveLength(1)
+    expect(screen.getAllByText('담당 기관 문의 방법은?').length).toBeGreaterThanOrEqual(1)
+    expect(screen.queryByText('장애인의료비지원 담당 기관 문의 방법은?')).toBeNull()
   })
 
   it('keeps the existing chatbot response free of info agent controls', async () => {
@@ -76,6 +153,7 @@ describe('VoiceChatbot info agent response', () => {
     expect(screen.queryByRole('article', { name: 'AI 접근성 정보 카드' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'AI 접근성 정보 다시 듣기' })).toBeNull()
     expect(screen.queryByLabelText('정보 후속 질문')).toBeNull()
+    expect(screen.queryByText('DEVICE_STATUS_CHECK · READ_DEVICE_STATUS')).toBeNull()
 
     await waitFor(() => {
       expect(latestVoiceChatRequestBody()).toEqual(expect.objectContaining({ text: '세탁기 몇 분 남았어?' }))
@@ -104,6 +182,7 @@ describe('VoiceChatbot info agent response', () => {
     await user.type(screen.getByLabelText('인식된 문장'), '최근 알림 읽어줘')
     await user.click(screen.getByRole('button', { name: '텍스트로 보내기' }))
     await screen.findByText('최근 알림은 한 건입니다.')
+    await screen.findByText('말하는 중')
 
     await user.type(screen.getByLabelText('인식된 문장'), '세탁기 몇 분 남았어?')
     await user.click(screen.getByRole('button', { name: '텍스트로 보내기' }))
@@ -113,7 +192,7 @@ describe('VoiceChatbot info agent response', () => {
     expect(screen.getByText('최근 알림은 한 건입니다.')).toBeTruthy()
     expect(screen.getAllByText('세탁기 몇 분 남았어?').length).toBeGreaterThanOrEqual(2)
     expect(window.HTMLElement.prototype.scrollIntoView).toHaveBeenCalled()
-  })
+  }, 10000)
 })
 
 function mockVoiceChatResponse(data) {
