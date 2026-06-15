@@ -7,4 +7,6 @@ for %%P in (8080 5173 5174 8000 8001 8002 8003 8004) do (
   )
 )
 
+taskkill /IM ngrok.exe /F >nul 2>&1
+
 echo Attempted to stop Able Band servers.
