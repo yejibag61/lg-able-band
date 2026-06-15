@@ -39,10 +39,11 @@ cd ML/emergency && python server.py
 ## Batch Files
 
 - `start-be.bat`: starts the Spring Boot backend
-- `start-fe.bat`: starts both frontend dev servers
+- `start-fe.bat`: starts both frontend dev servers and also starts `ngrok` for `FE/app` when available
 - `start-ml.bat`: starts the context, warning, and emergency AI servers
 - `start-all.bat`: starts BE, FE, and ML together
-- `stop-all.bat`: stops servers listening on ports `8080`, `5173`, `5174`, and `8000`-`8003`
+- `start-ngrok.bat`: starts an HTTPS tunnel for `http://localhost:5173`
+- `stop-all.bat`: stops servers listening on ports `8080`, `5173`, `5174`, and `8000`-`8004`, and also stops `ngrok`
 
 ## Backend Endpoints
 
@@ -55,6 +56,8 @@ cd ML/emergency && python server.py
 
 - Open `http://localhost:5173` after running the backend and frontend
 - `FE/wearable` runs on `http://localhost:5174`
+- If `ngrok` is installed, `start-fe.bat` and `start-all.bat` also start an HTTPS tunnel for the app frontend
+- Check the HTTPS forwarding URL at `http://127.0.0.1:4040`
 
 ## AI Servers
 

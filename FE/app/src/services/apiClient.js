@@ -65,7 +65,17 @@ export async function apiRequest(path, options = {}) {
 }
 
 function apiBaseUrl() {
-  return import.meta.env.VITE_API_BASE_URL?.trim() || DEFAULT_API_BASE_URL
+  const configuredBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim()
+
+  if (configuredBaseUrl) {
+    return configuredBaseUrl.replace(/\/$/, '')
+  }
+
+  if (import.meta.env.MODE === 'test') {
+    return DEFAULT_API_BASE_URL
+  }
+
+  return ''
 }
 
 async function parseResponse(response) {
