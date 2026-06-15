@@ -20,6 +20,7 @@ import {
   stopUwbSession,
   unpairWearable,
 } from './services/wearableService'
+import { clearWearableAccessToken, getWearableAccessToken } from './services/wearableApiClient'
 import { triggerVibration } from './services/vibrationService'
 import {
   getPairingPollIntervalMs,
@@ -200,6 +201,11 @@ function App() {
         }
       } catch (error) {
         if (isMounted) {
+          if (isAuthExpiredError(error)) {
+            resetPairingSession('')
+            return
+          }
+
           setAlertQueue([])
           setStatusMessage(error.message || '알림을 불러오지 못했습니다.')
         }
@@ -211,7 +217,7 @@ function App() {
     return () => {
       isMounted = false
     }
-  }, [alertStatuses, isPaired, mode])
+  }, [alertStatuses, isPaired, mode, resetPairingSession])
 
   useEffect(() => {
     if (!isPaired || mode !== 'deviceSelect') {
@@ -414,6 +420,7 @@ function App() {
             onConfirm={handleConfirm}
             onNextAlert={() => setAlertIndex((current) => Math.min(current + 1, alertQueue.length - 1))}
             onPreviousAlert={() => setAlertIndex((current) => Math.max(current - 1, 0))}
+            onResetPairing={() => resetPairingSession()}
           />
         ) : null}
 
@@ -569,7 +576,8 @@ function getInitialPairingStatus() {
 function getStoredPairedPairingSession() {
   try {
     const stored = JSON.parse(localStorage.getItem(PAIRED_PAIRING_STORAGE_KEY) || 'null')
-    if (!isPersistablePairingSession(stored)) {
+    if (!isPersistablePairingSession(stored) || !getWearableAccessToken()) {
+      clearStoredPairedPairingSession()
       return null
     }
 
@@ -608,10 +616,15 @@ function storePairedPairingSession(session) {
 
 function clearStoredPairedPairingSession() {
   localStorage.removeItem(PAIRED_PAIRING_STORAGE_KEY)
+  clearWearableAccessToken()
 }
 
 function isPersistablePairingSession(session) {
   return Boolean(session?.pairingSessionId && session?.deviceId && session?.nonce)
+}
+
+function isAuthExpiredError(error) {
+  return error?.status === 401 || error?.status === 403 || error?.code === 'UNAUTHORIZED'
 }
 
 function isTerminalPairingStatus(status) {
