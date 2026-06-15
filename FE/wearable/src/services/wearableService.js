@@ -38,6 +38,7 @@ export function createWearableService({
   return {
     async createPairingSession() {
       const pairingSession = getMockPairingSession()
+      await assertPersistentPairingReady(request)
       return withFallback({
         apiEnabled: isPairingApiEnabled(),
         fallbackEnabled,
@@ -394,6 +395,57 @@ function pairingCreateBody(pairingSession) {
     deviceName: pairingSession.deviceName,
     pairingCode: pairingSession.pairingCode,
   }
+}
+
+async function assertPersistentPairingReady(request) {
+  if (!shouldRequirePersistentPairing()) {
+    return
+  }
+
+  try {
+    const status = await request('/api/db/status', { method: 'GET' })
+    if (status?.connected === true) {
+      return
+    }
+  } catch {
+    throwPersistentPairingUnavailable()
+  }
+
+  throwPersistentPairingUnavailable()
+}
+
+function throwPersistentPairingUnavailable() {
+  throw new Error(
+    '공유 DB에 연결된 백엔드가 필요합니다. 웨어러블 서버의 BE/.env 설정을 확인한 뒤 새 QR을 발급해주세요.',
+  )
+}
+
+function shouldRequirePersistentPairing() {
+  const explicitFlag = globalThis.__ABLE_BAND_REQUIRE_PERSISTENT_PAIRING__
+  if (explicitFlag === true || explicitFlag === false) {
+    return explicitFlag
+  }
+
+  const configuredFlag = import.meta.env.VITE_REQUIRE_PERSISTENT_PAIRING
+  if (configuredFlag === 'true') {
+    return true
+  }
+  if (configuredFlag === 'false') {
+    return false
+  }
+
+  return isRemotePhonePreviewHost(globalThis.location?.hostname)
+}
+
+function isRemotePhonePreviewHost(hostname = '') {
+  const normalizedHostname = String(hostname).toLowerCase()
+  return (
+    normalizedHostname.endsWith('.ngrok-free.dev') ||
+    (!['', 'localhost', '127.0.0.1', '::1'].includes(normalizedHostname) &&
+      !normalizedHostname.startsWith('192.168.') &&
+      !normalizedHostname.startsWith('10.') &&
+      !normalizedHostname.startsWith('172.'))
+  )
 }
 
 function appendQueryParam(params, key, value) {

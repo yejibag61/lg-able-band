@@ -444,7 +444,7 @@ describe('App login to home flow', () => {
   it.each([
     [
       'PAIRING_SESSION_NOT_FOUND',
-      '웨어러블에서 새 QR을 발급한 뒤 다시 스캔해주세요.',
+      '웨어러블 QR이 공유 DB에 등록되지 않았습니다. 웨어러블 서버의 BE/.env DB 연결을 확인한 뒤 새 QR을 발급해주세요.',
     ],
     [
       'PAIRING_EXPIRED',

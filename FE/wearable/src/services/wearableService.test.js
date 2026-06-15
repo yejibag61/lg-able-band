@@ -15,6 +15,7 @@ describe('wearableService', () => {
   afterEach(() => {
     localStorage.clear()
     delete globalThis.__ABLE_BAND_ALLOW_API_FAILURE_FALLBACK__
+    delete globalThis.__ABLE_BAND_REQUIRE_PERSISTENT_PAIRING__
   })
 
   it('creates a stable QR pairing payload for phone linking', async () => {
@@ -171,6 +172,39 @@ describe('wearableService', () => {
     expect(session.pairingSessionId).toBe('pairing-able-260610-1440')
     expect(session.pairingPayload).toContain('lg-able-band://pair')
     expect(session.status).toBe('waiting')
+  })
+
+  it('rejects phone pairing QR creation when the shared database is unavailable', async () => {
+    globalThis.__ABLE_BAND_REQUIRE_PERSISTENT_PAIRING__ = true
+    const apiFetch = vi.fn(async (url) => {
+      if (url === 'http://api.test/api/db/status') {
+        return jsonResponse({ connected: false, database: 'unconfigured' }, 503)
+      }
+      return jsonResponse({
+        pairingSessionId: 'pairing-memory-only',
+        deviceId: 'able-band-demo-001',
+        pairingCode: 'ABLE-4IN-260610',
+        nonce: 'memory-only-nonce',
+        status: 'WAITING',
+      })
+    })
+    const service = createWearableService({
+      baseUrl: 'http://api.test',
+      fetchImpl: apiFetch,
+      fallbackEnabled: true,
+    })
+
+    await expect(service.createPairingSession()).rejects.toThrow(
+      '공유 DB에 연결된 백엔드가 필요합니다.',
+    )
+    expect(apiFetch).toHaveBeenCalledWith(
+      'http://api.test/api/db/status',
+      expect.objectContaining({ method: 'GET' }),
+    )
+    expect(apiFetch).not.toHaveBeenCalledWith(
+      'http://api.test/api/wearable/pairing-sessions',
+      expect.anything(),
+    )
   })
 
   it('selects the highest priority current alert', async () => {

@@ -157,9 +157,10 @@ function App() {
 
         setPairing(nextSession)
         handlePairingStatus(nextSession)
-      } catch {
+      } catch (error) {
         if (isMounted) {
           setPairingStatus('invalid')
+          setStatusMessage(error.message || '연동 QR 생성에 실패했습니다.')
         }
       }
     }

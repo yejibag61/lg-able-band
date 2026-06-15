@@ -4,7 +4,6 @@ cd /d "%~dp0"
 
 call :start_if_free 5173 LGABLEBAND_FE_APP "cd /d ""%~dp0FE\app"" && npm run dev"
 call :start_if_free 5174 LGABLEBAND_FE_WEARABLE "cd /d ""%~dp0FE\wearable"" && npm run dev"
-call "%~dp0start-ngrok.bat" 5173 FE/app
 exit /b
 
 :start_if_free
