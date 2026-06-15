@@ -137,7 +137,7 @@ public class WearablePairingService {
 			);
 		}
 
-		DeviceService.DeviceSummary device = this.deviceService.createDevice(
+		DeviceService.DeviceSummary device = this.deviceService.claimWearableDevice(
 			authorization,
 			new DeviceService.DeviceCreateRequest(
 				DEFAULT_VENDOR,

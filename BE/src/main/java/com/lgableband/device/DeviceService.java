@@ -134,6 +134,53 @@ public class DeviceService {
 		}
 	}
 
+	public DeviceSummary claimWearableDevice(String authorization, DeviceCreateRequest request) {
+		JdbcTemplate jdbcTemplate = jdbcTemplate();
+		MvpDataService.CurrentUser user = this.dataService.currentUser(authorization);
+
+		if (request.type() != DeviceType.WEARABLE) {
+			throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_DEVICE_TYPE", "웨어러블 기기만 연동할 수 있습니다.");
+		}
+
+		if (jdbcTemplate == null) {
+			MockDataStore.Device device = this.mockDataStore.addDevice(
+				user.userId(),
+				request.name(),
+				request.type(),
+				request.locationSupported()
+			);
+			return new DeviceSummary(
+				device.deviceId(),
+				device.name(),
+				device.type(),
+				device.connectionStatus(),
+				device.locationSupported(),
+				device.lastEventAt(),
+				request.vendor(),
+				request.vendorDeviceId(),
+				request.remoteEnabled()
+			);
+		}
+
+		try {
+			long deviceId = insertDevice(jdbcTemplate, user.userId(), request);
+			insertRegistrationEvent(jdbcTemplate, deviceId, request);
+			return new DeviceSummary(
+				deviceId,
+				request.name(),
+				request.type(),
+				ConnectionStatus.CONNECTED,
+				request.locationSupported(),
+				OffsetDateTime.now(),
+				request.vendor(),
+				request.vendorDeviceId(),
+				request.remoteEnabled()
+			);
+		} catch (DuplicateKeyException ex) {
+			return claimExistingWearableDevice(jdbcTemplate, user.userId(), request);
+		}
+	}
+
 	public void deleteDevice(String authorization, long deviceId) {
 		JdbcTemplate jdbcTemplate = jdbcTemplate();
 		MvpDataService.CurrentUser user = this.dataService.currentUser(authorization);
@@ -201,6 +248,59 @@ public class DeviceService {
 			deviceId,
 			registrationPayload(request),
 			LocalDateTime.now()
+		);
+	}
+
+	private DeviceSummary claimExistingWearableDevice(JdbcTemplate jdbcTemplate, long userId, DeviceCreateRequest request) {
+		String vendorDeviceId = blankToNull(request.vendorDeviceId());
+		if (vendorDeviceId == null) {
+			throw new ApiException(HttpStatus.CONFLICT, "DUPLICATED_DEVICE", "이미 연결된 기기입니다.");
+		}
+
+		DeviceRow existing = jdbcTemplate.query(
+			"""
+			SELECT device_id, user_id
+			FROM device
+			WHERE vendor_device_id = ?
+			""",
+			(rs, rowNum) -> new DeviceRow(
+				rs.getLong("device_id"),
+				rs.getLong("user_id")
+			),
+			vendorDeviceId
+		).stream().findFirst()
+			.orElseThrow(() -> new ApiException(HttpStatus.CONFLICT, "DUPLICATED_DEVICE", "이미 연결된 기기입니다."));
+
+		jdbcTemplate.update(
+			"""
+			UPDATE device
+			SET user_id = ?,
+			    device_type = ?,
+			    name = ?,
+			    connection_status = 'CONNECTED',
+			    location_supported = ?,
+			    remote_enabled = ?,
+			    updated_at = CURRENT_TIMESTAMP(6)
+			WHERE device_id = ?
+			""",
+			userId,
+			request.type().name(),
+			request.name(),
+			request.locationSupported(),
+			request.remoteEnabled(),
+			existing.deviceId()
+		);
+		insertRegistrationEvent(jdbcTemplate, existing.deviceId(), request);
+		return new DeviceSummary(
+			existing.deviceId(),
+			request.name(),
+			request.type(),
+			ConnectionStatus.CONNECTED,
+			request.locationSupported(),
+			OffsetDateTime.now(),
+			request.vendor(),
+			request.vendorDeviceId(),
+			request.remoteEnabled()
 		);
 	}
 
