@@ -6193,3 +6193,126 @@ h2 {
   font-size: 0.78rem;
   line-height: 1.5;
 }
+
+.uwb-card {
+  gap: 18px;
+  background: #ffffff;
+}
+
+.uwb-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.uwb-device-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 78px;
+  min-height: 32px;
+  border-radius: 999px;
+  padding: 0 12px;
+  background: #fff1f2;
+  color: #e11d48;
+  font-size: 0.76rem;
+  font-weight: 520;
+}
+
+.uwb-distance-panel {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  padding: 18px 16px;
+  border-radius: 20px;
+  background: #fbfbfc;
+  text-align: center;
+}
+
+.uwb-distance-value {
+  color: #e11d48;
+  font-size: 3rem;
+  font-weight: 540;
+  line-height: 0.96;
+  letter-spacing: -0.06em;
+}
+
+.uwb-distance-caption {
+  max-width: 240px;
+  color: #6b7280;
+  font-size: 0.84rem;
+  font-weight: 430;
+  line-height: 1.6;
+}
+
+.uwb-meta-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: #7b8494;
+  font-size: 0.74rem;
+  font-weight: 450;
+}
+
+.device-location-button {
+  border-color: #f2d2d9;
+  color: #b42343;
+}
+
+.device-guide-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(17, 24, 39, 0.22);
+  backdrop-filter: blur(6px);
+}
+
+.device-guide-overlay-card {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  width: min(100%, 272px);
+  padding: 24px 20px;
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.98);
+  text-align: center;
+  box-shadow: 0 18px 48px rgba(15, 23, 42, 0.14);
+}
+
+.device-guide-overlay-card strong {
+  color: #111827;
+  font-size: 1rem;
+  font-weight: 540;
+  line-height: 1.35;
+}
+
+.device-guide-overlay-card p {
+  color: #6b7280;
+  font-size: 0.82rem;
+  font-weight: 430;
+  line-height: 1.55;
+}
+
+.device-guide-spinner {
+  width: 38px;
+  height: 38px;
+  border: 3px solid rgba(225, 29, 72, 0.16);
+  border-top-color: #e11d48;
+  border-radius: 50%;
+  animation: deviceGuideSpin 0.9s linear infinite;
+}
+
+@keyframes deviceGuideSpin {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}

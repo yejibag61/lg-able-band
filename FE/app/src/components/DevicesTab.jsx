@@ -1,11 +1,12 @@
 import { useMemo, useState } from 'react'
+import { useBleProximityGuide } from '../features/ble/useBleProximityGuide'
 import { createDevice } from '../services/deviceService'
 
 const connectionLabels = {
   CONNECTED: '연결됨',
   WARNING: '주의 필요',
   DISCONNECTED: '연결 필요',
-  ERROR: '점검 필요',
+  ERROR: '확인 필요',
 }
 
 const deviceCatalog = [
@@ -15,7 +16,7 @@ const deviceCatalog = [
     type: 'WASHER',
     typeLabel: '세탁기',
     room: '세탁실',
-    detail: '세탁 완료, 문 열림, 오류 알림을 Able Band로 전달합니다.',
+    detail: '세탁 완료와 문 열림, 오류 안내를 앱에서 바로 확인할 수 있습니다.',
     primarySignal: '세탁 완료 알림',
     locationSupported: true,
     remoteEnabled: true,
@@ -28,12 +29,12 @@ const deviceCatalog = [
     type: 'TV',
     typeLabel: 'TV',
     room: '거실',
-    detail: '전원 상태, 볼륨, 채널 변경 안내를 확인할 수 있습니다.',
-    primarySignal: '전원/볼륨 상태 안내',
+    detail: '전원 상태와 볼륨, 현재 사용 상태를 앱에서 확인합니다.',
+    primarySignal: '전원 상태 안내',
     locationSupported: false,
     remoteEnabled: true,
     defaultVendorDeviceId: 'thinq-tv-001',
-    management: ['전원 상태 안내', '볼륨/채널 안내', '리모컨 찾기'],
+    management: ['전원 상태 안내', '볼륨/채널 안내', 'UWB 위치 안내'],
   },
   {
     templateId: 'range',
@@ -41,12 +42,12 @@ const deviceCatalog = [
     type: 'RANGE',
     typeLabel: '전기레인지',
     room: '주방',
-    detail: '과열, 조리 완료, 전원 상태를 생활 알림으로 안내합니다.',
+    detail: '과열 경고와 전원 상태, 조리 완료 신호를 확인할 수 있습니다.',
     primarySignal: '과열 경고',
     locationSupported: false,
     remoteEnabled: false,
     defaultVendorDeviceId: 'thinq-range-001',
-    management: ['전원 상태 안내', '조리 완료 알림', '과열 경고'],
+    management: ['전원 상태 안내', '조리 완료 알림', 'UWB 위치 안내'],
   },
   {
     templateId: 'door',
@@ -54,12 +55,12 @@ const deviceCatalog = [
     type: 'DOOR_SENSOR',
     typeLabel: '도어센서',
     room: '현관',
-    detail: '문 열림과 장시간 개방 상태를 즉시 안내합니다.',
+    detail: '문 열림과 장시간 열림 상태를 빠르게 확인할 수 있습니다.',
     primarySignal: '문 열림 알림',
     locationSupported: false,
     remoteEnabled: false,
     defaultVendorDeviceId: 'thinq-door-001',
-    management: ['문 열림 알림', '장시간 열림 경고', '외출 상태 확인'],
+    management: ['문 열림 알림', '열림 상태 경고', 'UWB 위치 안내'],
   },
   {
     templateId: 'air',
@@ -67,12 +68,12 @@ const deviceCatalog = [
     type: 'AIR_SENSOR',
     typeLabel: '공기질 센서',
     room: '거실',
-    detail: '공기질, 온습도, 미세먼지 상태를 생활 알림으로 전달합니다.',
+    detail: '공기질과 온습도 변화를 생활 신호처럼 확인할 수 있습니다.',
     primarySignal: '공기질 상태 안내',
     locationSupported: true,
     remoteEnabled: false,
     defaultVendorDeviceId: 'thinq-air-001',
-    management: ['대기질 상태 안내', '온도/습도 안내', '미세먼지 안내'],
+    management: ['공기질 상태 안내', '온도/습도 안내', 'UWB 위치 안내'],
   },
   {
     templateId: 'refrigerator',
@@ -80,12 +81,12 @@ const deviceCatalog = [
     type: 'REFRIGERATOR',
     typeLabel: '냉장고',
     room: '주방',
-    detail: '문 열림, 온도 이상, 식재료 상태 알림을 관리합니다.',
+    detail: '문 열림과 온도 이상, 주요 상태를 한 번에 확인합니다.',
     primarySignal: '문 열림 알림',
     locationSupported: false,
     remoteEnabled: true,
     defaultVendorDeviceId: 'thinq-fridge-001',
-    management: ['문 열림 알림', '온도 이상 안내', '식재료 찾기'],
+    management: ['문 열림 알림', '온도 이상 안내', 'UWB 위치 안내'],
   },
 ]
 
@@ -110,14 +111,16 @@ export function DevicesTab({ devices = [], maxDeviceCount, uwb }) {
     error: '',
   })
 
+  const bleGuide = useBleProximityGuide()
+
   const selectedDevice =
     connectedDevices.find((device) => device.deviceId === selectedDeviceId) || null
 
   const connectedCount = connectedDevices.filter(
     (device) => device.connectionStatus === 'CONNECTED',
   ).length
-  const warningCount = connectedDevices.filter(
-    (device) => device.connectionStatus === 'WARNING' || device.connectionStatus === 'ERROR',
+  const warningCount = connectedDevices.filter((device) =>
+    ['WARNING', 'ERROR'].includes(device.connectionStatus),
   ).length
   const locationSupportedCount = connectedDevices.filter(
     (device) => device.locationSupported,
@@ -132,8 +135,13 @@ export function DevicesTab({ devices = [], maxDeviceCount, uwb }) {
     (device) => !registeredDeviceTypes.has(device.type),
   ).length
 
-  const uwbTarget = getUwbTarget(connectedDevices, selectedDevice, uwb)
-  const uwbGuide = uwbTarget ? createUwbGuide(uwbTarget, uwb) : null
+  const uwbTarget = getGuideTarget(connectedDevices, selectedDevice, uwb)
+  const isGuidingCurrentTarget = Boolean(
+    uwbTarget && bleGuide.isActive && bleGuide.targetName === uwbTarget.name,
+  )
+  const isGuidingSelectedDevice = Boolean(
+    selectedDevice && bleGuide.isActive && bleGuide.targetName === selectedDevice.name,
+  )
 
   function handleFindNearbyDevices() {
     if (availableDeviceCount === 0) {
@@ -160,6 +168,19 @@ export function DevicesTab({ devices = [], maxDeviceCount, uwb }) {
     }
 
     setConnectionMessage(`${selectedDevice.name} 상태를 방금 새로고침했습니다.`)
+  }
+
+  function handleToggleLocationGuide(targetDevice = uwbTarget || selectedDevice) {
+    if (!targetDevice) {
+      return
+    }
+
+    if (bleGuide.isActive && bleGuide.targetName === targetDevice.name) {
+      bleGuide.stopGuide()
+      return
+    }
+
+    bleGuide.startGuide(targetDevice.name)
   }
 
   function openCreatePage(template) {
@@ -255,7 +276,7 @@ export function DevicesTab({ devices = [], maxDeviceCount, uwb }) {
             <p className="card-label">가전 추가</p>
             <h2 id="device-add-title">{template?.name || '가전'} 연결</h2>
             <p>
-              선택한 가전을 계정에 연결하고, 이후 알림과 UWB 안내를 사용할 수 있게 등록합니다.
+              선택한 가전을 계정에 연결하고, 이후 알림과 위치 안내를 바로 사용할 수 있게 등록합니다.
             </p>
           </div>
 
@@ -273,7 +294,7 @@ export function DevicesTab({ devices = [], maxDeviceCount, uwb }) {
               type="text"
               value={draft.name}
               onChange={(event) => updateDraft('name', event.target.value)}
-              placeholder="예: 우리집 세탁기"
+              placeholder="예: 우리 집 세탁기"
             />
           </label>
 
@@ -305,8 +326,8 @@ export function DevicesTab({ devices = [], maxDeviceCount, uwb }) {
               onChange={(event) => updateDraft('locationSupported', event.target.checked)}
             />
             <div>
-              <strong>UWB 위치 안내 사용</strong>
-              <p>이 가전을 UWB 찾기 대상으로 등록합니다.</p>
+              <strong>위치 안내 사용</strong>
+              <p>이 가전을 위치 안내 대상으로 함께 관리합니다.</p>
             </div>
           </label>
 
@@ -318,7 +339,7 @@ export function DevicesTab({ devices = [], maxDeviceCount, uwb }) {
             />
             <div>
               <strong>원격 제어 사용</strong>
-              <p>원격 상태 조회와 연동 기능을 사용할 수 있게 등록합니다.</p>
+              <p>원격 상태 조회와 제어 기능을 사용할 수 있게 등록합니다.</p>
             </div>
           </label>
 
@@ -347,10 +368,7 @@ export function DevicesTab({ devices = [], maxDeviceCount, uwb }) {
         <div>
           <p className="card-label">LG ThinQ 연동</p>
           <h2 id="devices-title">우리 집 가전을 연결해요.</h2>
-          <p>
-            세탁기, TV, 전기레인지, 도어센서, 공기질 센서, 냉장고를 한 화면에서 관리할
-            수 있습니다.
-          </p>
+          <p>세탁기, TV, 전기레인지, 도어센서, 공기질 센서, 냉장고를 한 화면에서 관리합니다.</p>
         </div>
         <button className="device-find-button" type="button" onClick={handleFindNearbyDevices}>
           주변 기기 찾기
@@ -378,20 +396,43 @@ export function DevicesTab({ devices = [], maxDeviceCount, uwb }) {
         </span>
       </div>
 
-      {uwbGuide ? (
+      {uwbTarget ? (
         <section className="content-card uwb-card">
-          <div className="section-title-row">
+          <div className="uwb-card-header">
             <div>
               <p className="card-label">UWB 위치 안내</p>
-              <h2>{uwbGuide.targetName} 찾기</h2>
+              <h2>{bleGuide.targetName || uwbTarget.name} 찾기</h2>
             </div>
-            <span>{uwbGuide.distanceM}m</span>
+            <span className="uwb-device-badge">{bleGuide.bleDevicePrefix}</span>
           </div>
-          <p>
-            {uwbGuide.vibrationPattern} · {uwbGuide.voiceGuide}
-          </p>
-          <button className="primary-button full-button" type="button">
-            위치 안내 시작
+
+          <div className="uwb-distance-panel" aria-live="polite">
+            <strong className="uwb-distance-value">{bleGuide.distanceText}m</strong>
+            <p className="uwb-distance-caption">{bleGuide.helperText}</p>
+          </div>
+
+          <div className="uwb-meta-row">
+            <span>{bleGuide.statusLabel}</span>
+            <span>{bleGuide.deviceLabel}</span>
+          </div>
+
+          {bleGuide.errorMessage ? (
+            <p className="limit-message" role="alert">
+              {bleGuide.errorMessage}
+            </p>
+          ) : null}
+
+          <button
+            className="primary-button full-button"
+            type="button"
+            disabled={bleGuide.isConnecting}
+            onClick={() => handleToggleLocationGuide(uwbTarget)}
+          >
+            {bleGuide.isConnecting
+              ? '위치 안내 연결 중...'
+              : isGuidingCurrentTarget
+                ? '위치 안내 종료'
+                : '위치 안내 시작'}
           </button>
         </section>
       ) : (
@@ -399,10 +440,10 @@ export function DevicesTab({ devices = [], maxDeviceCount, uwb }) {
           <div className="section-title-row">
             <div>
               <p className="card-label">UWB 위치 안내</p>
-              <h2>연결된 UWB 대상 기기가 없습니다</h2>
+              <h2>연결된 가전이 없습니다</h2>
             </div>
           </div>
-          <p>UWB를 지원하는 가전을 연결하면 이 화면에서 위치 안내를 시작할 수 있습니다.</p>
+          <p>가전을 먼저 연결하면 이 화면에서 위치 안내를 바로 시작할 수 있습니다.</p>
         </section>
       )}
 
@@ -469,8 +510,8 @@ export function DevicesTab({ devices = [], maxDeviceCount, uwb }) {
               <dd>{selectedDevice.lastEventLabel}</dd>
             </div>
             <div>
-              <dt>UWB 안내</dt>
-              <dd>{selectedDevice.locationSupported ? '지원' : '미지원'}</dd>
+              <dt>위치 안내</dt>
+              <dd>임시 BLE 테스트 가능</dd>
             </div>
             <div>
               <dt>주요 알림</dt>
@@ -490,8 +531,17 @@ export function DevicesTab({ devices = [], maxDeviceCount, uwb }) {
             >
               상태 새로고침
             </button>
-            <button className="secondary-button compact-button" type="button">
-              알림 설정
+            <button
+              className="secondary-button compact-button device-location-button"
+              type="button"
+              disabled={bleGuide.isConnecting}
+              onClick={() => handleToggleLocationGuide(selectedDevice)}
+            >
+              {bleGuide.isConnecting
+                ? '연결 중...'
+                : isGuidingSelectedDevice
+                  ? '위치 안내 종료'
+                  : '위치 안내 시작'}
             </button>
           </div>
         </section>
@@ -537,9 +587,7 @@ export function DevicesTab({ devices = [], maxDeviceCount, uwb }) {
                   }
                   key={device.templateId}
                   type="button"
-                  aria-label={
-                    isRegistered ? `${device.name} 이미 연결됨` : `${device.name} 추가하기`
-                  }
+                  aria-label={isRegistered ? `${device.name} 이미 연결됨` : `${device.name} 추가하기`}
                   disabled={isRegistered}
                   onClick={() => openCreatePage(device)}
                 >
@@ -555,6 +603,16 @@ export function DevicesTab({ devices = [], maxDeviceCount, uwb }) {
           </section>
         ) : null}
       </section>
+
+      {bleGuide.isShowingOverlay ? (
+        <div className="device-guide-overlay" role="status" aria-live="polite">
+          <div className="device-guide-overlay-card">
+            <div className="device-guide-spinner" aria-hidden="true" />
+            <strong>{bleGuide.statusTitle || '기기를 연결하는 중이에요'}</strong>
+            <p>{bleGuide.helperText}</p>
+          </div>
+        </div>
+      ) : null}
     </section>
   )
 }
@@ -593,37 +651,21 @@ function createFallbackTemplate(device) {
     room: '기기 위치',
     detail: '연결된 가전의 상태를 확인할 수 있습니다.',
     primarySignal: '기기 상태 안내',
-    management: ['상태 확인'],
+    management: ['상태 확인', '위치 안내 시작'],
   }
 }
 
-function getUwbTarget(devices, selectedDevice, uwb) {
-  const connectedUwbDevices = devices.filter(
-    (device) => device.connectionStatus === 'CONNECTED' && device.locationSupported,
-  )
-
-  if (connectedUwbDevices.length === 0) {
-    return null
-  }
-
-  if (selectedDevice?.connectionStatus === 'CONNECTED' && selectedDevice.locationSupported) {
+function getGuideTarget(devices, selectedDevice, uwb) {
+  if (selectedDevice) {
     return selectedDevice
   }
 
-  const previewTarget = connectedUwbDevices.find((device) => device.name === uwb?.targetName)
-  return previewTarget || connectedUwbDevices[0]
-}
-
-function createUwbGuide(target, uwb) {
-  const distanceM = Number.isFinite(uwb?.distanceM) ? uwb.distanceM : 2.4
-  const vibrationPattern = uwb?.vibrationPattern || '강한 진동'
-
-  return {
-    targetName: target.name,
-    distanceM,
-    vibrationPattern,
-    voiceGuide: `${target.name}까지 약 ${distanceM}미터입니다. 연결된 가전 기준으로 위치를 안내합니다.`,
+  const previewTarget = devices.find((device) => device.name === uwb?.targetName)
+  if (previewTarget) {
+    return previewTarget
   }
+
+  return devices[0] || null
 }
 
 function formatLastEvent(value) {
@@ -704,10 +746,19 @@ function renderDeviceIcon(type) {
     )
   }
 
+  if (type === 'REFRIGERATOR') {
+    return (
+      <svg viewBox="0 0 48 48" focusable="false">
+        <rect x="14" y="6" width="20" height="36" rx="4" />
+        <path d="M14 22h20M29 14h1M29 30h1" />
+      </svg>
+    )
+  }
+
   return (
     <svg viewBox="0 0 48 48" focusable="false">
-      <rect x="14" y="6" width="20" height="36" rx="4" />
-      <path d="M14 22h20M29 14h1M29 30h1" />
+      <rect x="10" y="10" width="28" height="28" rx="6" />
+      <path d="M16 24h16" />
     </svg>
   )
 }
