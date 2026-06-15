@@ -112,7 +112,7 @@ describe('Wearable MVP', () => {
     expect(await screen.findByRole('heading', { name: '전기레인지 과열 주의' })).toBeTruthy()
     expect(localStorage.getItem('lg-able-band.accessToken')).toBe('paired-api-token')
     expect(apiFetch).toHaveBeenCalledWith(
-      'http://localhost:8080/api/wearable/pairing-sessions/pairing-api-001?deviceId=able-band-api-001&nonce=nonce-api-001',
+      '/api/wearable/pairing-sessions/pairing-api-001?deviceId=able-band-api-001&nonce=nonce-api-001',
       expect.objectContaining({ method: 'GET' }),
     )
     expect(screen.getByText('위험 알림')).toBeTruthy()
@@ -200,7 +200,7 @@ describe('Wearable MVP', () => {
     expect(await screen.findByText('연결이 해제되었습니다')).toBeTruthy()
     expect(localStorage.getItem('lg-able-band.accessToken')).toBeNull()
     expect(apiFetch).toHaveBeenCalledWith(
-      'http://localhost:8080/api/wearable/pairing-sessions/pairing-api-001/unpair',
+      '/api/wearable/pairing-sessions/pairing-api-001/unpair',
       expect.objectContaining({
         body: JSON.stringify({
           deviceId: 'able-band-api-001',
@@ -435,7 +435,7 @@ function setupPairingApi({
   const apiFetch = vi.fn(async (url, options = {}) => {
     const endpoint = String(url)
     const method = options.method || 'GET'
-    if (endpoint === 'http://localhost:8080/api/wearable/pairing-sessions' && method === 'POST') {
+    if (endpoint === '/api/wearable/pairing-sessions' && method === 'POST') {
       const session = createQueue.shift() || pairingApiSession
       sessions.set(session.pairingSessionId, session)
       return jsonResponse({
@@ -445,7 +445,7 @@ function setupPairingApi({
     }
 
     const pairingSessionMatch = endpoint.match(
-      /^http:\/\/localhost:8080\/api\/wearable\/pairing-sessions\/([^?]+)/,
+      /^\/api\/wearable\/pairing-sessions\/([^?]+)/,
     )
     if (pairingSessionMatch) {
       const pairingSessionId = decodeURIComponent(pairingSessionMatch[1])
@@ -467,7 +467,7 @@ function setupPairingApi({
       })
     }
 
-    if (endpoint === 'http://localhost:8080/api/alerts?limit=20') {
+    if (endpoint === '/api/alerts?limit=20') {
       if (alertFailure) {
         return jsonResponse({ message: '서버 연결 실패' }, 500)
       }
@@ -476,7 +476,7 @@ function setupPairingApi({
     }
 
     const alertConfirmMatch = endpoint.match(
-      /^http:\/\/localhost:8080\/api\/alerts\/(\d+)\/confirm$/,
+      /^\/api\/alerts\/(\d+)\/confirm$/,
     )
     if (alertConfirmMatch && method === 'POST') {
       return jsonResponse({
@@ -486,7 +486,7 @@ function setupPairingApi({
       })
     }
 
-    if (endpoint === 'http://localhost:8080/api/emergency-requests' && method === 'POST') {
+    if (endpoint === '/api/emergency-requests' && method === 'POST') {
       const forcedEmergencyErrorCode =
         emergencyErrorCode || window.__ABLE_BAND_WEARABLE_EMERGENCY_ERROR__ || ''
       if (forcedEmergencyErrorCode) {
@@ -501,7 +501,7 @@ function setupPairingApi({
       })
     }
 
-    if (endpoint === 'http://localhost:8080/api/uwb/targets' && method === 'GET') {
+    if (endpoint === '/api/uwb/targets' && method === 'GET') {
       if (uwbTargetFailure) {
         return jsonResponse({ message: '서버 연결 실패' }, 500)
       }
@@ -533,7 +533,7 @@ function setupPairingApi({
       })
     }
 
-    if (endpoint === 'http://localhost:8080/api/uwb/sessions' && method === 'POST') {
+    if (endpoint === '/api/uwb/sessions' && method === 'POST') {
       const requestedSession = getRequestedUwbSession()
       const requestBody = JSON.parse(options.body || '{}')
       return jsonResponse({
@@ -547,7 +547,7 @@ function setupPairingApi({
     }
 
     const uwbSessionMatch = endpoint.match(
-      /^http:\/\/localhost:8080\/api\/uwb\/sessions\/(\d+)$/,
+      /^\/api\/uwb\/sessions\/(\d+)$/,
     )
     if (uwbSessionMatch && method === 'GET') {
       const requestedSession = findMockUwbSession(Number(uwbSessionMatch[1]))
@@ -579,7 +579,7 @@ function nextPairingStatus({
 function findEmergencyRequestCall(apiFetch) {
   return apiFetch.mock.calls.find(
     ([url, options = {}]) =>
-      String(url) === 'http://localhost:8080/api/emergency-requests' &&
+      String(url) === '/api/emergency-requests' &&
       options.method === 'POST',
   )
 }
