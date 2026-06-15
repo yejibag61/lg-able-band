@@ -435,6 +435,10 @@ function setupPairingApi({
   const apiFetch = vi.fn(async (url, options = {}) => {
     const endpoint = String(url)
     const method = options.method || 'GET'
+    if (endpoint === '/api/db/status' && method === 'GET') {
+      return jsonResponse({ connected: true, database: 'able_band' })
+    }
+
     if (endpoint === '/api/wearable/pairing-sessions' && method === 'POST') {
       const session = createQueue.shift() || pairingApiSession
       sessions.set(session.pairingSessionId, session)

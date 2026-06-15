@@ -416,7 +416,7 @@ async function assertPersistentPairingReady(request) {
 
 function throwPersistentPairingUnavailable() {
   throw new Error(
-    '공유 DB에 연결된 백엔드가 필요합니다. 웨어러블 서버의 BE/.env 설정을 확인한 뒤 새 QR을 발급해주세요.',
+    '공유 DB에 연결된 백엔드가 필요합니다. 앱과 웨어러블을 서로 다른 컴퓨터에서 실행한다면 QR을 띄우는 컴퓨터의 BE/.env도 같은 DB를 보게 설정한 뒤 새 QR을 발급해주세요.',
   )
 }
 
@@ -434,18 +434,7 @@ function shouldRequirePersistentPairing() {
     return false
   }
 
-  return isRemotePhonePreviewHost(globalThis.location?.hostname)
-}
-
-function isRemotePhonePreviewHost(hostname = '') {
-  const normalizedHostname = String(hostname).toLowerCase()
-  return (
-    normalizedHostname.endsWith('.ngrok-free.dev') ||
-    (!['', 'localhost', '127.0.0.1', '::1'].includes(normalizedHostname) &&
-      !normalizedHostname.startsWith('192.168.') &&
-      !normalizedHostname.startsWith('10.') &&
-      !normalizedHostname.startsWith('172.'))
-  )
+  return !allowsApiFailureFallback()
 }
 
 function appendQueryParam(params, key, value) {

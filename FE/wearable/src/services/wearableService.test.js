@@ -30,7 +30,57 @@ describe('wearableService', () => {
     expect(session.expiresInMinutes).toBe(5)
   })
 
-  it('creates pairing sessions through the wearable final api', async () => {
+  it('checks the shared database before creating pairing sessions through the wearable final api', async () => {
+    const apiFetch = vi.fn(async (url) => {
+      if (url === 'http://api.test/api/db/status') {
+        return jsonResponse({ connected: true, database: 'able_band' })
+      }
+
+      return jsonResponse({
+        pairingSessionId: 'pairing-api-001',
+        deviceId: 'able-band-api-001',
+        pairingCode: 'ABLE-API-001',
+        nonce: 'nonce-api-001',
+        issuedAt: '2026-06-10T15:00:00+09:00',
+        expiresAt: '2026-06-10T15:05:00+09:00',
+        expiresInMinutes: 5,
+        pairingPayload: 'lg-able-band://pair?pairingSessionId=pairing-api-001&from=backend',
+        status: 'WAITING',
+      })
+    })
+    const service = createWearableService({
+      baseUrl: 'http://api.test',
+      fetchImpl: apiFetch,
+      fallbackEnabled: false,
+    })
+
+    const session = await service.createPairingSession()
+
+    expect(apiFetch).toHaveBeenCalledWith(
+      'http://api.test/api/db/status',
+      expect.objectContaining({ method: 'GET' }),
+    )
+    expect(apiFetch).toHaveBeenCalledWith(
+      'http://api.test/api/wearable/pairing-sessions',
+      expect.objectContaining({
+        body: JSON.stringify({
+          deviceId: 'able-band-demo-001',
+          deviceName: 'LG Able Band',
+          pairingCode: 'ABLE-4IN-260610',
+        }),
+        method: 'POST',
+      }),
+    )
+    expect(session).toMatchObject({
+      pairingSessionId: 'pairing-api-001',
+      deviceId: 'able-band-api-001',
+      pairingPayload: 'lg-able-band://pair?pairingSessionId=pairing-api-001&from=backend',
+      status: 'waiting',
+    })
+  })
+
+  it('can opt out of the shared database check for isolated development tests', async () => {
+    globalThis.__ABLE_BAND_REQUIRE_PERSISTENT_PAIRING__ = false
     const apiFetch = vi.fn(async () =>
       jsonResponse({
         pairingSessionId: 'pairing-api-001',
@@ -72,6 +122,36 @@ describe('wearableService', () => {
   })
 
   it('uses the Vite proxy API path when no explicit API base URL is configured', async () => {
+    const apiFetch = vi.fn(async (url) => {
+      if (url === '/api/db/status') {
+        return jsonResponse({ connected: true, database: 'able_band' })
+      }
+
+      return jsonResponse({
+        pairingSessionId: 'pairing-api-relative-001',
+        deviceId: 'able-band-relative-001',
+        pairingCode: 'ABLE-REL-001',
+        nonce: 'nonce-relative-001',
+        pairingPayload: 'lg-able-band://pair?pairingSessionId=pairing-api-relative-001',
+        status: 'WAITING',
+      })
+    })
+    const service = createWearableService({
+      fetchImpl: apiFetch,
+      fallbackEnabled: false,
+    })
+
+    await service.createPairingSession()
+
+    expect(apiFetch).toHaveBeenCalledWith('/api/db/status', expect.objectContaining({ method: 'GET' }))
+    expect(apiFetch).toHaveBeenCalledWith(
+      '/api/wearable/pairing-sessions',
+      expect.objectContaining({ method: 'POST' }),
+    )
+  })
+
+  it('can use the Vite proxy API path without a database check when explicitly configured', async () => {
+    globalThis.__ABLE_BAND_REQUIRE_PERSISTENT_PAIRING__ = false
     const apiFetch = vi.fn(async () =>
       jsonResponse({
         pairingSessionId: 'pairing-api-relative-001',
@@ -174,8 +254,7 @@ describe('wearableService', () => {
     expect(session.status).toBe('waiting')
   })
 
-  it('rejects phone pairing QR creation when the shared database is unavailable', async () => {
-    globalThis.__ABLE_BAND_REQUIRE_PERSISTENT_PAIRING__ = true
+  it('rejects pairing QR creation by default when the shared database is unavailable', async () => {
     const apiFetch = vi.fn(async (url) => {
       if (url === 'http://api.test/api/db/status') {
         return jsonResponse({ connected: false, database: 'unconfigured' }, 503)
