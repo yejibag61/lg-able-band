@@ -62,6 +62,13 @@ public class WearablePairingService {
 	}
 
 	public PairingSessionResponse createSession(String deviceId, String deviceName, String pairingCode) {
+		expireSessions();
+		WearablePairingSession existing = this.pairingRepository.findWaitingSessionForDevice(deviceId).orElse(null);
+		if (existing != null) {
+			this.pairingRepository.expireWaitingSessionsForDevice(existing.deviceId(), existing.pairingSessionId());
+			return sessionResponse(existing);
+		}
+
 		OffsetDateTime issuedAt = now();
 		OffsetDateTime expiresAt = issuedAt.plus(this.sessionTtl);
 		WearablePairingSession session = WearablePairingSession.waiting(
@@ -75,6 +82,7 @@ public class WearablePairingService {
 		);
 
 		this.pairingRepository.save(session);
+		this.pairingRepository.expireWaitingSessionsForDevice(session.deviceId(), session.pairingSessionId());
 		return sessionResponse(session);
 	}
 
@@ -128,6 +136,10 @@ public class WearablePairingService {
 			if (session.linkedUserId() == user.userId()) {
 				WearablePairingSession refreshed = session.refreshToken(bearerToken(authorization));
 				this.pairingRepository.save(refreshed);
+				this.pairingRepository.expireWaitingSessionsForDevice(
+					refreshed.deviceId(),
+					refreshed.pairingSessionId()
+				);
 				return completeResponse(refreshed);
 			}
 			throw new ApiException(
@@ -155,6 +167,7 @@ public class WearablePairingService {
 			now()
 		);
 		this.pairingRepository.save(paired);
+		this.pairingRepository.expireWaitingSessionsForDevice(paired.deviceId(), paired.pairingSessionId());
 		return completeResponse(paired);
 	}
 

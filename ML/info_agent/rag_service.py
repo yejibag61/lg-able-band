@@ -7,6 +7,7 @@ from typing import Dict, List, Optional
 
 
 DATA_PATH = Path(__file__).resolve().parent / "data" / "raw" / "documents.csv"
+BOKJIRO_DATA_PATH = Path(__file__).resolve().parent / "data" / "bokjiro_documents.csv"
 TOKEN_PATTERN = re.compile(r"[0-9A-Za-z가-힣]+")
 
 FALLBACK_DOCUMENT = {
@@ -27,13 +28,25 @@ def _tokens(text: str) -> set[str]:
 
 
 def _load_documents() -> List[Dict[str, str]]:
-    if not DATA_PATH.exists():
-        return []
-    try:
-        with DATA_PATH.open("r", encoding="utf-8-sig", newline="") as csv_file:
-            return list(csv.DictReader(csv_file))
-    except (OSError, csv.Error, UnicodeError):
-        return []
+    documents: List[Dict[str, str]] = []
+    for path in (DATA_PATH, BOKJIRO_DATA_PATH):
+        if not path.exists() or not path.stat().st_size:
+            continue
+        try:
+            with path.open("r", encoding="utf-8-sig", newline="") as csv_file:
+                rows = list(csv.DictReader(csv_file))
+                if path == BOKJIRO_DATA_PATH:
+                    detail_fields = (
+                        "supportTarget", "selectionCriteria", "applicationMethod", "contact"
+                    )
+                    rows = [
+                        row for row in rows
+                        if any(str(row.get(field, "")).strip() for field in detail_fields)
+                    ]
+                documents.extend(rows)
+        except (OSError, csv.Error, UnicodeError):
+            continue
+    return documents
 
 
 def search_documents(

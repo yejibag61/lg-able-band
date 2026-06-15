@@ -1,4 +1,5 @@
 const DEFAULT_SOUND_CHATBOT_URL = 'http://127.0.0.1:8002/api/ai/voice-chat'
+const PROXIED_SOUND_CHATBOT_URL = '/api/ai/voice-chat'
 
 export async function requestVoiceChat(payload) {
   const response = await fetch(soundChatbotUrl(), {
@@ -19,5 +20,9 @@ export async function requestVoiceChat(payload) {
 }
 
 export function soundChatbotUrl() {
-  return import.meta.env.VITE_SOUND_CHATBOT_URL?.trim() || DEFAULT_SOUND_CHATBOT_URL
+  const configuredUrl = import.meta.env.VITE_SOUND_CHATBOT_URL?.trim()
+  if (configuredUrl) {
+    return configuredUrl
+  }
+  return import.meta.env.MODE === 'test' ? DEFAULT_SOUND_CHATBOT_URL : PROXIED_SOUND_CHATBOT_URL
 }

@@ -9,7 +9,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 STEPS = (
     "collect_ablenews_rss.py", "collect_theindigo_news.py", "collect_welfarenews.py",
     "collect_socialfocus.py", "collect_policy_briefing.py", "collect_public_welfare.py",
-    "collect_local_welfare.py", "collect_koddi_report_api.py", "collect_kpf_news_metadata.py",
+    "collect_local_welfare.py", "collect_bokjiro.py", "collect_koddi_report_api.py", "collect_kpf_news_metadata.py",
     "collect_targeted_accessibility_news.py", "merge_real_documents.py", "validate_documents.py",
 )
 

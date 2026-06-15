@@ -1,5 +1,22 @@
 # LG Able Band Info Agent
 
+## 복지로 상세 문서 수집
+
+복지로/공공데이터 API는 사용자 질의 중 실시간 호출하지 않고, 별도 수집 단계에서
+상세 서비스 문서를 `data/bokjiro_documents.csv`로 저장합니다. 이 파일이 없거나
+비어 있으면 RAG는 기존 문서만 사용합니다.
+
+`.env`에 `DATA_GO_KR_SERVICE_KEY` 또는 `BOKJIRO_SERVICE_KEY`와
+`BOKJIRO_API_URL` 또는 `PUBLIC_WELFARE_API_URL`을 설정한 뒤 실행합니다.
+일일 100회 한도에 맞춰 기본적으로 목록 1회와 상세조회 최대 99회를 사용합니다.
+수집 결과는 누적 저장되며 이미 상세 수집한 서비스는 다음 실행에서 건너뜁니다.
+
+```powershell
+python ML/info_agent/scripts/collect_bokjiro.py
+# 또는 ML/info_agent 폴더에서
+python scripts/collect_bokjiro.py
+```
+
 Able Band 사용자가 행동하거나 알림으로 확인할 수 있는 실제 정보를 수집하고 검색·분류하는
 ML 서버입니다. 수집은 실시간 요청 방식이 아닌 배치 방식입니다.
 
@@ -48,3 +65,43 @@ python test_requests.py
 
 - `models/category_classifier.joblib`
 - `models/priority_classifier.joblib`
+
+## 선택적 LLM 답변 생성
+
+Info Agent는 기본적으로 기존 템플릿 응답만 사용합니다. 검색 신뢰도가 높은 비긴급
+복지·지원 질문의 답변 문장만 LLM으로 자연스럽게 만들려면
+`ML/info_agent/.env` 또는 실행 환경에 다음 값을 설정합니다.
+
+```properties
+OPENAI_API_KEY=...
+INFO_AGENT_LLM_ENABLED=true
+INFO_AGENT_LLM_MODEL=gpt-4o-mini
+INFO_AGENT_LLM_TIMEOUT_SEC=8
+INFO_AGENT_LLM_MAX_INPUT_DOCS=3
+INFO_AGENT_LLM_MAX_TOKENS=500
+INFO_AGENT_LLM_CACHE_TTL_SEC=600
+INFO_AGENT_LLM_MIN_SCORE=0.45
+```
+
+`INFO_AGENT_LLM_ENABLED=true`와 API 키가 모두 있어야 호출됩니다. 검색 결과 없음,
+낮은 검색 점수, 긴급·위험·보호자 연락 질문, 넓은 범위 질문, 후속 확인 질문에서는
+기존 템플릿을 사용합니다. 호출 오류나 timeout, rate limit, JSON 형식 오류가 발생해도
+기존 응답으로 자동 fallback하며 결과의 `meta`에 LLM 사용 여부가 기록됩니다.
+
+## 챗봇 품질 진단 및 평가
+
+Info Agent 응답의 `meta.debug`에는 최종 분류 결과, priority, 최상위 검색 문서와
+점수, 검색 문서 수, 추출 필드, 검색 fallback 여부가 기록됩니다.
+
+평가 질문 데이터는 `data/chatbot_eval_questions.csv`에 있으며 다음 명령으로
+기존 BE 라우팅 규칙과 Info Agent category 결과를 함께 평가할 수 있습니다.
+
+```powershell
+cd ML/info_agent
+python eval_info_agent_quality.py
+python eval_info_agent_quality.py --show-passes
+python eval_info_agent_quality.py --limit 10
+```
+
+평가 실패가 있으면 스크립트는 종료 코드 `1`을 반환하고 실패 질문과 주요 debug
+정보를 출력합니다.

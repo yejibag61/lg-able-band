@@ -79,10 +79,44 @@ public class WearablePairingRepository {
 		return Optional.ofNullable(SESSIONS.get(pairingSessionId));
 	}
 
+	public Optional<WearablePairingSession> findWaitingSessionForDevice(String deviceId) {
+		JdbcTemplate jdbcTemplate = jdbcTemplate();
+		if (jdbcTemplate != null) {
+			try {
+				List<WearablePairingSession> sessions = findWaitingSessionForDeviceDb(jdbcTemplate, deviceId);
+				if (!sessions.isEmpty()) {
+					WearablePairingSession session = sessions.getFirst();
+					SESSIONS.put(session.pairingSessionId(), session);
+					return Optional.of(session);
+				}
+			} catch (DataAccessException ignored) {
+			}
+		}
+		return SESSIONS.values().stream()
+			.filter(session -> isWaitingSessionForDevice(session, deviceId))
+			.max((left, right) -> left.issuedAt().compareTo(right.issuedAt()));
+	}
+
 	public Optional<WearablePairingSession> expire(String pairingSessionId) {
 		Optional<WearablePairingSession> expired = find(pairingSessionId).map(WearablePairingSession::expire);
 		expired.ifPresent(this::save);
 		return expired;
+	}
+
+	public void expireWaitingSessionsForDevice(String deviceId, String retainedPairingSessionId) {
+		SESSIONS.replaceAll((key, session) ->
+			isOtherWaitingSessionForDevice(session, deviceId, retainedPairingSessionId)
+				? session.expire()
+				: session
+		);
+		writeFallbackFile();
+		JdbcTemplate jdbcTemplate = jdbcTemplate();
+		if (jdbcTemplate != null) {
+			try {
+				expireWaitingSessionsForDeviceDb(jdbcTemplate, deviceId, retainedPairingSessionId);
+			} catch (DataAccessException ignored) {
+			}
+		}
 	}
 
 	public void expireSessions(OffsetDateTime now) {
@@ -156,6 +190,26 @@ public class WearablePairingRepository {
 		);
 	}
 
+	private void expireWaitingSessionsForDeviceDb(
+		JdbcTemplate jdbcTemplate,
+		String deviceId,
+		String retainedPairingSessionId
+	) {
+		jdbcTemplate.update(
+			"""
+			UPDATE wearable_pairing_session
+			SET status = 'EXPIRED',
+			    wearable_access_token = NULL,
+			    updated_at = CURRENT_TIMESTAMP(6)
+			WHERE device_id = ?
+			  AND status = 'WAITING'
+			  AND pairing_session_id <> ?
+			""",
+			deviceId,
+			retainedPairingSessionId
+		);
+	}
+
 	private List<WearablePairingSession> findDb(JdbcTemplate jdbcTemplate, String pairingSessionId) {
 		return jdbcTemplate.query(
 			"""
@@ -183,28 +237,85 @@ public class WearablePairingRepository {
 			LEFT JOIN device d ON d.device_id = w.linked_device_id
 			WHERE w.pairing_session_id = ?
 			""",
-			(rs, rowNum) -> new WearablePairingSession(
-				rs.getString("pairing_session_id"),
-				rs.getString("device_id"),
-				rs.getString("device_name"),
-				rs.getString("pairing_code"),
-				rs.getString("nonce"),
-				toOffsetDateTime(rs.getObject("issued_at", LocalDateTime.class)),
-				toOffsetDateTime(rs.getObject("expires_at", LocalDateTime.class)),
-				WearablePairingService.PairingStatus.valueOf(rs.getString("status")),
-				nullableLong(rs, "linked_user_id"),
-				linkedDevice(rs),
-				rs.getString("wearable_access_token"),
-				toOffsetDateTime(rs.getObject("paired_at", LocalDateTime.class)),
-				toOffsetDateTime(rs.getObject("unpaired_at", LocalDateTime.class))
-			),
+			this::mapSession,
 			pairingSessionId
+		);
+	}
+
+	private List<WearablePairingSession> findWaitingSessionForDeviceDb(
+		JdbcTemplate jdbcTemplate,
+		String deviceId
+	) {
+		return jdbcTemplate.query(
+			"""
+			SELECT w.pairing_session_id,
+			       w.device_id,
+			       w.device_name,
+			       w.pairing_code,
+			       w.nonce,
+			       w.status,
+			       w.linked_user_id,
+			       w.linked_device_id,
+			       w.wearable_access_token,
+			       w.issued_at,
+			       w.expires_at,
+			       w.paired_at,
+			       w.unpaired_at,
+			       d.name AS linked_device_name,
+			       d.device_type AS linked_device_type,
+			       d.connection_status AS linked_device_connection_status,
+			       d.location_supported AS linked_device_location_supported,
+			       d.vendor_device_id AS linked_vendor_device_id,
+			       d.remote_enabled AS linked_device_remote_enabled,
+			       COALESCE(d.updated_at, d.created_at) AS linked_device_last_event_at
+			FROM wearable_pairing_session w
+			LEFT JOIN device d ON d.device_id = w.linked_device_id
+			WHERE w.device_id = ?
+			  AND w.status = 'WAITING'
+			ORDER BY w.issued_at DESC, w.created_at DESC
+			LIMIT 1
+			""",
+			this::mapSession,
+			deviceId
+		);
+	}
+
+	private WearablePairingSession mapSession(ResultSet rs, int rowNum) throws SQLException {
+		return new WearablePairingSession(
+			rs.getString("pairing_session_id"),
+			rs.getString("device_id"),
+			rs.getString("device_name"),
+			rs.getString("pairing_code"),
+			rs.getString("nonce"),
+			toOffsetDateTime(rs.getObject("issued_at", LocalDateTime.class)),
+			toOffsetDateTime(rs.getObject("expires_at", LocalDateTime.class)),
+			WearablePairingService.PairingStatus.valueOf(rs.getString("status")),
+			nullableLong(rs, "linked_user_id"),
+			linkedDevice(rs),
+			rs.getString("wearable_access_token"),
+			toOffsetDateTime(rs.getObject("paired_at", LocalDateTime.class)),
+			toOffsetDateTime(rs.getObject("unpaired_at", LocalDateTime.class))
 		);
 	}
 
 	private boolean shouldExpire(WearablePairingSession session, OffsetDateTime now) {
 		return session.status() == WearablePairingService.PairingStatus.WAITING
 			&& !now.isBefore(session.expiresAt());
+	}
+
+	private boolean isWaitingSessionForDevice(WearablePairingSession session, String deviceId) {
+		return session.status() == WearablePairingService.PairingStatus.WAITING
+			&& session.deviceId().equals(deviceId);
+	}
+
+	private boolean isOtherWaitingSessionForDevice(
+		WearablePairingSession session,
+		String deviceId,
+		String retainedPairingSessionId
+	) {
+		return session.status() == WearablePairingService.PairingStatus.WAITING
+			&& session.deviceId().equals(deviceId)
+			&& !session.pairingSessionId().equals(retainedPairingSessionId);
 	}
 
 	private Long linkedDeviceId(WearablePairingSession session) {

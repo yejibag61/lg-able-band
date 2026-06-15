@@ -79,6 +79,15 @@ describe('VoiceChatbot info agent response', () => {
           title: '장애인의료비지원',
           summary: '의료비를 지원합니다.',
           source: '복지로',
+          supportTarget: '등록 장애인 중 의료비 지원 대상자',
+          eligibility: '등록 장애인 중 의료비 지원 대상자',
+          selectionCriteria: '소득 기준 확인 필요',
+          ageCondition: '연령 기준 확인 필요',
+          incomeCondition: '소득 기준 확인 필요',
+          regionCondition: '주소지 관할 지역',
+          applyMethod: '주소지 주민센터에 방문 신청합니다.',
+          applicationMethod: '주소지 주민센터에 방문 신청합니다.',
+          contact: '주소지 주민센터',
         },
         classification: {
           category: '의료/건강',
@@ -126,6 +135,14 @@ describe('VoiceChatbot info agent response', () => {
           lastInfoAgent: expect.objectContaining({
             title: '장애인의료비지원',
             category: '의료/건강',
+            importantFields: expect.objectContaining({
+              supportTarget: '등록 장애인 중 의료비 지원 대상자',
+              eligibility: '등록 장애인 중 의료비 지원 대상자',
+              selectionCriteria: '소득 기준 확인 필요',
+              applicationMethod: '주소지 주민센터에 방문 신청합니다.',
+              applyMethod: '주소지 주민센터에 방문 신청합니다.',
+              contact: '주소지 주민센터',
+            }),
           }),
         }),
       }))
@@ -133,6 +150,12 @@ describe('VoiceChatbot info agent response', () => {
     expect(screen.getAllByRole('article', { name: 'AI 접근성 정보 카드' })).toHaveLength(1)
     expect(screen.getAllByText('담당 기관 문의 방법은?').length).toBeGreaterThanOrEqual(1)
     expect(screen.queryByText('장애인의료비지원 담당 기관 문의 방법은?')).toBeNull()
+    expect(screen.getByLabelText('정보 후속 질문')).toBeTruthy()
+
+    await user.click(screen.getByRole('button', { name: '정보 후속 질문 닫기' }))
+
+    expect(screen.queryByLabelText('정보 후속 질문')).toBeNull()
+    expect(screen.getByLabelText('추천 질문')).toBeTruthy()
   })
 
   it('keeps the existing chatbot response free of info agent controls', async () => {

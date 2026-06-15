@@ -187,6 +187,60 @@ class WearablePairingHardeningTests {
 	}
 
 	@Test
+	void creatingPairingSessionReusesExistingWaitingQrForSameBand() throws Exception {
+		String deviceId = uniqueDeviceId("single-active-qr");
+		PairingFixture first = createPairingSession(deviceId);
+		PairingFixture second = createPairingSession(deviceId);
+
+		org.junit.jupiter.api.Assertions.assertEquals(first.sessionId(), second.sessionId());
+		org.junit.jupiter.api.Assertions.assertEquals(first.nonce(), second.nonce());
+
+		this.mockMvc.perform(get("/api/wearable/pairing-sessions/" + first.sessionId())
+				.param("deviceId", deviceId)
+				.param("nonce", first.nonce()))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.status").value("WAITING"));
+
+		this.mockMvc.perform(get("/api/wearable/pairing-sessions/" + second.sessionId())
+				.param("deviceId", deviceId)
+				.param("nonce", second.nonce()))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.status").value("WAITING"));
+	}
+
+	@Test
+	void creatingPairingSessionAfterExpiryIssuesNewQrForSameBand() throws Exception {
+		String deviceId = uniqueDeviceId("new-after-expiry");
+		PairingFixture first = createPairingSession(deviceId);
+
+		this.clock.advance(Duration.ofSeconds(2));
+
+		PairingFixture second = createPairingSession(deviceId);
+
+		org.junit.jupiter.api.Assertions.assertNotEquals(first.sessionId(), second.sessionId());
+		org.junit.jupiter.api.Assertions.assertNotEquals(first.nonce(), second.nonce());
+
+		this.mockMvc.perform(get("/api/wearable/pairing-sessions/" + first.sessionId())
+				.param("deviceId", deviceId)
+				.param("nonce", first.nonce()))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.status").value("EXPIRED"));
+
+		this.mockMvc.perform(get("/api/wearable/pairing-sessions/" + second.sessionId())
+				.param("deviceId", deviceId)
+				.param("nonce", second.nonce()))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.status").value("WAITING"));
+
+		this.mockMvc.perform(post("/api/wearable/pairing-sessions/" + first.sessionId() + "/complete")
+				.header("Authorization", "Bearer " + userToken())
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(pairingCompleteBody(deviceId, first.nonce())))
+			.andExpect(status().isConflict())
+			.andExpect(jsonPath("$.code").value("PAIRING_EXPIRED"));
+	}
+
+	@Test
 	void wearablePairingCanBeCompletedAndPolled() throws Exception {
 		String deviceId = uniqueDeviceId("complete-poll");
 		PairingFixture pairing = createPairingSession(deviceId);

@@ -78,8 +78,8 @@ class ChatbotRouterTests {
 			assertThat(response.get("intent")).isEqualTo("INFO_AGENT_QUERY");
 			assertThat(response.get("action")).isEqualTo("SHOW_INFO_CARD");
 			assertThat(response.get("responseType")).isEqualTo("INFO_CARD");
-			assertThat(response.get("answerText")).isEqualTo("장애인의료비지원 정보입니다.");
-			assertThat(response.get("voiceText")).isEqualTo("장애인의료비지원 안내입니다.");
+			assertThat(response.get("answerText")).isEqualTo("장애인의료비지원 정보를 찾았어요.");
+			assertThat(response.get("voiceText")).isEqualTo("장애인의료비지원 정보를 찾았어요. 출처에서 확인해 주세요.");
 			assertThat(response.get("infoCard")).isInstanceOf(Map.class);
 			assertThat(servers.infoRequestBody()).contains("\"userAccessibilityType\":\"HEARING_IMPAIRED\"");
 			assertThat(servers.soundRequests()).isZero();
@@ -107,6 +107,22 @@ class ChatbotRouterTests {
 			assertThat(response.get("infoCard")).isNull();
 			assertThat(response.get("answerText")).isEqualTo("장애인의료비지원 문의는 관할 주민센터에서 확인해 주세요.");
 			assertThat(servers.infoRequestBody()).contains("\"query\":\"장애인의료비지원 담당 기관 문의 방법은?\"");
+			assertThat(servers.infoRequestBody()).contains("\"isFollowup\":true");
+			assertThat(servers.soundRequests()).isZero();
+		}
+	}
+
+	@ParameterizedTest
+	@ValueSource(strings = {
+		"지원 대상은 누구야?",
+		"누가 받을 수 있어?",
+		"신청 조건은?"
+	})
+	void routesEligibilityFollowupsToInfoAgent(String question) throws Exception {
+		try (Servers servers = Servers.start()) {
+			servers.router().route(followupRequest(question));
+
+			assertThat(servers.infoRequests()).isEqualTo(1);
 			assertThat(servers.infoRequestBody()).contains("\"isFollowup\":true");
 			assertThat(servers.soundRequests()).isZero();
 		}
@@ -224,6 +240,8 @@ class ChatbotRouterTests {
 					{
 					  "success": true,
 					  "responseType": "INFO_CARD",
+					  "answerText": "장애인의료비지원 정보를 찾았어요.",
+					  "voiceText": "장애인의료비지원 정보를 찾았어요. 출처에서 확인해 주세요.",
 					  "notificationTabMessage": "장애인의료비지원 정보입니다.",
 					  "voiceMessage": "장애인의료비지원 안내입니다.",
 					  "bandMessage": "의료비 지원",

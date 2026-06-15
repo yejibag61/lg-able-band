@@ -30,6 +30,7 @@ export function VoiceChatbot({ preview, session, summary }) {
   const [inputText, setInputText] = useState('')
   const [status, setStatus] = useState('대기 중')
   const [response, setResponse] = useState(null)
+  const [followupPromptResponse, setFollowupPromptResponse] = useState(null)
   const [messages, setMessages] = useState([])
   const [error, setError] = useState('')
   const [isRequesting, setIsRequesting] = useState(false)
@@ -50,7 +51,7 @@ export function VoiceChatbot({ preview, session, summary }) {
 
   const supportsSpeechRecognition = Boolean(SpeechRecognition)
   const chatbotContext = useMemo(() => createChatbotContext(summary, preview), [preview, summary])
-  const hasInfoCard = Boolean(response?.infoCard)
+  const hasFollowupPrompts = Boolean(followupPromptResponse?.infoCard)
 
   useEffect(() => {
     isOpenRef.current = isOpen
@@ -382,6 +383,7 @@ export function VoiceChatbot({ preview, session, summary }) {
             source: response.infoCard.source,
             summary: response.infoCard.summary,
             recommendedAction: response.infoCard.recommendedAction,
+            importantFields: infoCardImportantFields(response.infoCard),
           }
         : null)
       const data = await requestVoiceChat({
@@ -409,7 +411,9 @@ export function VoiceChatbot({ preview, session, summary }) {
           source: data.infoCard.source,
           summary: data.infoCard.summary,
           recommendedAction: data.infoCard.recommendedAction,
+          importantFields: infoCardImportantFields(data.infoCard),
         }
+        setFollowupPromptResponse(data)
       }
       setResponse(data)
       setMessages((previousMessages) => previousMessages.map((message) => (
@@ -571,12 +575,22 @@ export function VoiceChatbot({ preview, session, summary }) {
             <div ref={conversationEndRef} />
           </div>
 
-          {hasInfoCard ? (
+          {hasFollowupPrompts ? (
             <div className="voice-followup-block">
-              <strong className="voice-followup-label">✦ 정보 후속 질문</strong>
+              <div className="voice-followup-heading">
+                <strong className="voice-followup-label">✦ 정보 후속 질문</strong>
+                <button
+                  type="button"
+                  className="voice-followup-close"
+                  aria-label="정보 후속 질문 닫기"
+                  onClick={() => setFollowupPromptResponse(null)}
+                >
+                  닫기
+                </button>
+              </div>
               <div className="voice-followup-row" aria-label="정보 후속 질문">
-                {getFollowupPrompts(response).map((prompt) => {
-                  const topic = response.infoCard?.title || ''
+                {getFollowupPrompts(followupPromptResponse).map((prompt) => {
+                  const topic = followupPromptResponse.infoCard?.title || ''
                   const requestText = `${topic} ${prompt}`.trim()
 
                   return (
@@ -640,7 +654,7 @@ export function VoiceChatbot({ preview, session, summary }) {
             </button>
           </div>
 
-          {!hasInfoCard ? (
+          {!hasFollowupPrompts ? (
             <div className="voice-sample-block">
               <strong className="voice-followup-label">✦ 추천 질문</strong>
               <div className="voice-sample-row" aria-label="추천 질문">
@@ -957,5 +971,23 @@ function mapAlert(alert) {
     message: alert.message,
     severity: alert.severity,
     createdAt: alert.occurredAt,
+  }
+}
+
+function infoCardImportantFields(infoCard) {
+  return {
+    supportTarget: infoCard?.supportTarget || '',
+    eligibility: infoCard?.eligibility || '',
+    applicationTarget: infoCard?.applicationTarget || '',
+    selectionCriteria: infoCard?.selectionCriteria || '',
+    ageCondition: infoCard?.ageCondition || '',
+    incomeCondition: infoCard?.incomeCondition || '',
+    regionCondition: infoCard?.regionCondition || '',
+    supportContent: infoCard?.supportContent || '',
+    applyMethod: infoCard?.applyMethod || '',
+    applicationMethod: infoCard?.applicationMethod || '',
+    applicationPeriod: infoCard?.applicationPeriod || '',
+    contact: infoCard?.contact || '',
+    requiredDocuments: infoCard?.requiredDocuments || '',
   }
 }

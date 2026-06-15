@@ -31,11 +31,26 @@ def normalize_top_k(value: int) -> int:
     return max(1, min(10, normalized))
 
 
-def _meta(top_k: int, safe_mode: bool) -> dict[str, Any]:
+def _meta(
+    top_k: int,
+    safe_mode: bool,
+    llm_meta: dict[str, Any] | None = None,
+    quality_debug: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    llm_values = llm_meta or {}
+    debug_values = quality_debug or {}
     return {
         "topK": top_k,
         "safeMode": safe_mode,
         "version": VERSION,
+        **llm_values,
+        "llmFallbackReason": llm_values.get("fallbackReason", ""),
+        "predictedCategory": debug_values.get("predictedCategory", ""),
+        "predictedPriority": debug_values.get("predictedPriority", ""),
+        "topDocCount": debug_values.get("retrievedDocumentCount", 0),
+        "topDocScore": debug_values.get("topDocumentScore"),
+        "extractedFields": debug_values.get("extractedFields", {}),
+        **({"debug": debug_values} if debug_values else {}),
     }
 
 
@@ -71,7 +86,24 @@ def build_error_response(
             "recommendedChannels": ["APP", "BAND"],
             "notifyGuardian": False,
         },
-        "meta": _meta(top_k, safe_mode),
+        "meta": _meta(
+            top_k,
+            safe_mode,
+            quality_debug={
+                "routingResult": AGENT_TYPE,
+                "responseIntent": "INFO_AGENT_ERROR",
+                "predictedCategory": "",
+                "predictedPriority": "",
+                "topDocumentScore": None,
+                "retrievedDocumentCount": 0,
+                "extractedFields": {},
+                "extractedFieldNames": [],
+                "fallbackUsed": True,
+                "fallbackLevel": "error",
+                "isFollowup": False,
+                "errorType": type(error).__name__,
+            },
+        ),
     }
 
 
@@ -97,11 +129,13 @@ def run_info_agent(
             top_k=normalized_top_k,
             context=context,
         )
+        llm_meta = response.pop("_llmMeta", {})
+        quality_debug = response.pop("_qualityDebug", {})
         return {
             "success": True,
             "agentType": AGENT_TYPE,
             **response,
-            "meta": _meta(normalized_top_k, safe_mode),
+            "meta": _meta(normalized_top_k, safe_mode, llm_meta, quality_debug),
         }
     except Exception as error:
         if not safe_mode:

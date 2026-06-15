@@ -22,8 +22,10 @@ public class ChatbotRouter {
 		"차별", "신고", "인권위", "권리구제", "활동지원"
 	);
 	private static final List<String> INFO_AGENT_FOLLOWUP_KEYWORDS = List.of(
-		"지원 대상", "대상", "누구", "신청", "신청 방법", "이용 방법", "담당 기관", "문의", "전화번호",
-		"서류", "필요 서류", "기간", "언제까지", "마감", "자세히", "더 알려줘"
+		"지원 대상", "대상", "누구", "누가 받을", "받을 수", "신청 조건", "자격 조건",
+		"신청", "신청 방법", "이용 방법", "담당 기관", "문의", "전화번호",
+		"서류", "필요 서류", "기간", "언제까지", "마감", "자세히", "더 알려줘",
+		"지금 어떻게", "어떻게 해야", "안전 행동", "대처"
 	);
 	private static final String INFO_UNAVAILABLE = "정보 안내 서버에 연결하지 못했습니다. 잠시 후 다시 시도해 주세요.";
 	private static final String CHATBOT_UNAVAILABLE = "음성 챗봇 서버에 연결하지 못했습니다. 잠시 후 다시 시도해 주세요.";
@@ -104,7 +106,12 @@ public class ChatbotRouter {
 	private String lastInfoAgentTitle(Map<String, Object> request) {
 		Map<String, Object> context = mapValue(request.get("context"));
 		Map<String, Object> lastInfoAgent = mapValue(context.get("lastInfoAgent"));
-		return stringValue(lastInfoAgent.get("title")).trim();
+		String title = stringValue(lastInfoAgent.get("title")).trim();
+		if (!title.isBlank()) {
+			return title;
+		}
+		Map<String, Object> lastInfoCard = mapValue(context.get("lastInfoCard"));
+		return stringValue(lastInfoCard.get("title")).trim();
 	}
 
 	private Map<String, Object> infoAgentContext(Map<String, Object> request, String originalText) {
@@ -141,6 +148,8 @@ public class ChatbotRouter {
 			response.put("followupAnswer", followupAnswer);
 			copyIfPresent(infoResponse, response, "classification");
 			copyIfPresent(infoResponse, response, "sourceDocuments");
+			copyIfPresent(infoResponse, response, "meta");
+			copyIfPresent(infoResponse, response, "rag");
 			return response;
 		}
 		if ("NO_RESULT".equals(responseType)) {
@@ -153,23 +162,32 @@ public class ChatbotRouter {
 			response.put("voiceText", response.get("answerText"));
 			response.put("infoCard", null);
 			copyIfPresent(infoResponse, response, "classification");
+			copyIfPresent(infoResponse, response, "meta");
+			copyIfPresent(infoResponse, response, "rag");
 			return response;
 		}
 
 		String notification = stringValue(infoResponse.get("notificationTabMessage"));
+		String agentAnswerText = stringValue(infoResponse.get("answerText"));
 		String actionGuide = stringValue(appCard.get("recommendedAction"));
 		String title = stringValue(appCard.get("title"));
-		String answerText = !notification.isBlank()
+		String answerText = !agentAnswerText.isBlank()
+			? agentAnswerText
+			: !notification.isBlank()
 			? notification
 			: !title.isBlank()
 				? title + " 정보입니다. " + actionGuide
 				: "관련 정보를 찾았습니다. 앱에서 자세히 확인하세요.";
-		String voiceText = stringValue(infoResponse.get("voiceMessage"));
+		String voiceText = stringValue(infoResponse.get("voiceText"));
+		if (voiceText.isBlank()) {
+			voiceText = stringValue(infoResponse.get("voiceMessage"));
+		}
+		String agentAction = stringValue(infoResponse.get("action"));
 
 		Map<String, Object> response = new LinkedHashMap<>();
 		response.put("responseType", responseType.isBlank() ? "INFO_CARD" : responseType);
 		response.put("intent", "INFO_AGENT_QUERY");
-		response.put("action", "SHOW_INFO_CARD");
+		response.put("action", agentAction.isBlank() ? "SHOW_INFO_CARD" : agentAction);
 		response.put("answerText", answerText);
 		response.put("voiceText", voiceText.isBlank() ? answerText : voiceText);
 		response.put("infoCard", appCard);
@@ -179,6 +197,8 @@ public class ChatbotRouter {
 		copyIfPresent(infoResponse, response, "notifyGuardian");
 		copyIfPresent(infoResponse, response, "classification");
 		copyIfPresent(infoResponse, response, "sourceDocuments");
+		copyIfPresent(infoResponse, response, "meta");
+		copyIfPresent(infoResponse, response, "rag");
 		return response;
 	}
 

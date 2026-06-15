@@ -1,5 +1,6 @@
 """TF-IDF document retrieval using the info-agent classifier results."""
 
+import json
 from pathlib import Path
 from typing import Any
 
@@ -15,7 +16,9 @@ except ImportError:
 
 
 MODULE_DIR = Path(__file__).resolve().parent
+BOKJIRO_DOCUMENT_PATH = MODULE_DIR / "data" / "bokjiro_documents.csv"
 DOCUMENT_PATHS = (
+    MODULE_DIR / "data" / "processed" / "documents_enriched.csv",
     MODULE_DIR / "documents.csv",
     MODULE_DIR / "data" / "raw" / "documents.csv",
 )
@@ -32,6 +35,23 @@ RESULT_COLUMNS = (
     "appRelevanceScore",
     "appUseCase",
     "targetKeywordGroup",
+    "importantFields",
+    "importantFieldQuality",
+)
+SEARCHABLE_IMPORTANT_FIELDS = (
+    "supportTarget",
+    "eligibility",
+    "applicationTarget",
+    "selectionCriteria",
+    "ageCondition",
+    "incomeCondition",
+    "regionCondition",
+    "supportContent",
+    "applyMethod",
+    "applicationMethod",
+    "applicationPeriod",
+    "contact",
+    "requiredDocuments",
 )
 EXACT_KEYWORD_GROUPS = (
     ("수어통역", "수화통역", "문자통역", "의사소통 지원", "수어", "수화"),
@@ -77,8 +97,49 @@ def _find_documents_path() -> Path:
     )
 
 
+def _parse_important_fields(value: Any) -> dict[str, str]:
+    if isinstance(value, dict):
+        return {str(key): str(item) for key, item in value.items() if item}
+    if not isinstance(value, str) or not value.strip():
+        return {}
+    try:
+        parsed = json.loads(value)
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return {}
+    if not isinstance(parsed, dict):
+        return {}
+    return {str(key): str(item) for key, item in parsed.items() if item}
+
+
 def _load_documents() -> pd.DataFrame:
     documents = pd.read_csv(_find_documents_path(), encoding="utf-8-sig")
+    if BOKJIRO_DOCUMENT_PATH.is_file() and BOKJIRO_DOCUMENT_PATH.stat().st_size:
+        try:
+            bokjiro = pd.read_csv(BOKJIRO_DOCUMENT_PATH, encoding="utf-8-sig").fillna("")
+            if not bokjiro.empty:
+                important_columns = (
+                    "supportTarget", "selectionCriteria", "applicationMethod", "contact"
+                )
+                for column in important_columns:
+                    if column not in bokjiro.columns:
+                        bokjiro[column] = ""
+                has_detail = bokjiro[list(important_columns)].apply(
+                    lambda row: any(str(value).strip() for value in row),
+                    axis=1,
+                )
+                bokjiro = bokjiro.loc[has_detail].copy()
+                if "importantFields" not in bokjiro.columns:
+                    bokjiro["importantFields"] = ""
+                for index, row in bokjiro.iterrows():
+                    fields = _parse_important_fields(row.get("importantFields", ""))
+                    for field in important_columns:
+                        value = str(row.get(field, "")).strip()
+                        if value:
+                            fields[field] = value
+                    bokjiro.at[index, "importantFields"] = json.dumps(fields, ensure_ascii=False)
+                documents = pd.concat([documents, bokjiro], ignore_index=True, sort=False)
+        except (OSError, ValueError, pd.errors.ParserError, UnicodeError):
+            pass
     for column in RESULT_COLUMNS:
         if column not in documents.columns:
             documents[column] = ""
@@ -88,12 +149,26 @@ def _load_documents() -> pd.DataFrame:
     documents["appRelevanceScore"] = pd.to_numeric(
         documents["appRelevanceScore"], errors="coerce"
     ).fillna(0.0)
+    documents["_importantFields"] = documents["importantFields"].apply(
+        _parse_important_fields
+    )
+    documents["_importantText"] = documents["_importantFields"].apply(
+        lambda fields: " ".join(
+            str(fields.get(field, "")).strip()
+            for field in SEARCHABLE_IMPORTANT_FIELDS
+            if str(fields.get(field, "")).strip()
+        )
+    )
     return documents
 
 
 DOCUMENTS = _load_documents()
 DOCUMENT_TEXTS = (
-    DOCUMENTS["title"].str.strip() + " " + DOCUMENTS["content"].str.strip()
+    DOCUMENTS["title"].str.strip()
+    + " "
+    + DOCUMENTS["content"].str.strip()
+    + " "
+    + DOCUMENTS["_importantText"].str.strip()
 ).tolist()
 DOCUMENT_TEXTS = [
     text if text.strip() else f"document {index}"
@@ -161,6 +236,8 @@ def _keyword_match_counts(query: str) -> np.ndarray:
         + DOCUMENTS["content"]
         + " "
         + DOCUMENTS["targetKeywordGroup"]
+        + " "
+        + DOCUMENTS["_importantText"]
     ).str.lower()
     return sum(searchable.str.contains(keyword.lower(), regex=False).astype(float) for keyword in keywords).to_numpy()
 
@@ -231,8 +308,16 @@ def search_documents(query: str, top_k: int = 5) -> dict:
         keyword in query for keyword in DISASTER_KEYWORDS
     )
     candidates["_sourceTypeBoost"] = 0.0
+    candidates["_requestedFieldBoost"] = 0.0
     if asks_for_application:
         candidates.loc[candidates["sourceType"].eq("PUBLIC_API"), "_sourceTypeBoost"] = 0.18
+        has_application_method = candidates["_importantFields"].apply(
+            lambda fields: bool(
+                str(fields.get("applicationMethod") or fields.get("applyMethod") or "").strip()
+            )
+        )
+        candidates.loc[has_application_method, "_requestedFieldBoost"] = 0.65
+        candidates.loc[~has_application_method, "_requestedFieldBoost"] = -0.15
         if allows_news:
             candidates.loc[
                 candidates["sourceType"].isin(("RSS", "NEWS_LIST")), "_sourceTypeBoost"
@@ -255,6 +340,7 @@ def search_documents(query: str, top_k: int = 5) -> dict:
         candidates["_similarityScore"]
         + candidates["_keywordBoost"]
         + candidates["_sourceTypeBoost"]
+        + candidates["_requestedFieldBoost"]
         + candidates["_deafblindBoost"]
         + candidates["_generalMedicalAdjustment"]
         + candidates["category"].eq(classification["category"]).astype(float) * 0.15
@@ -288,6 +374,8 @@ def search_documents(query: str, top_k: int = 5) -> dict:
                 "appRelevanceScore": _display_score(document["appRelevanceScore"]),
                 "appUseCase": document["appUseCase"],
                 "targetKeywordGroup": document["targetKeywordGroup"],
+                "importantFields": document["_importantFields"],
+                "importantFieldQuality": document["importantFieldQuality"],
                 "similarityScore": round(float(document["_similarityScore"]), 4),
                 "finalScore": round(float(document["_finalScore"]), 4),
             }

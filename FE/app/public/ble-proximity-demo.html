@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+    <title>LG Able Band BLE 근접 데모</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f6f6f2;
+        --panel: #ffffff;
+        --line: #e5e7eb;
+        --text: #111827;
+        --muted: #6b7280;
+        --soft: #f1f3f5;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+        background: var(--bg);
+        color: var(--text);
+      }
+
+      .page {
+        width: min(100%, 420px);
+        min-height: 100vh;
+        margin: 0 auto;
+        padding: 28px 18px 36px;
+      }
+
+      h1,
+      h2,
+      p {
+        margin: 0;
+      }
+
+      .hero {
+        display: grid;
+        gap: 8px;
+        margin-bottom: 18px;
+      }
+
+      .hero h1 {
+        font-size: 28px;
+        line-height: 1.18;
+        font-weight: 600;
+        letter-spacing: -0.02em;
+      }
+
+      .hero p {
+        color: var(--muted);
+        line-height: 1.58;
+        font-size: 14px;
+      }
+
+      .version {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .card {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 20px;
+        padding: 18px;
+        margin-bottom: 14px;
+      }
+
+      .grid {
+        display: grid;
+        gap: 12px;
+      }
+
+      .field {
+        display: grid;
+        gap: 6px;
+      }
+
+      .field label {
+        font-size: 13px;
+        color: var(--muted);
+      }
+
+      .field input {
+        width: 100%;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 12px 14px;
+        font-size: 15px;
+        background: #fff;
+      }
+
+      .actions {
+        display: grid;
+        gap: 10px;
+        margin-top: 14px;
+      }
+
+      button {
+        border: 0;
+        border-radius: 14px;
+        padding: 14px 16px;
+        background: #111827;
+        color: #ffffff;
+        font-size: 15px;
+        font-weight: 500;
+      }
+
+      button.secondary {
+        background: var(--soft);
+        color: var(--text);
+      }
+
+      button:disabled {
+        opacity: 0.45;
+      }
+
+      .result-main {
+        display: grid;
+        gap: 10px;
+      }
+
+      .result-main strong {
+        font-size: 36px;
+        line-height: 1;
+        font-weight: 600;
+        letter-spacing: -0.03em;
+      }
+
+      .pill {
+        display: inline-flex;
+        width: fit-content;
+        padding: 7px 10px;
+        border-radius: 999px;
+        background: var(--soft);
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .meta {
+        display: grid;
+        gap: 10px;
+        margin-top: 14px;
+      }
+
+      .meta-row {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        font-size: 14px;
+      }
+
+      .meta-row span:first-child {
+        color: var(--muted);
+      }
+
+      .status-box {
+        display: grid;
+        gap: 8px;
+      }
+
+      .status-box p {
+        line-height: 1.55;
+        font-size: 14px;
+      }
+
+      .log {
+        width: 100%;
+        min-height: 180px;
+        border-radius: 14px;
+        border: 1px solid var(--line);
+        background: #fbfbfb;
+        padding: 14px;
+        font-size: 12px;
+        line-height: 1.5;
+        color: #374151;
+        white-space: pre-wrap;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <section class="hero">
+        <h1>BLE 근접 데모</h1>
+        <span class="version">demo version 2026-06-15-04</span>
+        <p>
+          ESP32 보드를 선택하면 휴대폰과 연결된 뒤 RSSI를 기준으로 대략적인 거리와 가까워지는 상태를
+          보여줍니다. 방향 안내는 현재 방식으로는 지원하지 않습니다.
+        </p>
+      </section>
+
+      <section class="card">
+        <div class="grid">
+          <div class="field">
+            <label for="namePrefix">기기 이름 prefix</label>
+            <input id="namePrefix" value="ABLE-ESP32" />
+          </div>
+          <div class="field">
+            <label for="txPowerAt1m">txPowerAt1m (dBm)</label>
+            <input id="txPowerAt1m" type="number" value="-59" />
+          </div>
+          <div class="field">
+            <label for="pathLossExponent">path loss exponent</label>
+            <input id="pathLossExponent" type="number" step="0.1" value="2.2" />
+          </div>
+        </div>
+        <div class="actions">
+          <button id="connectButton">ESP32 연결 시작</button>
+          <button id="disconnectButton" class="secondary" disabled>연결 해제</button>
+        </div>
+      </section>
+
+      <section class="card result-main">
+        <span class="pill" id="connectionState">대기 중</span>
+        <strong id="distanceText">-- m</strong>
+        <p id="messageText">연결을 시작하면 가까워지는 상태를 보여줍니다.</p>
+        <div class="meta">
+          <div class="meta-row"><span>기기명</span><span id="deviceNameText">-</span></div>
+          <div class="meta-row"><span>RSSI</span><span id="rssiText">-</span></div>
+          <div class="meta-row"><span>추세</span><span id="trendText">-</span></div>
+          <div class="meta-row"><span>방향</span><span id="directionText">미지원</span></div>
+        </div>
+      </section>
+
+      <section class="card status-box">
+        <h2>지원 상태</h2>
+        <p id="supportText">브라우저 지원 여부를 확인 중입니다.</p>
+      </section>
+
+      <section class="card status-box">
+        <h2>로그</h2>
+        <div id="log" class="log"></div>
+      </section>
+    </main>
+
+    <script type="module" src="/ble-proximity-demo.js?v=2026-06-15-04"></script>
+  </body>
+</html>

@@ -14,6 +14,7 @@ export function CurrentAlertScreen({
   onConfirm,
   onNextAlert,
   onPreviousAlert,
+  onResetPairing,
 }) {
   const swipeStartXRef = useRef(null)
   const swipeStartYRef = useRef(null)
@@ -38,6 +39,13 @@ export function CurrentAlertScreen({
           <p className="live-message" role="status">
             {actionMessage}
           </p>
+        ) : null}
+        {hasActionMessage && onResetPairing ? (
+          <div className="action-row">
+            <button className="primary-action" type="button" onClick={onResetPairing}>
+              QR 생성
+            </button>
+          </div>
         ) : null}
       </section>
     )
