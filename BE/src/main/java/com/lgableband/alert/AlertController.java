@@ -1,11 +1,14 @@
 package com.lgableband.alert;
 
+import com.lgableband.common.ApiException;
 import com.lgableband.common.AlertStatus;
 import com.lgableband.common.AlertType;
 import java.util.List;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -37,7 +40,15 @@ public class AlertController {
 	}
 
 	@PostMapping("/{alertId}/confirm")
-	public AlertService.StatusResponse confirm(@RequestHeader("Authorization") String authorization, @PathVariable long alertId) {
+	public AlertService.StatusResponse confirm(
+		@RequestHeader("Authorization") String authorization,
+		@PathVariable long alertId,
+		@RequestBody(required = false) AlertConfirmRequest request
+	) {
+		if (request != null && request.responseType() != null && !request.responseType().isBlank()
+			&& !"CONFIRMED".equals(request.responseType())) {
+			throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", "지원하지 않는 알림 확인 응답입니다.");
+		}
 		return this.alertService.confirm(authorization, alertId);
 	}
 
@@ -53,6 +64,9 @@ public class AlertController {
 	}
 
 	public record AlertListResponse(List<AlertService.AlertView> items) {
+	}
+
+	public record AlertConfirmRequest(String responseType) {
 	}
 
 	public record ReplayResponse(

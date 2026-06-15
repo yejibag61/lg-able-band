@@ -4,9 +4,42 @@ import { apiRequest } from './apiClient'
 export async function getGuardianDashboard() {
   try {
     return await apiRequest('/api/guardians/dashboard')
-  } catch {
+  } catch (error) {
+    if (isGuardianDashboardStrictMode()) {
+      throw error
+    }
+
     return createMockGuardianDashboard()
   }
+}
+
+function isGuardianDashboardStrictMode() {
+  return (
+    parseOptionalBoolean(window.__ABLE_BAND_GUARDIAN_DASHBOARD_STRICT__) ??
+    parseOptionalBoolean(import.meta.env.VITE_GUARDIAN_DASHBOARD_STRICT_MODE) ??
+    false
+  )
+}
+
+function parseOptionalBoolean(value) {
+  if (value === undefined || value === null || value === '') {
+    return null
+  }
+
+  if (typeof value === 'boolean') {
+    return value
+  }
+
+  const normalizedValue = String(value).trim().toLowerCase()
+  if (['1', 'true', 'yes', 'on'].includes(normalizedValue)) {
+    return true
+  }
+
+  if (['0', 'false', 'no', 'off'].includes(normalizedValue)) {
+    return false
+  }
+
+  return null
 }
 
 function createMockGuardianDashboard() {

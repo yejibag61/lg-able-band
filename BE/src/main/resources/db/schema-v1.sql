@@ -137,6 +137,32 @@ CREATE TABLE IF NOT EXISTS device_event (
 	CONSTRAINT ck_device_event_level CHECK (event_level IN ('LOW', 'MEDIUM', 'HIGH', 'CRITICAL'))
 );
 
+CREATE TABLE IF NOT EXISTS wearable_pairing_session (
+	pairing_session_id VARCHAR(80) NOT NULL,
+	device_id VARCHAR(255) NOT NULL,
+	device_name VARCHAR(100) NOT NULL,
+	pairing_code VARCHAR(80) NOT NULL,
+	nonce VARCHAR(80) NOT NULL,
+	status VARCHAR(20) NOT NULL DEFAULT 'WAITING',
+	linked_user_id BIGINT NULL,
+	linked_device_id BIGINT NULL,
+	wearable_access_token VARCHAR(255) NULL,
+	issued_at DATETIME(6) NOT NULL,
+	expires_at DATETIME(6) NOT NULL,
+	paired_at DATETIME(6) NULL,
+	unpaired_at DATETIME(6) NULL,
+	created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+	updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+	PRIMARY KEY (pairing_session_id),
+	UNIQUE KEY uk_wearable_pairing_nonce (nonce),
+	KEY ix_wearable_pairing_device_id (device_id),
+	KEY ix_wearable_pairing_linked_user_id (linked_user_id),
+	KEY ix_wearable_pairing_linked_device_id (linked_device_id),
+	CONSTRAINT fk_wearable_pairing_linked_user_id FOREIGN KEY (linked_user_id) REFERENCES app_user (user_id) ON DELETE SET NULL,
+	CONSTRAINT fk_wearable_pairing_linked_device_id FOREIGN KEY (linked_device_id) REFERENCES device (device_id) ON DELETE SET NULL,
+	CONSTRAINT ck_wearable_pairing_status CHECK (status IN ('WAITING', 'PAIRED', 'EXPIRED', 'UNPAIRED', 'INVALID'))
+);
+
 CREATE TABLE IF NOT EXISTS alert (
 	alert_id BIGINT NOT NULL AUTO_INCREMENT,
 	user_id BIGINT NOT NULL,

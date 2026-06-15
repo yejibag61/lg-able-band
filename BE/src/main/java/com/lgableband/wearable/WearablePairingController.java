@@ -3,6 +3,7 @@ package com.lgableband.wearable;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -55,6 +56,35 @@ public class WearablePairingController {
 		);
 	}
 
+	@PostMapping("/{pairingSessionId}/unpair")
+	public WearablePairingService.PairingUnpairResponse unpair(
+		@RequestHeader("Authorization") String authorization,
+		@PathVariable String pairingSessionId,
+		@Valid @RequestBody UnpairRequest request
+	) {
+		return this.wearablePairingService.unpair(
+			authorization,
+			pairingSessionId,
+			request.deviceId(),
+			request.nonce()
+		);
+	}
+
+	@DeleteMapping("/{pairingSessionId}")
+	public WearablePairingService.PairingUnpairResponse unpairFromWearable(
+		@RequestHeader("Authorization") String authorization,
+		@PathVariable String pairingSessionId,
+		@RequestParam String deviceId,
+		@RequestParam String nonce
+	) {
+		return this.wearablePairingService.unpair(
+			authorization,
+			pairingSessionId,
+			deviceId,
+			nonce
+		);
+	}
+
 	public record CreatePairingSessionRequest(
 		@NotBlank String deviceId,
 		@NotBlank String deviceName,
@@ -65,6 +95,12 @@ public class WearablePairingController {
 	public record CompletePairingRequest(
 		@NotBlank String deviceId,
 		@NotBlank String pairingCode,
+		@NotBlank String nonce
+	) {
+	}
+
+	public record UnpairRequest(
+		@NotBlank String deviceId,
 		@NotBlank String nonce
 	) {
 	}

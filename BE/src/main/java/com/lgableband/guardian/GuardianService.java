@@ -99,7 +99,10 @@ public class GuardianService {
 		MvpDataService.CurrentGuardian guardian = this.dataService.currentGuardian(authorization);
 		JdbcTemplate jdbcTemplate = jdbcTemplate();
 		if (jdbcTemplate == null) {
-			long linkedUserId = guardian.linkedUserId() == null ? 1 : guardian.linkedUserId();
+			if (guardian.linkedUserId() == null) {
+				throw new ApiException(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND", "?곌껐???ъ슜?먮? 李얠쓣 ???놁뒿?덈떎.");
+			}
+			long linkedUserId = guardian.linkedUserId();
 			MockDataStore.UserProfile user = this.mockDataStore.user(linkedUserId);
 			MockDataStore.Account account = this.mockDataStore.accountById(user.accountId());
 			List<GuardianAlertSummary> alerts = this.mockDataStore.alerts(linkedUserId, null, null, 20).stream()

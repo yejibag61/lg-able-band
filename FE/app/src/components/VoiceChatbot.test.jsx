@@ -1,23 +1,19 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { vi } from 'vitest'
 import { VoiceChatbot } from './VoiceChatbot'
-import { requestVoiceChat } from '../services/voiceChatbotService'
-
-vi.mock('../services/voiceChatbotService', () => ({
-  requestVoiceChat: vi.fn(),
-}))
 
 describe('VoiceChatbot info agent response', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    globalThis.fetch = vi.fn()
     installSpeechSynthesisMock()
     window.HTMLElement.prototype.scrollIntoView = vi.fn()
   })
 
   it('renders the accessible info card and reads voiceText again', async () => {
     const user = userEvent.setup()
-    requestVoiceChat.mockResolvedValue({
+    mockVoiceChatResponse({
       intent: 'INFO_AGENT_QUERY',
       action: 'SHOW_INFO_CARD',
       answerText: '폭염 안전 정보를 안내합니다.',
@@ -64,7 +60,7 @@ describe('VoiceChatbot info agent response', () => {
 
   it('keeps the existing chatbot response free of info agent controls', async () => {
     const user = userEvent.setup()
-    requestVoiceChat.mockResolvedValue({
+    mockVoiceChatResponse({
       intent: 'DEVICE_STATUS_CHECK',
       action: 'READ_DEVICE_STATUS',
       answerText: '세탁 완료까지 12분 남았습니다.',
@@ -82,25 +78,26 @@ describe('VoiceChatbot info agent response', () => {
     expect(screen.queryByLabelText('정보 후속 질문')).toBeNull()
 
     await waitFor(() => {
-      expect(requestVoiceChat).toHaveBeenCalledWith(expect.objectContaining({ text: '세탁기 몇 분 남았어?' }))
+      expect(latestVoiceChatRequestBody()).toEqual(expect.objectContaining({ text: '세탁기 몇 분 남았어?' }))
     })
   })
 
   it('keeps previous user and bot messages when a new question is sent', async () => {
     const user = userEvent.setup()
-    requestVoiceChat
-      .mockResolvedValueOnce({
+    mockVoiceChatResponses(
+      {
         intent: 'ALERT_LIST',
         action: 'READ_ALERTS',
         answerText: '최근 알림은 한 건입니다.',
         voiceText: '최근 알림은 한 건입니다.',
-      })
-      .mockResolvedValueOnce({
+      },
+      {
         intent: 'DEVICE_STATUS_CHECK',
         action: 'READ_DEVICE_STATUS',
         answerText: '세탁 완료까지 12분 남았습니다.',
         voiceText: '세탁 완료까지 12분 남았습니다.',
-      })
+      },
+    )
 
     render(<VoiceChatbot preview={{}} session={{}} summary={{}} />)
     await user.click(screen.getByRole('button', { name: '음성 챗봇 열기' }))
@@ -118,6 +115,24 @@ describe('VoiceChatbot info agent response', () => {
     expect(window.HTMLElement.prototype.scrollIntoView).toHaveBeenCalled()
   })
 })
+
+function mockVoiceChatResponse(data) {
+  mockVoiceChatResponses(data)
+}
+
+function mockVoiceChatResponses(...responses) {
+  for (const data of responses) {
+    globalThis.fetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => data,
+    })
+  }
+}
+
+function latestVoiceChatRequestBody() {
+  const lastCall = globalThis.fetch.mock.calls.at(-1)
+  return JSON.parse(lastCall?.[1]?.body || '{}')
+}
 
 function installSpeechSynthesisMock() {
   class MockSpeechSynthesisUtterance {

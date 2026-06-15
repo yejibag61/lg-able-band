@@ -574,9 +574,9 @@ function WearablePairingScannerScreen({ onBack, onPairingComplete }) {
 
     try {
       const result = await completeWearablePairing(pairing)
+      await onPairingComplete?.(result).catch(() => null)
       setScanStatus('paired')
       setScannerMessage(result?.message || '웨어러블 연동이 완료되었습니다.')
-      await onPairingComplete?.(result)
     } catch (error) {
       setScanStatus('invalid')
       setScannerMessage(error.message || '웨어러블 연동에 실패했습니다. QR을 다시 확인해 주세요.')
@@ -652,7 +652,7 @@ function WearablePairingScannerScreen({ onBack, onPairingComplete }) {
 }
 
 function waitForVideoFrame(video) {
-  const timeoutMs = window.__ABLE_BAND_CAMERA_FRAME_TIMEOUT_MS__ || CAMERA_FRAME_TIMEOUT_MS
+  const timeoutMs = getCameraFrameTimeoutMs()
 
   return new Promise((resolve, reject) => {
     let timeoutId = 0
@@ -699,6 +699,20 @@ function waitForVideoFrame(video) {
     video.addEventListener('resize', checkFrame)
     checkFrame()
   })
+}
+
+function getCameraFrameTimeoutMs() {
+  return (
+    parsePositiveTimeoutMs(window.__ABLE_BAND_CAMERA_FRAME_TIMEOUT_MS__) ??
+    parsePositiveTimeoutMs(import.meta.env.VITE_CAMERA_FRAME_TIMEOUT_MS) ??
+    parsePositiveTimeoutMs(import.meta.env.VITE_ABLE_BAND_CAMERA_FRAME_TIMEOUT_MS) ??
+    CAMERA_FRAME_TIMEOUT_MS
+  )
+}
+
+function parsePositiveTimeoutMs(value) {
+  const timeoutMs = Number(value)
+  return Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : null
 }
 
 function hasReadableVideoFrame(video) {

@@ -8,9 +8,15 @@ import {
   normalizeUwbSession,
   replayAlert,
   requestEmergencyHelp,
+  unpairWearable,
 } from './wearableService'
 
 describe('wearableService', () => {
+  afterEach(() => {
+    localStorage.clear()
+    delete globalThis.__ABLE_BAND_ALLOW_API_FAILURE_FALLBACK__
+  })
+
   it('creates a stable QR pairing payload for phone linking', async () => {
     const session = await getPairingSession()
     const payload = createPairingPayload(session)
@@ -97,7 +103,37 @@ describe('wearableService', () => {
     })
   })
 
-  it('falls back to a mock pairing session when the api is unavailable', async () => {
+  it('unpairs a wearable session through the final api and clears the stored token', async () => {
+    localStorage.setItem('lg-able-band.accessToken', 'paired-api-token')
+    const apiFetch = vi.fn(async () => jsonResponse({ status: 'UNPAIRED' }))
+    const service = createWearableService({
+      baseUrl: 'http://api.test',
+      fetchImpl: apiFetch,
+      fallbackEnabled: false,
+    })
+
+    const response = await service.unpairWearable({
+      pairingSessionId: 'pairing-api-001',
+      deviceId: 'able-band-api-001',
+      nonce: 'nonce-api-001',
+    })
+
+    expect(apiFetch).toHaveBeenCalledWith(
+      'http://api.test/api/wearable/pairing-sessions/pairing-api-001/unpair',
+      expect.objectContaining({
+        body: JSON.stringify({
+          deviceId: 'able-band-api-001',
+          nonce: 'nonce-api-001',
+        }),
+        method: 'POST',
+      }),
+    )
+    expect(response.status).toBe('UNPAIRED')
+    expect(localStorage.getItem('lg-able-band.accessToken')).toBeNull()
+  })
+
+  it('falls back to a mock pairing session when explicit development fallback is enabled', async () => {
+    globalThis.__ABLE_BAND_ALLOW_API_FAILURE_FALLBACK__ = true
     const service = createWearableService({
       baseUrl: 'http://api.test',
       fetchImpl: vi.fn(async () => {
@@ -153,6 +189,100 @@ describe('wearableService', () => {
     expect(arrivedMockShape.vibrationPattern).toBe('LONG_TWICE')
   })
 
+  it('normalizes DB UWB target and session shapes from the final api', async () => {
+    const apiFetch = vi.fn(async (url, options = {}) => {
+      if (url === 'http://api.test/api/uwb/targets') {
+        return jsonResponse({
+          items: [
+            {
+              deviceId: 44,
+              name: '냉장고',
+              type: 'REFRIGERATOR',
+              connectionStatus: 'CONNECTED',
+              locationSupported: true,
+              updatedAt: '2026-06-10T14:00:00+09:00',
+            },
+          ],
+        })
+      }
+      if (url === 'http://api.test/api/uwb/sessions' && options.method === 'POST') {
+        return jsonResponse({
+          sessionId: 9901,
+          targetDevice: { deviceId: 44, name: '냉장고' },
+          targetDeviceId: 44,
+          targetDeviceName: '냉장고',
+          status: 'ACTIVE',
+          navigationStatus: 'ACTIVE',
+          distanceM: 4,
+          confidence: 0.86,
+          voiceGuide: '냉장고까지 약 4미터입니다.',
+          vibrationPattern: 'SLOW',
+          updatedAt: '2026-06-10T14:01:00+09:00',
+        })
+      }
+      throw new Error(`unexpected request: ${url}`)
+    })
+    const service = createWearableService({
+      baseUrl: 'http://api.test',
+      fetchImpl: apiFetch,
+      fallbackEnabled: false,
+    })
+
+    const targets = await service.getUwbTargets()
+    const session = await service.startUwbSession(targets[0].deviceId)
+
+    expect(apiFetch).toHaveBeenCalledWith(
+      'http://api.test/api/uwb/targets',
+      expect.objectContaining({ method: 'GET' }),
+    )
+    expect(apiFetch).toHaveBeenCalledWith(
+      'http://api.test/api/uwb/sessions',
+      expect.objectContaining({
+        body: JSON.stringify({ targetDeviceId: 44 }),
+        method: 'POST',
+      }),
+    )
+    expect(targets[0]).toMatchObject({
+      deviceId: 44,
+      name: '냉장고',
+      locationSupported: true,
+      status: '연결됨',
+    })
+    expect(session).toMatchObject({
+      sessionId: 9901,
+      targetDeviceName: '냉장고',
+      navigationStatus: 'ACTIVE',
+      distanceM: 4,
+      confidence: 0.86,
+      voiceGuide: '냉장고까지 약 4미터입니다.',
+      vibrationPattern: 'SLOW',
+    })
+  })
+
+  it('normalizesDbUwbSessionShape', () => {
+    const session = normalizeUwbSession({
+      sessionId: 9101,
+      targetDevice: { deviceId: 10, name: '세탁기' },
+      status: 'ACTIVE',
+      distanceM: 2.4,
+      confidence: 0.91,
+      voiceGuide: '세탁기까지 약 2미터입니다.',
+      vibrationPattern: 'MEDIUM',
+    })
+
+    expect(session).toMatchObject({
+      sessionId: 9101,
+      targetDeviceId: 10,
+      targetDeviceName: '세탁기',
+      status: 'ACTIVE',
+      navigationStatus: 'ACTIVE',
+      distanceM: 2.4,
+      confidence: 0.91,
+      voiceGuide: '세탁기까지 약 2미터입니다.',
+      vibrationPattern: 'MEDIUM',
+    })
+  })
+
   it('fetches current alert from final api shape', async () => {
     const apiFetch = vi.fn(async () => ({
       ok: true,
@@ -189,7 +319,15 @@ describe('wearableService', () => {
     expect(alert.voiceGuide).toContain('주방 온도가 높습니다.')
   })
 
-  it('falls back to mock when wearable api is unavailable', async () => {
+  it('uses mock alerts only when no wearable api is configured', async () => {
+    const service = createWearableService()
+
+    const alert = await service.getCurrentAlert()
+
+    expect(alert.alertId).toBe(201)
+  })
+
+  it('surfaces alert network failures when wearable api is configured', async () => {
     const service = createWearableService({
       baseUrl: 'http://api.test',
       fetchImpl: vi.fn(async () => {
@@ -198,9 +336,44 @@ describe('wearableService', () => {
       fallbackEnabled: true,
     })
 
-    const alert = await service.getCurrentAlert()
+    await expect(service.getCurrentAlert()).rejects.toThrow('network down')
+  })
 
-    expect(alert.alertId).toBe(201)
+  it('surfaces emergency network failures instead of fallback success', async () => {
+    const service = createWearableService({
+      baseUrl: 'http://api.test',
+      fetchImpl: vi.fn(async () => {
+        throw new Error('network down')
+      }),
+      fallbackEnabled: true,
+    })
+
+    await expect(service.requestEmergencyHelp('도움이 필요합니다.')).rejects.toThrow('network down')
+  })
+
+  it('surfaces UWB target and start network failures instead of fallback data', async () => {
+    const service = createWearableService({
+      baseUrl: 'http://api.test',
+      fetchImpl: vi.fn(async () => {
+        throw new Error('network down')
+      }),
+      fallbackEnabled: true,
+    })
+
+    await expect(service.getUwbTargets()).rejects.toThrow('network down')
+    await expect(service.startUwbSession(10)).rejects.toThrow('network down')
+  })
+
+  it('surfaces unpair network failures instead of local success', async () => {
+    const service = createWearableService({
+      baseUrl: 'http://api.test',
+      fetchImpl: vi.fn(async () => {
+        throw new Error('network down')
+      }),
+      fallbackEnabled: true,
+    })
+
+    await expect(service.unpairWearable(await getPairingSession())).rejects.toThrow('network down')
   })
 
   it('sends final api confirm request body', async () => {
@@ -255,6 +428,15 @@ describe('wearableService', () => {
     expect(response.status).toBe('SENT')
     expect(response.source).toBe('WEARABLE')
     expect(response.message).toContain('긴급 요청')
+  })
+
+  it('unpairs through the default service without a session and clears the token locally', async () => {
+    localStorage.setItem('lg-able-band.accessToken', 'paired-api-token')
+
+    const response = await unpairWearable(null)
+
+    expect(response.status).toBe('UNPAIRED')
+    expect(localStorage.getItem('lg-able-band.accessToken')).toBeNull()
   })
 })
 

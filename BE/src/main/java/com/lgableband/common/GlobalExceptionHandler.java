@@ -4,6 +4,7 @@ import java.util.Map;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
@@ -20,6 +21,16 @@ public class GlobalExceptionHandler {
 	public ResponseEntity<ErrorResponse> handleValidation(MethodArgumentNotValidException ex) {
 		return ResponseEntity.status(HttpStatus.BAD_REQUEST)
 			.body(new ErrorResponse("INVALID_REQUEST", "요청값을 확인해주세요.", Map.of()));
+	}
+
+	@ExceptionHandler(MissingRequestHeaderException.class)
+	public ResponseEntity<ErrorResponse> handleMissingRequestHeader(MissingRequestHeaderException ex) {
+		if ("Authorization".equalsIgnoreCase(ex.getHeaderName())) {
+			return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+				.body(new ErrorResponse("UNAUTHORIZED", "Authorization 헤더가 필요합니다.", Map.of()));
+		}
+		return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+			.body(new ErrorResponse("INVALID_REQUEST", "요청 헤더를 확인해주세요.", Map.of()));
 	}
 
 	@ExceptionHandler(Exception.class)

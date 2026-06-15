@@ -12,16 +12,21 @@ import {
   getCurrentAlerts,
   getInitialUwbSessionId,
   getPairingSessionStatus,
+  getUwbTargets,
   getUwbSession,
   requestEmergencyHelp,
   saveWearableAccessToken,
+  startUwbSession,
   stopUwbSession,
+  unpairWearable,
 } from './services/wearableService'
 import { triggerVibration } from './services/vibrationService'
+import {
+  getPairingPollIntervalMs,
+  getPairingSuccessTransitionMs,
+  getUwbPollIntervalMs,
+} from './runtimeTiming'
 import './App.css'
-
-const DEFAULT_UWB_POLL_INTERVAL_MS = 2000
-const DEFAULT_PAIRING_POLL_INTERVAL_MS = 1000
 
 function App() {
   const [isPaired, setIsPaired] = useState(false)
@@ -33,6 +38,8 @@ function App() {
   const [alertIndex, setAlertIndex] = useState(0)
   const [alertStatuses, setAlertStatuses] = useState({})
   const [uwbSession, setUwbSession] = useState(null)
+  const [uwbTargets, setUwbTargets] = useState([])
+  const [isUwbTargetLoading, setIsUwbTargetLoading] = useState(false)
   const [isUwbPolling, setIsUwbPolling] = useState(true)
   const isUwbPollingRef = useRef(true)
   const [statusMessage, setStatusMessage] = useState('')
@@ -42,6 +49,26 @@ function App() {
   const pairingCompleteTimerRef = useRef(null)
   const pairingCompletedRef = useRef(false)
   const selectedAlert = alertQueue[alertIndex] || null
+
+  const resetPairingSession = useCallback((message = '') => {
+    window.clearTimeout(pairingCompleteTimerRef.current)
+    window.clearTimeout(pairingPollTimerRef.current)
+    pairingCompletedRef.current = false
+    isUwbPollingRef.current = true
+    setIsPaired(false)
+    setMode('alert')
+    setPairing(null)
+    setPairingStatus('waiting')
+    setPairingGeneration((current) => current + 1)
+    setAlertQueue([])
+    setAlertIndex(0)
+    setAlertStatuses({})
+    setUwbSession(null)
+    setUwbTargets([])
+    setIsUwbTargetLoading(false)
+    setIsUwbPolling(true)
+    setStatusMessage(message)
+  }, [])
 
   const completePairing = useCallback((pairedSession = {}) => {
     if (pairingCompletedRef.current) {
@@ -56,7 +83,7 @@ function App() {
     pairingCompleteTimerRef.current = window.setTimeout(() => {
       setIsPaired(true)
       setMode('alert')
-    }, 80)
+    }, getPairingSuccessTransitionMs())
   }, [])
 
   useEffect(() => {
@@ -178,6 +205,39 @@ function App() {
   }, [alertStatuses, isPaired, mode])
 
   useEffect(() => {
+    if (!isPaired || mode !== 'deviceSelect') {
+      return undefined
+    }
+
+    let isMounted = true
+
+    async function loadTargets() {
+      setIsUwbTargetLoading(true)
+      try {
+        const targets = await getUwbTargets()
+        if (isMounted) {
+          setUwbTargets(targets)
+        }
+      } catch {
+        if (isMounted) {
+          setUwbTargets([])
+          setStatusMessage('위치 안내 기기를 불러오지 못했습니다.')
+        }
+      } finally {
+        if (isMounted) {
+          setIsUwbTargetLoading(false)
+        }
+      }
+    }
+
+    loadTargets()
+
+    return () => {
+      isMounted = false
+    }
+  }, [isPaired, mode])
+
+  useEffect(() => {
     if (!isPaired || mode !== 'uwb' || !isUwbPolling) {
       return undefined
     }
@@ -286,6 +346,18 @@ function App() {
     }
   }
 
+  async function handleUnpair() {
+    setIsBusy(true)
+    try {
+      await unpairWearable(pairing)
+      resetPairingSession('연결이 해제되었습니다')
+    } catch {
+      setStatusMessage('연동 해제에 실패했습니다.')
+    } finally {
+      setIsBusy(false)
+    }
+  }
+
   return (
     <main className="app-root">
       <WearableFrame>
@@ -312,15 +384,14 @@ function App() {
             status={pairingStatus}
             showManualComplete={isManualPairingEnabled()}
             onPairComplete={() => completePairing(pairing)}
-            onResetPairing={() => {
-              window.clearTimeout(pairingCompleteTimerRef.current)
-              window.clearTimeout(pairingPollTimerRef.current)
-              pairingCompletedRef.current = false
-              setPairing(null)
-              setPairingStatus('waiting')
-              setPairingGeneration((current) => current + 1)
-            }}
+            onResetPairing={() => resetPairingSession()}
           />
+        ) : null}
+
+        {!isPaired && statusMessage ? (
+          <p className="live-message" role="status">
+            {statusMessage}
+          </p>
         ) : null}
 
         {isPaired && mode === 'alert' ? (
@@ -365,30 +436,41 @@ function App() {
                 <dd>휴대폰 연결됨</dd>
               </div>
             </dl>
-            <button className="primary-action" type="button" onClick={() => setMode('emergency')}>
-              긴급 요청
-            </button>
+            <div className="action-row">
+              <button className="primary-action" type="button" onClick={() => setMode('emergency')}>
+                긴급 요청
+              </button>
+              <button
+                className="secondary-action"
+                disabled={isBusy}
+                type="button"
+                onClick={handleUnpair}
+              >
+                연동 해제
+              </button>
+            </div>
           </section>
         ) : null}
 
         {isPaired && mode === 'deviceSelect' ? (
           <DeviceSelectScreen
             actionMessage={statusMessage}
-            onSelect={(deviceName) => {
-              setUwbSession((current) => ({
-                ...(current || {}),
-                sessionId: current?.sessionId || getInitialUwbSessionId(),
-                targetDeviceName: deviceName,
-                distanceM: current?.distanceM || 2.4,
-                confidence: current?.confidence || 0.88,
-                navigationStatus: 'ACTIVE',
-                voiceGuide: `${deviceName} 위치 안내를 시작합니다.`,
-                vibrationPattern: 'MEDIUM',
-              }))
-              setStatusMessage('')
-              setMode('uwb')
-              isUwbPollingRef.current = true
-              setIsUwbPolling(true)
+            devices={uwbTargets}
+            isLoading={isUwbTargetLoading}
+            onSelect={async (device) => {
+              setIsBusy(true)
+              try {
+                const session = await startUwbSession(device.deviceId)
+                setUwbSession(session)
+                setStatusMessage('')
+                setMode('uwb')
+                isUwbPollingRef.current = true
+                setIsUwbPolling(true)
+              } catch {
+                setStatusMessage('위치 안내를 시작하지 못했습니다.')
+              } finally {
+                setIsBusy(false)
+              }
             }}
           />
         ) : null}
@@ -419,37 +501,8 @@ function App() {
   )
 }
 
-function DeviceSelectScreen({ actionMessage, onSelect }) {
-  const devices = [
-    {
-      name: '세탁기',
-      status: '연결됨',
-      statusTone: 'connected',
-      icon: '▣',
-      iconTone: 'teal',
-    },
-    {
-      name: 'TV',
-      status: '연결됨',
-      statusTone: 'connected',
-      icon: '▭',
-      iconTone: 'blue',
-    },
-    {
-      name: '안전 전기레인지',
-      status: '주의 필요',
-      statusTone: 'warning',
-      icon: '⌘',
-      iconTone: 'orange',
-    },
-    {
-      name: '도어센서',
-      status: '연결됨',
-      statusTone: 'connected',
-      icon: '▯',
-      iconTone: 'slate',
-    },
-  ]
+function DeviceSelectScreen({ actionMessage, devices = [], isLoading, onSelect }) {
+  const displayDevices = devices
 
   return (
     <section className="state-screen device-select-screen" aria-labelledby="device-select-title">
@@ -458,15 +511,15 @@ function DeviceSelectScreen({ actionMessage, onSelect }) {
           <p className="eyebrow">UWB</p>
           <h1 id="device-select-title">내 가전 목록</h1>
         </div>
-        <strong>{devices.length}개</strong>
+        <strong>{isLoading ? '확인 중' : `${displayDevices.length}개`}</strong>
       </div>
       <div className="device-select-grid">
-        {devices.map((device) => (
+        {displayDevices.map((device) => (
           <button
             className="device-select-card"
             type="button"
-            key={device.name}
-            onClick={() => onSelect(device.name)}
+            key={device.deviceId || device.name}
+            onClick={() => onSelect(device)}
           >
             <span className={`device-select-icon icon-${device.iconTone}`} aria-hidden="true">
               {device.icon}
@@ -493,16 +546,6 @@ function applyStoredAlertStatus(alert, alertStatuses) {
 
   const storedStatus = alertStatuses[alert.alertId]
   return storedStatus ? { ...alert, status: storedStatus } : alert
-}
-
-function getUwbPollIntervalMs() {
-  const override = Number(window.__ABLE_BAND_UWB_POLL_MS__)
-  return Number.isFinite(override) && override > 0 ? override : DEFAULT_UWB_POLL_INTERVAL_MS
-}
-
-function getPairingPollIntervalMs() {
-  const override = Number(window.__ABLE_BAND_PAIRING_POLL_MS__)
-  return Number.isFinite(override) && override > 0 ? override : DEFAULT_PAIRING_POLL_INTERVAL_MS
 }
 
 function getInitialPairingStatus() {
@@ -544,6 +587,8 @@ function mergePairingSession(currentSession, nextSession) {
 
 function formatEmergencyErrorMessage(error) {
   const messages = {
+    EMERGENCY_DUPLICATE_COOLDOWN:
+      '이미 긴급 요청을 보냈습니다. 잠시 후 다시 시도해주세요.',
     NO_GUARDIAN: '연결된 보호자가 없습니다. 휴대폰 앱에서 보호자를 먼저 연결해주세요.',
     DELIVERY_FAILED: '보호자에게 알림을 보내지 못했습니다. 잠시 후 다시 시도해주세요.',
     UNAUTHORIZED: '연동 인증이 만료되었습니다. 휴대폰에서 다시 연동해주세요.',

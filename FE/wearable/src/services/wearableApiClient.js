@@ -49,6 +49,10 @@ export function storeWearableAccessToken(accessToken) {
   globalThis.localStorage?.setItem(ACCESS_TOKEN_STORAGE_KEY, accessToken)
 }
 
+export function clearWearableAccessToken() {
+  globalThis.localStorage?.removeItem(ACCESS_TOKEN_STORAGE_KEY)
+}
+
 function apiBaseUrl() {
   return import.meta.env.VITE_API_BASE_URL?.trim() || DEFAULT_API_BASE_URL
 }

@@ -5,11 +5,14 @@ import com.lgableband.common.ApiException;
 import com.lgableband.mock.MockDataStore;
 import java.sql.PreparedStatement;
 import java.sql.Statement;
+import java.time.Duration;
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
@@ -27,26 +30,34 @@ public class EmergencyService {
 	private final ObjectProvider<PlatformTransactionManager> transactionManagerProvider;
 	private final MvpDataService dataService;
 	private final MockDataStore mockDataStore;
+	private final Duration duplicateCooldown;
+	private final Clock clock;
 
 	public EmergencyService(
 		ObjectProvider<JdbcTemplate> jdbcTemplateProvider,
 		ObjectProvider<PlatformTransactionManager> transactionManagerProvider,
 		MvpDataService dataService,
-		MockDataStore mockDataStore
+		MockDataStore mockDataStore,
+		@Value("${app.emergency.cooldown-seconds:10}") long duplicateCooldownSeconds,
+		ObjectProvider<Clock> clockProvider
 	) {
 		this.jdbcTemplateProvider = jdbcTemplateProvider;
 		this.transactionManagerProvider = transactionManagerProvider;
 		this.dataService = dataService;
 		this.mockDataStore = mockDataStore;
+		this.duplicateCooldown = Duration.ofSeconds(duplicateCooldownSeconds);
+		this.clock = clockProvider.getIfAvailable(() -> Clock.system(SERVICE_OFFSET));
 	}
 
 	public EmergencyRequestSummary create(String authorization, EmergencyController.EmergencyRequestBody request) {
 		MvpDataService.CurrentUser user = this.dataService.currentUser(authorization);
 		JdbcTemplate jdbcTemplate = jdbcTemplate();
 		if (jdbcTemplate == null) {
+			rejectDuplicateMockEmergency(user.userId(), request.source());
 			return toSummary(this.mockDataStore.createEmergency(user.userId(), request.message(), request.source()));
 		}
 
+		rejectDuplicateDbEmergency(jdbcTemplate, user.userId(), request.source());
 		List<GuardianTarget> guardians = guardianTargets(jdbcTemplate, user.userId(), null);
 		if (guardians.isEmpty()) {
 			throw new ApiException(HttpStatus.BAD_REQUEST, "NO_GUARDIAN", "등록된 보호자가 없습니다.");
@@ -126,7 +137,7 @@ public class EmergencyService {
 		EmergencyController.EmergencyRequestBody request,
 		List<GuardianTarget> guardians
 	) {
-		LocalDateTime now = LocalDateTime.now();
+		LocalDateTime now = LocalDateTime.ofInstant(this.clock.instant(), SERVICE_OFFSET);
 		long alertId = insertEmergencyAlert(jdbcTemplate, userId, request.message(), now);
 		long emergencyId = insertEmergencyRequest(jdbcTemplate, userId, alertId, request, now);
 		for (GuardianTarget guardian : guardians) {
@@ -284,6 +295,46 @@ public class EmergencyService {
 			request.guardianTargets().stream()
 				.map(guardian -> new GuardianTarget(guardian.guardianId(), guardian.name(), "SENT"))
 				.toList()
+		);
+	}
+
+	private void rejectDuplicateMockEmergency(long userId, String source) {
+		OffsetDateTime cutoff = OffsetDateTime.now(this.clock).minus(this.duplicateCooldown);
+		boolean duplicated = this.mockDataStore.emergencies(userId).stream()
+			.filter(request -> "SENT".equals(request.status()) || "ACKNOWLEDGED".equals(request.status()))
+			.filter(request -> source.equals(request.source()))
+			.anyMatch(request -> !request.sentAt().isBefore(cutoff));
+		if (duplicated) {
+			throw duplicateEmergencyException();
+		}
+	}
+
+	private void rejectDuplicateDbEmergency(JdbcTemplate jdbcTemplate, long userId, String source) {
+		LocalDateTime cutoff = LocalDateTime.ofInstant(this.clock.instant(), SERVICE_OFFSET).minus(this.duplicateCooldown);
+		Integer activeCount = jdbcTemplate.queryForObject(
+			"""
+			SELECT COUNT(*)
+			FROM emergency_request
+			WHERE user_id = ?
+			  AND source = ?
+			  AND status IN ('SENT', 'ACKNOWLEDGED')
+			  AND requested_at >= ?
+			""",
+			Integer.class,
+			userId,
+			source,
+			cutoff
+		);
+		if (activeCount != null && activeCount > 0) {
+			throw duplicateEmergencyException();
+		}
+	}
+
+	private ApiException duplicateEmergencyException() {
+		return new ApiException(
+			HttpStatus.CONFLICT,
+			"EMERGENCY_DUPLICATE_COOLDOWN",
+			"최근 긴급 요청이 처리 중입니다. 잠시 후 다시 시도해주세요."
 		);
 	}
 

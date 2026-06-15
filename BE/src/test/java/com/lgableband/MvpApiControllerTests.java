@@ -167,8 +167,47 @@ class MvpApiControllerTests {
 	}
 
 	@Test
+	void demoAccountsAndWearableSeedAreStable() throws Exception {
+		String userToken = loginToken("USER", "user@example.com");
+		String guardianToken = loginToken("GUARDIAN", "guardian@example.com");
+
+		this.mockMvc.perform(get("/api/guardians").header("Authorization", "Bearer " + userToken))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.items[0].name").value("김보호"))
+			.andExpect(jsonPath("$.items[0].connectionStatus").value("CONNECTED"));
+
+		this.mockMvc.perform(get("/api/guardians/dashboard").header("Authorization", "Bearer " + guardianToken))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.user.name").value("홍길동"));
+
+		String vendorDeviceId = "able-band-demo-001";
+		MvcResult created = this.mockMvc.perform(post("/api/devices")
+				.header("Authorization", "Bearer " + userToken)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(deviceCreateBody(vendorDeviceId)))
+			.andExpect(status().isCreated())
+			.andExpect(jsonPath("$.type").value("WEARABLE"))
+			.andExpect(jsonPath("$.vendorDeviceId").value(vendorDeviceId))
+			.andReturn();
+		String deviceId = extractJsonNumber(created.getResponse().getContentAsString(), "deviceId");
+
+		this.mockMvc.perform(delete("/api/devices/" + deviceId).header("Authorization", "Bearer " + userToken))
+			.andExpect(status().isNoContent());
+
+		this.mockMvc.perform(post("/api/devices")
+				.header("Authorization", "Bearer " + userToken)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(deviceCreateBody(vendorDeviceId)))
+			.andExpect(status().isCreated())
+			.andExpect(jsonPath("$.type").value("WEARABLE"))
+			.andExpect(jsonPath("$.vendorDeviceId").value(vendorDeviceId));
+	}
+
+	@Test
 	void guardiansCanBeManaged() throws Exception {
 		String token = userToken();
+		String pairingCompleteMessage =
+			"\uC6E8\uC5B4\uB7EC\uBE14 \uC5F0\uB3D9\uC774 \uC644\uB8CC\uB418\uC5C8\uC2B5\uB2C8\uB2E4.";
 
 		MvcResult created = this.mockMvc.perform(post("/api/guardians")
 				.header("Authorization", "Bearer " + token)
@@ -228,6 +267,8 @@ class MvpApiControllerTests {
 			.andExpect(status().isCreated());
 
 		String token = userToken();
+		String pairingCompleteMessage =
+			"\uC6E8\uC5B4\uB7EC\uBE14 \uC5F0\uB3D9\uC774 \uC644\uB8CC\uB418\uC5C8\uC2B5\uB2C8\uB2E4.";
 
 		this.mockMvc.perform(post("/api/guardians/link-by-email")
 				.header("Authorization", "Bearer " + token)
@@ -246,8 +287,69 @@ class MvpApiControllerTests {
 	}
 
 	@Test
+	void unlinkedGuardianCannotLoadDashboardForUser() throws Exception {
+		String suffix = "unlinked-dashboard-" + System.nanoTime();
+		String guardianEmail = signupGuardian(suffix);
+		String guardianToken = loginToken("GUARDIAN", guardianEmail);
+
+		this.mockMvc.perform(get("/api/guardians/dashboard").header("Authorization", "Bearer " + guardianToken))
+			.andExpect(status().isNotFound())
+			.andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"));
+	}
+
+	@Test
+	void guardianLinkByEmailHandlesNotFoundDuplicateAndInvalidEmail() throws Exception {
+		String suffix = "link-errors-" + System.nanoTime();
+		String userToken = signupUserAndToken(suffix);
+		String guardianEmail = signupGuardian(suffix);
+
+		this.mockMvc.perform(post("/api/guardians/link-by-email")
+				.header("Authorization", "Bearer " + userToken)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "email": "missing-%s@example.com",
+					  "isPrimary": false,
+					  "notifyOnDanger": true
+					}
+					""".formatted(suffix)))
+			.andExpect(status().isNotFound())
+			.andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"));
+
+		this.mockMvc.perform(post("/api/guardians/link-by-email")
+				.header("Authorization", "Bearer " + userToken)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "email": "not-an-email",
+					  "isPrimary": false,
+					  "notifyOnDanger": true
+					}
+					"""))
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+
+		linkGuardianByEmail(userToken, guardianEmail, true, true);
+
+		this.mockMvc.perform(post("/api/guardians/link-by-email")
+				.header("Authorization", "Bearer " + userToken)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "email": "%s",
+					  "isPrimary": true,
+					  "notifyOnDanger": true
+					}
+					""".formatted(guardianEmail)))
+			.andExpect(status().isConflict())
+			.andExpect(jsonPath("$.code").value("DUPLICATED_GUARDIAN"));
+	}
+
+	@Test
 	void livingSignalsCanBeLoadedAndUpdated() throws Exception {
 		String token = userToken();
+		String pairingCompleteMessage =
+			"\uC6E8\uC5B4\uB7EC\uBE14 \uC5F0\uB3D9\uC774 \uC644\uB8CC\uB418\uC5C8\uC2B5\uB2C8\uB2E4.";
 
 		this.mockMvc.perform(get("/api/living-signals").header("Authorization", "Bearer " + token))
 			.andExpect(status().isOk())
@@ -325,6 +427,8 @@ class MvpApiControllerTests {
 	@Test
 	void contextJudgmentCreatesAlertAndCanBeListed() throws Exception {
 		String token = userToken();
+		String pairingCompleteMessage =
+			"\uC6E8\uC5B4\uB7EC\uBE14 \uC5F0\uB3D9\uC774 \uC644\uB8CC\uB418\uC5C8\uC2B5\uB2C8\uB2E4.";
 
 		this.mockMvc.perform(post("/api/context/judgments")
 				.header("Authorization", "Bearer " + token)
@@ -359,6 +463,8 @@ class MvpApiControllerTests {
 	@Test
 	void warningRecommendationAndEmergencyHistoryAreAvailable() throws Exception {
 		String token = userToken();
+		String pairingCompleteMessage =
+			"\uC6E8\uC5B4\uB7EC\uBE14 \uC5F0\uB3D9\uC774 \uC644\uB8CC\uB418\uC5C8\uC2B5\uB2C8\uB2E4.";
 
 		this.mockMvc.perform(post("/api/warnings/recommendations")
 				.header("Authorization", "Bearer " + token)
@@ -415,6 +521,116 @@ class MvpApiControllerTests {
 	}
 
 	@Test
+	void emergencyRequestCreatesGuardianDeliveryRows() throws Exception {
+		String suffix = "delivery-" + System.nanoTime();
+		String userToken = signupUserAndToken(suffix);
+		String primaryGuardianEmail = signupGuardian(suffix + "-primary");
+		String secondaryGuardianEmail = signupGuardian(suffix + "-secondary");
+		linkGuardianByEmail(userToken, primaryGuardianEmail, true, true);
+		linkGuardianByEmail(userToken, secondaryGuardianEmail, false, true);
+
+		this.mockMvc.perform(post("/api/emergency-requests")
+				.header("Authorization", "Bearer " + userToken)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "message": "전달 상태 확인 요청",
+					  "source": "APP"
+					}
+					"""))
+			.andExpect(status().isCreated())
+			.andExpect(jsonPath("$.status").value("SENT"))
+			.andExpect(jsonPath("$.source").value("APP"))
+			.andExpect(jsonPath("$.guardianNotified").value(true))
+			.andExpect(jsonPath("$.guardianTargets[0].deliveryStatus").value("SENT"))
+			.andExpect(jsonPath("$.guardianTargets[1].deliveryStatus").value("SENT"))
+			.andExpect(jsonPath("$.guardianTargets[2]").doesNotExist());
+
+		String guardianToken = loginToken("GUARDIAN", primaryGuardianEmail);
+		this.mockMvc.perform(get("/api/guardians/dashboard").header("Authorization", "Bearer " + guardianToken))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.emergencyRequests[0].source").value("APP"))
+			.andExpect(jsonPath("$.summary.activeEmergency").value(true));
+	}
+
+	@Test
+	void emergencyRequestHasDuplicateCooldown() throws Exception {
+		String suffix = "duplicate-" + System.nanoTime();
+		String userToken = signupUserAndToken(suffix);
+		String guardianEmail = signupGuardian(suffix);
+		linkGuardianByEmail(userToken, guardianEmail, true, true);
+		String body = """
+			{
+			  "message": "웨어러블 중복 요청",
+			  "source": "WEARABLE"
+			}
+			""";
+
+		this.mockMvc.perform(post("/api/emergency-requests")
+				.header("Authorization", "Bearer " + userToken)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(body))
+			.andExpect(status().isCreated())
+			.andExpect(jsonPath("$.status").value("SENT"));
+
+		this.mockMvc.perform(post("/api/emergency-requests")
+				.header("Authorization", "Bearer " + userToken)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(body))
+			.andExpect(status().isConflict())
+			.andExpect(jsonPath("$.code").value("EMERGENCY_DUPLICATE_COOLDOWN"));
+
+		this.mockMvc.perform(get("/api/emergency-requests").header("Authorization", "Bearer " + userToken))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.items[0].source").value("WEARABLE"))
+			.andExpect(jsonPath("$.items[1]").doesNotExist());
+	}
+
+	@Test
+	void emergencyCooldownIsScopedBySource() throws Exception {
+		String suffix = "source-cooldown-" + System.nanoTime();
+		String userToken = signupUserAndToken(suffix);
+		String guardianEmail = signupGuardian(suffix);
+		linkGuardianByEmail(userToken, guardianEmail, true, true);
+
+		this.mockMvc.perform(post("/api/emergency-requests")
+				.header("Authorization", "Bearer " + userToken)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "message": "앱에서 요청",
+					  "source": "APP"
+					}
+					"""))
+			.andExpect(status().isCreated())
+			.andExpect(jsonPath("$.source").value("APP"));
+
+		this.mockMvc.perform(post("/api/emergency-requests")
+				.header("Authorization", "Bearer " + userToken)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "message": "웨어러블에서 요청",
+					  "source": "WEARABLE"
+					}
+					"""))
+			.andExpect(status().isCreated())
+			.andExpect(jsonPath("$.source").value("WEARABLE"));
+
+		this.mockMvc.perform(post("/api/emergency-requests")
+				.header("Authorization", "Bearer " + userToken)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "message": "앱에서 다시 요청",
+					  "source": "APP"
+					}
+					"""))
+			.andExpect(status().isConflict())
+			.andExpect(jsonPath("$.code").value("EMERGENCY_DUPLICATE_COOLDOWN"));
+	}
+
+	@Test
 	void emergencyRequestFailsWhenUserHasNoGuardian() throws Exception {
 		String token = signupUserAndToken("noguardian-" + System.nanoTime());
 
@@ -429,6 +645,20 @@ class MvpApiControllerTests {
 					"""))
 			.andExpect(status().isBadRequest())
 			.andExpect(jsonPath("$.code").value("NO_GUARDIAN"));
+	}
+
+	@Test
+	void emergencyRequestWithoutAuthorizationReturnsUnauthorized() throws Exception {
+		this.mockMvc.perform(post("/api/emergency-requests")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "message": "인증 없이 요청합니다.",
+					  "source": "APP"
+					}
+					"""))
+			.andExpect(status().isUnauthorized())
+			.andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
 	}
 
 	@Test
@@ -497,6 +727,8 @@ class MvpApiControllerTests {
 		String deviceId = "able-band-complete-" + System.nanoTime();
 		PairingFixture pairing = createPairingSession(deviceId);
 		String token = userToken();
+		String pairingCompleteMessage =
+			"\uC6E8\uC5B4\uB7EC\uBE14 \uC5F0\uB3D9\uC774 \uC644\uB8CC\uB418\uC5C8\uC2B5\uB2C8\uB2E4.";
 
 		this.mockMvc.perform(post("/api/wearable/pairing-sessions/" + pairing.sessionId() + "/complete")
 				.header("Authorization", "Bearer " + token)
@@ -509,7 +741,7 @@ class MvpApiControllerTests {
 			.andExpect(jsonPath("$.device.type").value("WEARABLE"))
 			.andExpect(jsonPath("$.device.connectionStatus").value("CONNECTED"))
 			.andExpect(jsonPath("$.accessToken").value(token))
-			.andExpect(jsonPath("$.message").value("웨어러블 연동이 완료되었습니다."));
+			.andExpect(jsonPath("$.message").value(pairingCompleteMessage));
 	}
 
 	@Test
@@ -517,6 +749,8 @@ class MvpApiControllerTests {
 		String deviceId = "able-band-poll-" + System.nanoTime();
 		PairingFixture pairing = createPairingSession(deviceId);
 		String token = userToken();
+		String pairingCompleteMessage =
+			"\uC6E8\uC5B4\uB7EC\uBE14 \uC5F0\uB3D9\uC774 \uC644\uB8CC\uB418\uC5C8\uC2B5\uB2C8\uB2E4.";
 
 		this.mockMvc.perform(post("/api/wearable/pairing-sessions/" + pairing.sessionId() + "/complete")
 				.header("Authorization", "Bearer " + token)
@@ -551,6 +785,8 @@ class MvpApiControllerTests {
 		String deviceId = "able-band-repeat-" + System.nanoTime();
 		PairingFixture pairing = createPairingSession(deviceId);
 		String token = userToken();
+		String pairingCompleteMessage =
+			"\uC6E8\uC5B4\uB7EC\uBE14 \uC5F0\uB3D9\uC774 \uC644\uB8CC\uB418\uC5C8\uC2B5\uB2C8\uB2E4.";
 		String body = pairingCompleteBody(deviceId, pairing.nonce(), "ABLE-4IN-260610");
 
 		this.mockMvc.perform(post("/api/wearable/pairing-sessions/" + pairing.sessionId() + "/complete")
@@ -607,6 +843,19 @@ class MvpApiControllerTests {
 			""".formatted(deviceId, pairingCode, nonce);
 	}
 
+	private String deviceCreateBody(String vendorDeviceId) {
+		return """
+			{
+			  "vendor": "LG",
+			  "vendorDeviceId": "%s",
+			  "name": "LG Able Band",
+			  "type": "WEARABLE",
+			  "locationSupported": true,
+			  "remoteEnabled": true
+			}
+			""".formatted(vendorDeviceId);
+	}
+
 	private String extractJsonString(String content, String key) {
 		String marker = "\"" + key + "\":\"";
 		int start = content.indexOf(marker);
@@ -616,6 +865,20 @@ class MvpApiControllerTests {
 		int valueStart = start + marker.length();
 		int valueEnd = content.indexOf("\"", valueStart);
 		return valueEnd < 0 ? "" : content.substring(valueStart, valueEnd);
+	}
+
+	private String extractJsonNumber(String content, String key) {
+		String marker = "\"" + key + "\":";
+		int start = content.indexOf(marker);
+		if (start < 0) {
+			return "";
+		}
+		int valueStart = start + marker.length();
+		int valueEnd = valueStart;
+		while (valueEnd < content.length() && Character.isDigit(content.charAt(valueEnd))) {
+			valueEnd++;
+		}
+		return content.substring(valueStart, valueEnd);
 	}
 
 	private String signupUserAndToken(String suffix) throws Exception {
@@ -656,6 +919,21 @@ class MvpApiControllerTests {
 					""".formatted(suffix, email)))
 			.andExpect(status().isCreated());
 		return email;
+	}
+
+	private void linkGuardianByEmail(String token, String guardianEmail, boolean isPrimary, boolean notifyOnDanger)
+		throws Exception {
+		this.mockMvc.perform(post("/api/guardians/link-by-email")
+				.header("Authorization", "Bearer " + token)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "email": "%s",
+					  "isPrimary": %s,
+					  "notifyOnDanger": %s
+					}
+					""".formatted(guardianEmail, isPrimary, notifyOnDanger)))
+			.andExpect(status().isCreated());
 	}
 
 	private String loginToken(String role, String email) throws Exception {

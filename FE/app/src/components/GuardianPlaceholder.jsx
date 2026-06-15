@@ -17,7 +17,7 @@ const statusLabels = {
   CANCELED: '취소됨',
 }
 
-const DASHBOARD_POLL_INTERVAL_MS = 5000
+const DASHBOARD_POLL_INTERVAL_MS = 3000
 
 export function GuardianPlaceholder({ account, onLogout }) {
   const [dashboardState, setDashboardState] = useState({
@@ -69,7 +69,7 @@ export function GuardianPlaceholder({ account, onLogout }) {
     }
 
     loadDashboard()
-    pollTimer = window.setInterval(() => loadDashboard({ silent: true }), DASHBOARD_POLL_INTERVAL_MS)
+    pollTimer = window.setInterval(() => loadDashboard({ silent: true }), getDashboardPollIntervalMs())
 
     return () => {
       isMounted = false
@@ -286,6 +286,19 @@ export function GuardianPlaceholder({ account, onLogout }) {
       </div>
     </main>
   )
+}
+
+function getDashboardPollIntervalMs() {
+  return (
+    parsePositiveIntervalMs(window.__ABLE_BAND_GUARDIAN_DASHBOARD_POLL_MS__) ??
+    parsePositiveIntervalMs(import.meta.env.VITE_GUARDIAN_DASHBOARD_POLL_MS) ??
+    DASHBOARD_POLL_INTERVAL_MS
+  )
+}
+
+function parsePositiveIntervalMs(value) {
+  const intervalMs = Number(value)
+  return Number.isFinite(intervalMs) && intervalMs > 0 ? intervalMs : null
 }
 
 function formatGuardianTime(value) {

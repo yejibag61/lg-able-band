@@ -6,6 +6,7 @@ import {
   mockUwbSessions,
 } from '../mocks/wearableMock'
 import {
+  clearWearableAccessToken,
   getWearableAccessToken,
   storeWearableAccessToken,
   wearableApiRequest,
@@ -58,6 +59,36 @@ export function createWearableService({
         request: async () => normalizePairingSession(await request(pairingStatusPath(pairingSession))),
       })
     },
+    async unpairWearable(pairingSession) {
+      const pairingSessionId = getPairingSessionId(pairingSession)
+      if (!pairingSessionId) {
+        clearWearableAccessToken()
+        return { status: 'UNPAIRED' }
+      }
+
+      try {
+        return await withFallback({
+          apiEnabled: isPairingApiEnabled(),
+          fallbackEnabled,
+          fallback: () => ({ pairingSessionId, status: 'UNPAIRED' }),
+          request: async () => {
+            const unpaired = await request(pairingUnpairPath(pairingSession), {
+              method: 'POST',
+              body: {
+                deviceId: pairingSession?.deviceId,
+                nonce: pairingSession?.nonce,
+              },
+            })
+            return {
+              pairingSessionId,
+              status: unpaired?.status || 'UNPAIRED',
+            }
+          },
+        })
+      } finally {
+        clearWearableAccessToken()
+      }
+    },
     async getCurrentAlert() {
       const alerts = await this.getCurrentAlerts()
       return selectPriorityAlert(alerts)
@@ -104,6 +135,31 @@ export function createWearableService({
         fallbackEnabled,
         fallback: () => getMockUwbSession(sessionId),
         request: async () => normalizeUwbSession(await request(`/api/uwb/sessions/${sessionId}`)),
+      })
+    },
+    async getUwbTargets() {
+      return withFallback({
+        apiEnabled: isApiEnabled(),
+        fallbackEnabled,
+        fallback: getMockUwbTargets,
+        request: async () =>
+          normalizeListResponse(await request('/api/uwb/targets', { method: 'GET' })).map(
+            normalizeUwbTarget,
+          ),
+      })
+    },
+    async startUwbSession(targetDeviceId) {
+      return withFallback({
+        apiEnabled: isApiEnabled(),
+        fallbackEnabled,
+        fallback: () => startMockUwbSession(targetDeviceId),
+        request: async () =>
+          normalizeUwbSession(
+            await request('/api/uwb/sessions', {
+              method: 'POST',
+              body: { targetDeviceId: Number(targetDeviceId) },
+            }),
+          ),
       })
     },
     async stopUwbSession(sessionId) {
@@ -162,6 +218,10 @@ export async function getPairingSessionStatus(pairingSession) {
   return defaultService.getPairingSessionStatus(pairingSession)
 }
 
+export async function unpairWearable(pairingSession) {
+  return defaultService.unpairWearable(pairingSession)
+}
+
 export function saveWearableAccessToken(accessToken) {
   storeWearableAccessToken(accessToken)
 }
@@ -186,6 +246,14 @@ export async function getUwbSession(sessionId) {
   return defaultService.getUwbSession(sessionId)
 }
 
+export async function getUwbTargets() {
+  return defaultService.getUwbTargets()
+}
+
+export async function startUwbSession(targetDeviceId) {
+  return defaultService.startUwbSession(targetDeviceId)
+}
+
 export async function stopUwbSession(sessionId) {
   return defaultService.stopUwbSession(sessionId)
 }
@@ -197,13 +265,31 @@ export async function requestEmergencyHelp(message) {
 export function normalizeUwbSession(session) {
   return {
     sessionId: session.sessionId,
+    targetDeviceId: session.targetDeviceId || session.targetDevice?.deviceId,
     targetDeviceName: session.targetDeviceName || session.targetDevice?.name || '대상 기기',
+    status: session.status || session.navigationStatus,
     distanceM: session.distanceM,
     confidence: session.confidence,
     navigationStatus: session.navigationStatus || session.status,
     voiceGuide: session.voiceGuide,
     vibrationPattern: session.vibrationPattern || 'NONE',
     updatedAt: session.updatedAt || '',
+  }
+}
+
+export function normalizeUwbTarget(target) {
+  const connectionStatus = target.connectionStatus || 'CONNECTED'
+  return {
+    deviceId: target.deviceId,
+    name: target.name || '위치 안내 기기',
+    type: target.type || target.deviceType || 'UWB_TAG',
+    connectionStatus,
+    locationSupported: target.locationSupported !== false,
+    updatedAt: target.updatedAt || target.lastEventAt || '',
+    status: connectionStatus === 'CONNECTED' ? '연결됨' : '연결 확인 필요',
+    statusTone: connectionStatus === 'CONNECTED' ? 'connected' : 'warning',
+    icon: deviceIcon(target.type || target.deviceType),
+    iconTone: deviceIconTone(target.type || target.deviceType),
   }
 }
 
@@ -291,6 +377,15 @@ function pairingStatusPath(pairingSession) {
   return `/api/wearable/pairing-sessions/${encodeURIComponent(pairingSessionId)}${
     queryString ? `?${queryString}` : ''
   }`
+}
+
+function pairingUnpairPath(pairingSession) {
+  const pairingSessionId = getPairingSessionId(pairingSession)
+  if (!pairingSessionId) {
+    throw new Error('연동 세션 정보를 찾을 수 없습니다.')
+  }
+
+  return `/api/wearable/pairing-sessions/${encodeURIComponent(pairingSessionId)}/unpair`
 }
 
 function pairingCreateBody(pairingSession) {
@@ -397,6 +492,46 @@ async function stopMockUwbSession(sessionId) {
   }
 }
 
+function getMockUwbTargets() {
+  return [
+    normalizeUwbTarget({ deviceId: 10, name: '세탁기', type: 'WASHER', connectionStatus: 'CONNECTED' }),
+    normalizeUwbTarget({ deviceId: 11, name: 'TV', type: 'TV', connectionStatus: 'CONNECTED' }),
+    normalizeUwbTarget({ deviceId: 12, name: '안전 전기레인지', type: 'RANGE', connectionStatus: 'WARNING' }),
+    normalizeUwbTarget({ deviceId: 13, name: '도어센서', type: 'DOOR_SENSOR', connectionStatus: 'CONNECTED' }),
+  ]
+}
+
+function startMockUwbSession(targetDeviceId) {
+  const target = getMockUwbTargets().find((item) => item.deviceId === Number(targetDeviceId))
+  if (!target) {
+    throw new Error('위치 안내 대상을 찾을 수 없습니다.')
+  }
+
+  const initialSessionId = getInitialUwbSessionId()
+  const existingSession = mockUwbSessions.find((item) => item.sessionId === initialSessionId)
+  if (existingSession) {
+    return normalizeUwbSession({
+      ...existingSession,
+      targetDevice: { deviceId: target.deviceId, name: target.name },
+      targetDeviceId: target.deviceId,
+      targetDeviceName: target.name,
+      status: existingSession.navigationStatus,
+    })
+  }
+
+  return normalizeUwbSession({
+    sessionId: initialSessionId,
+    targetDevice: { deviceId: target.deviceId, name: target.name },
+    targetDeviceId: target.deviceId,
+    status: 'ACTIVE',
+    distanceM: 2.4,
+    confidence: 0.88,
+    voiceGuide: `${target.name} 위치 안내를 시작합니다.`,
+    vibrationPattern: 'MEDIUM',
+    updatedAt: new Date().toISOString(),
+  })
+}
+
 function requestMockEmergencyHelp(message) {
   const forcedErrorCode = globalThis.__ABLE_BAND_WEARABLE_EMERGENCY_ERROR__
   if (forcedErrorCode) {
@@ -421,12 +556,16 @@ async function withFallback({ apiEnabled, fallbackEnabled, fallback, request }) 
   try {
     return await request()
   } catch (error) {
-    if (!fallbackEnabled || shouldSurfaceApiError(error)) {
+    if (!fallbackEnabled || shouldSurfaceApiError(error) || !allowsApiFailureFallback()) {
       throw error
     }
 
     return fallback()
   }
+}
+
+function allowsApiFailureFallback() {
+  return globalThis.__ABLE_BAND_ALLOW_API_FAILURE_FALLBACK__ === true
 }
 
 function shouldSurfaceApiError(error) {
@@ -439,7 +578,31 @@ function createEmergencyError(code) {
   return error
 }
 
+function deviceIcon(type) {
+  const icons = {
+    WASHER: '▣',
+    TV: '▭',
+    RANGE: '⌘',
+    DOOR_SENSOR: '▯',
+    REFRIGERATOR: '▤',
+  }
+  return icons[type] || '▣'
+}
+
+function deviceIconTone(type) {
+  const tones = {
+    WASHER: 'teal',
+    TV: 'blue',
+    RANGE: 'orange',
+    DOOR_SENSOR: 'slate',
+    REFRIGERATOR: 'teal',
+  }
+  return tones[type] || 'teal'
+}
+
 const emergencyErrorMessages = {
+  EMERGENCY_DUPLICATE_COOLDOWN:
+    '이미 긴급 요청을 보냈습니다. 잠시 후 다시 시도해주세요.',
   NO_GUARDIAN: '연결된 보호자가 없습니다. 휴대폰 앱에서 보호자를 먼저 연결해주세요.',
   DELIVERY_FAILED: '보호자에게 알림을 보내지 못했습니다. 잠시 후 다시 시도해주세요.',
   UNAUTHORIZED: '연동 인증이 만료되었습니다. 휴대폰에서 다시 연동해주세요.',

@@ -43,6 +43,7 @@ public class DeviceService {
 
 		if (jdbcTemplate == null) {
 			return this.mockDataStore.devices(user.userId()).stream()
+				.filter(device -> device.connectionStatus() != ConnectionStatus.DISCONNECTED)
 				.map(device -> new DeviceSummary(
 					device.deviceId(),
 					device.name(),
@@ -70,6 +71,7 @@ public class DeviceService {
 			FROM device d
 			LEFT JOIN device_event de ON de.device_id = d.device_id
 			WHERE d.user_id = ?
+			  AND d.connection_status <> 'DISCONNECTED'
 			GROUP BY d.device_id, d.name, d.device_type, d.connection_status,
 			         d.location_supported, d.vendor_device_id, d.remote_enabled, d.created_at
 			ORDER BY last_event_at DESC, d.device_id DESC
@@ -128,7 +130,36 @@ public class DeviceService {
 				request.remoteEnabled()
 			);
 		} catch (DuplicateKeyException ex) {
-			throw new ApiException(HttpStatus.CONFLICT, "DUPLICATED_DEVICE", "이미 연결된 기기입니다.");
+			return reconnectExistingDevice(jdbcTemplate, user.userId(), request);
+		}
+	}
+
+	public void deleteDevice(String authorization, long deviceId) {
+		JdbcTemplate jdbcTemplate = jdbcTemplate();
+		MvpDataService.CurrentUser user = this.dataService.currentUser(authorization);
+
+		if (jdbcTemplate == null) {
+			boolean removed = this.mockDataStore.devices(user.userId())
+				.removeIf(device -> device.deviceId() == deviceId);
+			if (!removed) {
+				throw new ApiException(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND", "기기를 찾을 수 없습니다.");
+			}
+			return;
+		}
+
+		int updated = jdbcTemplate.update(
+			"""
+			UPDATE device
+			SET connection_status = 'DISCONNECTED',
+			    updated_at = CURRENT_TIMESTAMP(6)
+			WHERE device_id = ?
+			  AND user_id = ?
+			""",
+			deviceId,
+			user.userId()
+		);
+		if (updated == 0) {
+			throw new ApiException(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND", "기기를 찾을 수 없습니다.");
 		}
 	}
 
@@ -170,6 +201,61 @@ public class DeviceService {
 			deviceId,
 			registrationPayload(request),
 			LocalDateTime.now()
+		);
+	}
+
+	private DeviceSummary reconnectExistingDevice(JdbcTemplate jdbcTemplate, long userId, DeviceCreateRequest request) {
+		String vendorDeviceId = blankToNull(request.vendorDeviceId());
+		if (vendorDeviceId == null) {
+			throw new ApiException(HttpStatus.CONFLICT, "DUPLICATED_DEVICE", "이미 연결된 기기입니다.");
+		}
+
+		DeviceRow existing = jdbcTemplate.query(
+			"""
+			SELECT device_id, user_id
+			FROM device
+			WHERE vendor_device_id = ?
+			""",
+			(rs, rowNum) -> new DeviceRow(
+				rs.getLong("device_id"),
+				rs.getLong("user_id")
+			),
+			vendorDeviceId
+		).stream().findFirst()
+			.orElseThrow(() -> new ApiException(HttpStatus.CONFLICT, "DUPLICATED_DEVICE", "이미 연결된 기기입니다."));
+
+		if (existing.userId() != userId) {
+			throw new ApiException(HttpStatus.CONFLICT, "DUPLICATED_DEVICE", "이미 연결된 기기입니다.");
+		}
+
+		jdbcTemplate.update(
+			"""
+			UPDATE device
+			SET device_type = ?,
+			    name = ?,
+			    connection_status = 'CONNECTED',
+			    location_supported = ?,
+			    remote_enabled = ?,
+			    updated_at = CURRENT_TIMESTAMP(6)
+			WHERE device_id = ?
+			""",
+			request.type().name(),
+			request.name(),
+			request.locationSupported(),
+			request.remoteEnabled(),
+			existing.deviceId()
+		);
+		insertRegistrationEvent(jdbcTemplate, existing.deviceId(), request);
+		return new DeviceSummary(
+			existing.deviceId(),
+			request.name(),
+			request.type(),
+			ConnectionStatus.CONNECTED,
+			request.locationSupported(),
+			OffsetDateTime.now(),
+			request.vendor(),
+			request.vendorDeviceId(),
+			request.remoteEnabled()
 		);
 	}
 
@@ -235,5 +321,8 @@ public class DeviceService {
 		boolean locationSupported,
 		boolean remoteEnabled
 	) {
+	}
+
+	private record DeviceRow(long deviceId, long userId) {
 	}
 }

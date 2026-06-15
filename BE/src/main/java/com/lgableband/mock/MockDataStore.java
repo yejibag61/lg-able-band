@@ -447,11 +447,26 @@ public class MockDataStore {
 	}
 
 	public List<EventHistory> events(long userId, AlertType type, int page, int size) {
-		return this.eventsByUserId.getOrDefault(userId, List.of()).stream()
-			.filter(event -> type == null || event.type() == type)
-			.sorted(Comparator.comparing(EventHistory::occurredAt).reversed())
+		return events(userId, type, null, null, page, size);
+	}
+
+	public List<EventHistory> events(long userId, AlertType type, OffsetDateTime from, OffsetDateTime to, int page, int size) {
+		return filteredEvents(userId, type, from, to).stream()
 			.skip((long) page * size)
 			.limit(size)
+			.toList();
+	}
+
+	public long countEvents(long userId, AlertType type, OffsetDateTime from, OffsetDateTime to) {
+		return filteredEvents(userId, type, from, to).size();
+	}
+
+	private List<EventHistory> filteredEvents(long userId, AlertType type, OffsetDateTime from, OffsetDateTime to) {
+		return this.eventsByUserId.getOrDefault(userId, List.of()).stream()
+			.filter(event -> type == null || event.type() == type)
+			.filter(event -> from == null || !event.occurredAt().isBefore(from))
+			.filter(event -> to == null || !event.occurredAt().isAfter(to))
+			.sorted(Comparator.comparing(EventHistory::occurredAt).reversed())
 			.toList();
 	}
 
@@ -464,6 +479,7 @@ public class MockDataStore {
 
 		UwbSession session = new UwbSession(
 			this.uwbSequence.incrementAndGet(),
+			userId,
 			target.deviceId(),
 			target.name(),
 			NavigationStatus.ACTIVE,
@@ -478,26 +494,49 @@ public class MockDataStore {
 	}
 
 	public UwbSession uwbSession(long sessionId) {
+		return advanceUwbSession(requireUwbSession(sessionId));
+	}
+
+	public UwbSession uwbSession(long userId, long sessionId) {
+		UwbSession session = requireOwnedUwbSession(userId, sessionId);
+		return advanceUwbSession(session);
+	}
+
+	public UwbSession stopUwbSession(long sessionId) {
+		UwbSession stopped = requireUwbSession(sessionId).withStatus(NavigationStatus.CANCELED);
+		this.uwbSessions.put(sessionId, stopped);
+		return stopped;
+	}
+
+	public UwbSession stopUwbSession(long userId, long sessionId) {
+		UwbSession stopped = requireOwnedUwbSession(userId, sessionId).withStatus(NavigationStatus.CANCELED);
+		this.uwbSessions.put(sessionId, stopped);
+		return stopped;
+	}
+
+	private UwbSession requireUwbSession(long sessionId) {
 		UwbSession session = this.uwbSessions.get(sessionId);
 		if (session == null) {
 			throw new ApiException(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND", "UWB 세션을 찾을 수 없습니다.");
 		}
+		return session;
+	}
+
+	private UwbSession requireOwnedUwbSession(long userId, long sessionId) {
+		UwbSession session = requireUwbSession(sessionId);
+		if (session.userId() != userId) {
+			throw new ApiException(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND", "UWB 세션을 찾을 수 없습니다.");
+		}
+		return session;
+	}
+
+	private UwbSession advanceUwbSession(UwbSession session) {
 		double nextDistance = Math.max(0.5, session.distanceM() - 1.0);
 		NavigationStatus status = nextDistance <= 0.5 ? NavigationStatus.ARRIVED : NavigationStatus.ACTIVE;
 		VibrationPattern pattern = vibrationPattern(nextDistance, status);
 		UwbSession updated = session.withNavigation(nextDistance, status, pattern);
-		this.uwbSessions.put(sessionId, updated);
+		this.uwbSessions.put(session.sessionId(), updated);
 		return updated;
-	}
-
-	public UwbSession stopUwbSession(long sessionId) {
-		UwbSession session = this.uwbSessions.get(sessionId);
-		if (session == null) {
-			throw new ApiException(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND", "UWB 세션을 찾을 수 없습니다.");
-		}
-		UwbSession stopped = session.withStatus(NavigationStatus.CANCELED);
-		this.uwbSessions.put(sessionId, stopped);
-		return stopped;
 	}
 
 	private VibrationPattern vibrationPattern(double distanceM, NavigationStatus status) {
@@ -584,17 +623,17 @@ public class MockDataStore {
 	public record EventHistory(long eventId, long alertId, AlertType type, Severity severity, String title, String deviceName, OffsetDateTime occurredAt, AlertStatus alertStatus) {
 	}
 
-	public record UwbSession(long sessionId, long targetDeviceId, String targetDeviceName, NavigationStatus navigationStatus, double distanceM, double confidence, String voiceGuide, VibrationPattern vibrationPattern, OffsetDateTime updatedAt) {
+	public record UwbSession(long sessionId, long userId, long targetDeviceId, String targetDeviceName, NavigationStatus navigationStatus, double distanceM, double confidence, String voiceGuide, VibrationPattern vibrationPattern, OffsetDateTime updatedAt) {
 
 		public UwbSession withNavigation(double distanceM, NavigationStatus status, VibrationPattern pattern) {
 			String guide = status == NavigationStatus.ARRIVED
 				? this.targetDeviceName + "에 도착했습니다."
 				: this.targetDeviceName + "까지 약 " + distanceM + "미터입니다.";
-			return new UwbSession(this.sessionId, this.targetDeviceId, this.targetDeviceName, status, distanceM, this.confidence, guide, pattern, OffsetDateTime.now());
+			return new UwbSession(this.sessionId, this.userId, this.targetDeviceId, this.targetDeviceName, status, distanceM, this.confidence, guide, pattern, OffsetDateTime.now());
 		}
 
 		public UwbSession withStatus(NavigationStatus status) {
-			return new UwbSession(this.sessionId, this.targetDeviceId, this.targetDeviceName, status, this.distanceM, this.confidence, this.voiceGuide, this.vibrationPattern, OffsetDateTime.now());
+			return new UwbSession(this.sessionId, this.userId, this.targetDeviceId, this.targetDeviceName, status, this.distanceM, this.confidence, this.voiceGuide, this.vibrationPattern, OffsetDateTime.now());
 		}
 	}
 }

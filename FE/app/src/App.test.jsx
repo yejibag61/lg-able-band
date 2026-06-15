@@ -6,12 +6,19 @@ import { mockAppPreview } from './mocks/appPreviewMock'
 
 const API_BASE_URL = 'http://localhost:8080'
 const REQUEST_DELAY_MS = 80
+const ORIGINAL_CAMERA_FRAME_TIMEOUT_ENV = import.meta.env.VITE_CAMERA_FRAME_TIMEOUT_MS
+const ORIGINAL_ABLE_BAND_CAMERA_FRAME_TIMEOUT_ENV = import.meta.env.VITE_ABLE_BAND_CAMERA_FRAME_TIMEOUT_MS
 
 describe('App login to home flow', () => {
   beforeEach(() => {
     window.localStorage.clear()
     window.__ABLE_BAND_QR_DECODER__ = undefined
     window.__ABLE_BAND_CAMERA_FRAME_TIMEOUT_MS__ = undefined
+    window.__ABLE_BAND_GUARDIAN_DASHBOARD_ERROR__ = undefined
+    window.__ABLE_BAND_GUARDIAN_DASHBOARD_NETWORK_DOWN__ = undefined
+    window.__ABLE_BAND_GUARDIAN_DASHBOARD_STRICT__ = undefined
+    window.__ABLE_BAND_PAIRING_ACCESS_TOKEN__ = undefined
+    window.__ABLE_BAND_EMERGENCY_ERROR__ = undefined
     installSpeechSynthesisMock()
     installMockBackend()
   })
@@ -20,6 +27,15 @@ describe('App login to home flow', () => {
     vi.restoreAllMocks()
     delete window.__ABLE_BAND_QR_DECODER__
     delete window.__ABLE_BAND_CAMERA_FRAME_TIMEOUT_MS__
+    delete window.__ABLE_BAND_GUARDIAN_DASHBOARD_ERROR__
+    delete window.__ABLE_BAND_GUARDIAN_DASHBOARD_NETWORK_DOWN__
+    delete window.__ABLE_BAND_GUARDIAN_DASHBOARD_STRICT__
+    delete window.__ABLE_BAND_GUARDIAN_DASHBOARD_POLL_MS__
+    delete window.__ABLE_BAND_PAIRING_ERROR__
+    delete window.__ABLE_BAND_PAIRING_NETWORK_DOWN__
+    delete window.__ABLE_BAND_PAIRING_ACCESS_TOKEN__
+    delete window.__ABLE_BAND_EMERGENCY_ERROR__
+    restoreCameraFrameTimeoutEnv()
     window.localStorage.clear()
   })
 
@@ -173,6 +189,41 @@ describe('App login to home flow', () => {
     expect(JSON.parse(emergencyCall[1].body).source).toBe('APP')
   })
 
+  it.each([
+    [
+      'NO_GUARDIAN',
+      '긴급 요청을 받을 보호자가 없습니다. 보호자 연결에서 보호자를 먼저 등록해주세요.',
+    ],
+    [
+      'EMERGENCY_DUPLICATE_COOLDOWN',
+      '이미 긴급 요청을 보냈습니다. 잠시 후 다시 시도해주세요.',
+    ],
+  ])('surfaces emergency backend error %s with recovery guidance', async (code, expectedMessage) => {
+    const user = userEvent.setup()
+    window.__ABLE_BAND_EMERGENCY_ERROR__ = {
+      code,
+      message: '요청을 처리하지 못했습니다.',
+      status: 409,
+    }
+    render(<App />)
+
+    await loginAsUser(user)
+    await user.click(screen.getByRole('button', { name: '긴급 지원 요청' }))
+
+    await waitFor(() => {
+      expect(screen.getByRole('status').textContent).toContain(expectedMessage)
+    })
+
+    const emergencyCall = findFetchCalls('/api/emergency-requests', 'POST')[0]
+    expect(emergencyCall).toBeTruthy()
+    expect(JSON.parse(emergencyCall[1].body)).toEqual(
+      expect.objectContaining({
+        source: 'APP',
+        triggerType: 'MANUAL_REQUEST',
+      }),
+    )
+  })
+
   it('lets a newly signed up USER request emergency with the new account token', async () => {
     const user = userEvent.setup()
     render(<App />)
@@ -261,6 +312,196 @@ describe('App login to home flow', () => {
     expect(screen.getByText('등록된 알림음')).toBeTruthy()
   })
 
+  it('submits a complete wearable pairing QR payload and refreshes connected devices', async () => {
+    const user = userEvent.setup()
+    const rawValue =
+      'lg-able-band://pair?pairingSessionId=pairing-contract-260612&deviceId=able-band-contract-001&pairingCode=ABLE-4IN-260610&nonce=nonce-contract-001&source=wearable'
+    render(<App />)
+
+    await user.click(screen.getByRole('radio', { name: '사용자' }))
+    await user.type(screen.getByLabelText('이메일'), 'user@example.com')
+    await user.type(screen.getByLabelText('비밀번호'), 'password1234')
+    await user.click(screen.getByRole('button', { name: '로그인' }))
+
+    await screen.findByRole('heading', { name: /소희 홈/i })
+    await user.click(screen.getByRole('button', { name: '메뉴' }))
+    installQrScannerMock(rawValue)
+    await user.click(screen.getByRole('button', { name: /밴드 QR을 카메라로 스캔해요\./ }))
+    await user.click(screen.getByRole('button', { name: '카메라 켜기' }))
+
+    await waitFor(() => {
+      expect(screen.getByRole('status').textContent).toContain('웨어러블 연동이 완료되었습니다.')
+    })
+    expect(screen.getByText('연동 정보: LG Able Band · able-band-contract-001 · ABLE-4IN-260610')).toBeTruthy()
+
+    const pairingCall = findFetchCall(
+      '/api/wearable/pairing-sessions/pairing-contract-260612/complete',
+      'POST',
+    )
+    expect(pairingCall).toBeTruthy()
+    expect(JSON.parse(pairingCall[1].body)).toEqual({
+      deviceId: 'able-band-contract-001',
+      pairingCode: 'ABLE-4IN-260610',
+      nonce: 'nonce-contract-001',
+    })
+
+    await user.click(screen.getByRole('button', { name: '기기' }))
+    expect(await screen.findByRole('button', { name: 'LG Able Band 관리 열기' })).toBeTruthy()
+  })
+
+  it('appEmergencyAfterWearablePairingUsesUserToken', async () => {
+    const user = userEvent.setup()
+    const rawValue =
+      'lg-able-band://pair?pairingSessionId=pairing-token-260612&deviceId=able-band-token-001&pairingCode=ABLE-4IN-260610&nonce=nonce-token-001&source=wearable'
+    window.__ABLE_BAND_PAIRING_ACCESS_TOKEN__ = 'api-wearable-token'
+    render(<App />)
+
+    await loginAsUser(user)
+    expect(window.localStorage.getItem('lg-able-band.accessToken')).toBe('api-user-token')
+
+    await user.click(screen.getByRole('button', { name: '메뉴' }))
+    installQrScannerMock(rawValue)
+    await user.click(screen.getByRole('button', { name: /밴드 QR을 카메라로 스캔해요\./ }))
+    await user.click(screen.getByRole('button', { name: '카메라 켜기' }))
+
+    await waitFor(() => {
+      expect(screen.getByRole('status').textContent).toContain('웨어러블 연동이 완료되었습니다.')
+    })
+
+    const pairingCall = findFetchCall(
+      '/api/wearable/pairing-sessions/pairing-token-260612/complete',
+      'POST',
+    )
+    expect(pairingCall).toBeTruthy()
+    expect(new Headers(pairingCall[1].headers).get('Authorization')).toBe('Bearer api-user-token')
+    expect(JSON.parse(pairingCall[1].body)).toEqual({
+      deviceId: 'able-band-token-001',
+      pairingCode: 'ABLE-4IN-260610',
+      nonce: 'nonce-token-001',
+    })
+    expect(window.localStorage.getItem('lg-able-band.accessToken')).toBe('api-user-token')
+
+    await user.click(screen.getByRole('button', { name: '기기' }))
+    expect(await screen.findByRole('button', { name: 'LG Able Band 관리 열기' })).toBeTruthy()
+
+    await user.click(screen.getByRole('button', { name: '홈' }))
+    await user.click(screen.getByRole('button', { name: '긴급 지원 요청' }))
+
+    await waitFor(() => {
+      expect(screen.getByRole('status').textContent).toContain('보호자에게 긴급 요청을 보냈습니다.')
+    })
+
+    const emergencyCall = findFetchCalls('/api/emergency-requests', 'POST')[0]
+    expect(emergencyCall).toBeTruthy()
+    expect(new Headers(emergencyCall[1].headers).get('Authorization')).toBe('Bearer api-user-token')
+    expect(JSON.parse(emergencyCall[1].body)).toEqual(
+      expect.objectContaining({
+        source: 'APP',
+        triggerType: 'MANUAL_REQUEST',
+      }),
+    )
+  })
+
+  it('rejects a malformed wearable pairing QR without calling the complete API', async () => {
+    const user = userEvent.setup()
+    const rawValue =
+      'lg-able-band://pair?pairingSessionId=pairing-missing-nonce&deviceId=able-band-demo-001&pairingCode=ABLE-4IN-260610&source=wearable'
+    render(<App />)
+
+    await user.click(screen.getByRole('radio', { name: '사용자' }))
+    await user.type(screen.getByLabelText('이메일'), 'user@example.com')
+    await user.type(screen.getByLabelText('비밀번호'), 'password1234')
+    await user.click(screen.getByRole('button', { name: '로그인' }))
+
+    await screen.findByRole('heading', { name: /소희 홈/i })
+    await user.click(screen.getByRole('button', { name: '메뉴' }))
+    installQrScannerMock(rawValue)
+    await user.click(screen.getByRole('button', { name: /밴드 QR을 카메라로 스캔해요\./ }))
+    await user.click(screen.getByRole('button', { name: '카메라 켜기' }))
+
+    await waitFor(() => {
+      expect(screen.getByRole('status').textContent).toContain('Able Band 연동용 QR이 아닙니다.')
+    })
+    expect(findWearablePairingCompleteCalls()).toHaveLength(0)
+  })
+
+  it('rejects a non Able Band QR without calling the complete API', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    await loginAsUser(user)
+    await user.click(screen.getByRole('button', { name: '메뉴' }))
+    installQrScannerMock('https://example.com/not-able-band')
+    await user.click(screen.getByRole('button', { name: /밴드 QR을 카메라로 스캔해요\./ }))
+    await user.click(screen.getByRole('button', { name: '카메라 켜기' }))
+
+    await waitFor(() => {
+      expect(screen.getByRole('status').textContent).toContain('Able Band 연동용 QR이 아닙니다.')
+    })
+    expect(findWearablePairingCompleteCalls()).toHaveLength(0)
+  })
+
+  it.each([
+    [
+      'PAIRING_SESSION_NOT_FOUND',
+      '웨어러블에서 새 QR을 발급한 뒤 다시 스캔해주세요.',
+    ],
+    [
+      'PAIRING_EXPIRED',
+      'QR 유효 시간이 지났습니다. 웨어러블에서 새 QR을 발급해주세요.',
+    ],
+    [
+      'PAIRING_ALREADY_COMPLETED',
+      '이미 다른 계정과 연결된 QR입니다. 웨어러블에서 연동 해제 후 새 QR을 스캔해주세요.',
+    ],
+    [
+      'INVALID_PAIRING_PAYLOAD',
+      '연동 QR 정보가 올바르지 않습니다. 웨어러블 첫 화면의 새 QR을 다시 스캔해주세요.',
+    ],
+  ])('maps wearable pairing backend error %s to recovery guidance', async (code, expectedMessage) => {
+    const user = userEvent.setup()
+    const rawValue =
+      'lg-able-band://pair?pairingSessionId=pairing-error-260612&deviceId=able-band-error-001&pairingCode=ABLE-4IN-260610&nonce=nonce-error-001&source=wearable'
+    window.__ABLE_BAND_PAIRING_ERROR__ = {
+      code,
+      message: '백엔드 기본 오류 메시지',
+      status: code === 'INVALID_PAIRING_PAYLOAD' ? 400 : 409,
+    }
+    render(<App />)
+
+    await loginAsUser(user)
+    await user.click(screen.getByRole('button', { name: '메뉴' }))
+    installQrScannerMock(rawValue)
+    await user.click(screen.getByRole('button', { name: /밴드 QR을 카메라로 스캔해요\./ }))
+    await user.click(screen.getByRole('button', { name: '카메라 켜기' }))
+
+    await waitFor(() => {
+      expect(screen.getByRole('status').textContent).toContain(expectedMessage)
+    })
+    expect(findWearablePairingCompleteCalls()).toHaveLength(1)
+  })
+
+  it('surfaces backend unreachable guidance while keeping the scanner recoverable', async () => {
+    const user = userEvent.setup()
+    const rawValue =
+      'lg-able-band://pair?pairingSessionId=pairing-network-260612&deviceId=able-band-network-001&pairingCode=ABLE-4IN-260610&nonce=nonce-network-001&source=wearable'
+    window.__ABLE_BAND_PAIRING_NETWORK_DOWN__ = true
+    render(<App />)
+
+    await loginAsUser(user)
+    await user.click(screen.getByRole('button', { name: '메뉴' }))
+    installQrScannerMock(rawValue)
+    await user.click(screen.getByRole('button', { name: /밴드 QR을 카메라로 스캔해요\./ }))
+    await user.click(screen.getByRole('button', { name: '카메라 켜기' }))
+
+    await waitFor(() => {
+      expect(screen.getByRole('status').textContent).toContain(
+        '백엔드 서버에 연결할 수 없습니다.',
+      )
+    })
+    expect(findWearablePairingCompleteCalls()).toHaveLength(1)
+  })
+
   it('skips the login screen when a session is already stored and returns to login after logout', async () => {
     window.localStorage.setItem('lg-able-band.accessToken', 'api-user-token')
     window.localStorage.setItem(
@@ -321,6 +562,59 @@ describe('App login to home flow', () => {
 
     expect(await screen.findByAltText('LG Able Band')).toBeTruthy()
     expect(await screen.findByRole('heading', { name: '보호자 홈' })).toBeTruthy()
+  })
+
+  it('falls back to mock guardian dashboard data when backend is unavailable', async () => {
+    const user = userEvent.setup()
+    window.__ABLE_BAND_GUARDIAN_DASHBOARD_NETWORK_DOWN__ = true
+    render(<App />)
+
+    await user.click(screen.getByRole('radio', { name: '보호자' }))
+    await user.type(screen.getByLabelText('이메일'), 'guardian@example.com')
+    await user.type(screen.getByLabelText('비밀번호'), 'password1234')
+    await user.click(screen.getByRole('button', { name: '로그인' }))
+
+    expect(await screen.findByRole('heading', { name: '보호자 홈' })).toBeTruthy()
+    expect(screen.getByText('긴급 도움 요청이 진행 중입니다.')).toBeTruthy()
+    expect(screen.getByText(/위험 알림 \d+건/)).toBeTruthy()
+  })
+
+  it('shows the backend guardian dashboard error in strict mode', async () => {
+    const user = userEvent.setup()
+    window.__ABLE_BAND_GUARDIAN_DASHBOARD_STRICT__ = true
+    window.__ABLE_BAND_GUARDIAN_DASHBOARD_ERROR__ = {
+      status: 500,
+      code: 'RESOURCE_NOT_FOUND',
+      message: '보호자 대시보드를 찾을 수 없습니다.',
+    }
+    render(<App />)
+
+    await user.click(screen.getByRole('radio', { name: '보호자' }))
+    await user.type(screen.getByLabelText('이메일'), 'guardian@example.com')
+    await user.type(screen.getByLabelText('비밀번호'), 'password1234')
+    await user.click(screen.getByRole('button', { name: '로그인' }))
+
+    expect((await screen.findByRole('alert')).textContent).toContain(
+      '보호자 대시보드를 찾을 수 없습니다.',
+    )
+    expect(screen.queryByRole('heading', { name: '보호자 홈' })).toBeNull()
+    expect(screen.queryByText('긴급 도움 요청이 진행 중입니다.')).toBeNull()
+  })
+
+  it('uses a configured guardian dashboard polling interval', async () => {
+    const user = userEvent.setup()
+    window.__ABLE_BAND_GUARDIAN_DASHBOARD_POLL_MS__ = 10
+    render(<App />)
+
+    await user.click(screen.getByRole('radio', { name: '보호자' }))
+    await user.type(screen.getByLabelText('이메일'), 'guardian@example.com')
+    await user.type(screen.getByLabelText('비밀번호'), 'password1234')
+    await user.click(screen.getByRole('button', { name: '로그인' }))
+
+    expect(await screen.findByRole('heading', { name: '보호자 홈' })).toBeTruthy()
+    await waitFor(() => {
+      expect(findFetchCalls('/api/guardians/dashboard').length).toBeGreaterThanOrEqual(2)
+    })
   })
 
   it('falls back to jsQR when BarcodeDetector is unavailable for wearable pairing', async () => {
@@ -413,6 +707,73 @@ describe('App login to home flow', () => {
       expect(screen.getByRole('status').textContent).toContain('웨어러블 연동이 완료되었습니다.')
     })
     expect(getUserMedia).toHaveBeenNthCalledWith(1, { video: true })
+    expect(getUserMedia).toHaveBeenNthCalledWith(2, { video: { facingMode: { ideal: 'environment' } } })
+  })
+
+  it('uses the Vite camera frame timeout override when the first stream has no visible frames', async () => {
+    const user = userEvent.setup()
+    const rawValue =
+      'lg-able-band://pair?pairingSessionId=pairing-vite-timeout-260612&deviceId=able-band-demo-001&pairingCode=ABLE-4IN-260610&nonce=nonce-vite-timeout&source=wearable'
+    const getUserMedia = vi.fn()
+    let cameraAttempt = 0
+    import.meta.env.VITE_CAMERA_FRAME_TIMEOUT_MS = '10'
+
+    Object.defineProperty(navigator, 'mediaDevices', {
+      configurable: true,
+      value: {
+        getUserMedia: getUserMedia.mockImplementation(async () => {
+          cameraAttempt += 1
+          return {
+            getTracks: () => [{ stop: vi.fn() }],
+          }
+        }),
+      },
+    })
+    vi.spyOn(window.HTMLMediaElement.prototype, 'play').mockResolvedValue()
+    Object.defineProperty(window.HTMLMediaElement.prototype, 'readyState', {
+      configurable: true,
+      get: () => 2,
+    })
+    Object.defineProperty(window.HTMLVideoElement.prototype, 'videoWidth', {
+      configurable: true,
+      get: () => (cameraAttempt >= 2 ? 640 : 0),
+    })
+    Object.defineProperty(window.HTMLVideoElement.prototype, 'videoHeight', {
+      configurable: true,
+      get: () => (cameraAttempt >= 2 ? 480 : 0),
+    })
+    vi.spyOn(window.HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
+      drawImage: vi.fn(),
+      getImageData: vi.fn(() => ({
+        data: new Uint8ClampedArray(640 * 480 * 4),
+        width: 640,
+        height: 480,
+      })),
+    })
+    Object.defineProperty(window, 'BarcodeDetector', {
+      configurable: true,
+      value: class MockBarcodeDetector {
+        async detect() {
+          return [{ rawValue }]
+        }
+      },
+    })
+
+    render(<App />)
+
+    await user.click(screen.getByRole('radio', { name: '사용자' }))
+    await user.type(screen.getByLabelText('이메일'), 'user@example.com')
+    await user.type(screen.getByLabelText('비밀번호'), 'password1234')
+    await user.click(screen.getByRole('button', { name: '로그인' }))
+
+    await screen.findByRole('heading', { name: /소희 홈/i })
+    await user.click(screen.getByRole('button', { name: '메뉴' }))
+    await user.click(screen.getByRole('button', { name: /밴드 QR을 카메라로 스캔해요\./ }))
+    await user.click(screen.getByRole('button', { name: '카메라 켜기' }))
+
+    await waitFor(() => {
+      expect(screen.getByRole('status').textContent).toContain('웨어러블 연동이 완료되었습니다.')
+    })
     expect(getUserMedia).toHaveBeenNthCalledWith(2, { video: { facingMode: { ideal: 'environment' } } })
   })
 
@@ -655,6 +1016,14 @@ function installMockBackend() {
     }
 
     if (url === `${API_BASE_URL}/api/emergency-requests` && method === 'POST') {
+      if (window.__ABLE_BAND_EMERGENCY_ERROR__) {
+        const error = window.__ABLE_BAND_EMERGENCY_ERROR__
+        return jsonResponse(
+          { code: error.code, message: error.message, details: {} },
+          { status: error.status || 409 },
+        )
+      }
+
       const emergencyAlert = {
         alertId: 301,
         type: 'EMERGENCY',
@@ -685,6 +1054,18 @@ function installMockBackend() {
 
     const pairingCompleteMatch = url.match(/\/api\/wearable\/pairing-sessions\/([^/]+)\/complete$/)
     if (pairingCompleteMatch && method === 'POST') {
+      if (window.__ABLE_BAND_PAIRING_NETWORK_DOWN__) {
+        throw new TypeError('network down')
+      }
+
+      if (window.__ABLE_BAND_PAIRING_ERROR__) {
+        const error = window.__ABLE_BAND_PAIRING_ERROR__
+        return jsonResponse(
+          { code: error.code, message: error.message, details: {} },
+          { status: error.status || 409 },
+        )
+      }
+
       if (!body.nonce || body.pairingCode !== 'ABLE-4IN-260610') {
         return jsonResponse(
           { code: 'INVALID_PAIRING_PAYLOAD', message: '연동 QR 정보가 올바르지 않습니다.', details: {} },
@@ -707,7 +1088,7 @@ function installMockBackend() {
         pairingSessionId: pairingCompleteMatch[1],
         status: 'PAIRED',
         device: wearableDevice,
-        accessToken: 'api-user-token',
+        accessToken: window.__ABLE_BAND_PAIRING_ACCESS_TOKEN__ || 'api-user-token',
         message: '웨어러블 연동이 완료되었습니다.',
       })
     }
@@ -717,6 +1098,18 @@ function installMockBackend() {
     }
 
     if (url === `${API_BASE_URL}/api/guardians/dashboard` && method === 'GET') {
+      if (window.__ABLE_BAND_GUARDIAN_DASHBOARD_NETWORK_DOWN__) {
+        throw new TypeError('network down')
+      }
+
+      if (window.__ABLE_BAND_GUARDIAN_DASHBOARD_ERROR__) {
+        const error = window.__ABLE_BAND_GUARDIAN_DASHBOARD_ERROR__
+        return jsonResponse(
+          { code: error.code, message: error.message, details: {} },
+          { status: error.status || 500 },
+        )
+      }
+
       return jsonResponse({
         user: {
           userId: 1,
@@ -856,8 +1249,47 @@ function installQrScannerMock(rawValue, { detector = true } = {}) {
   })
 }
 
+async function loginAsUser(user) {
+  await user.click(screen.getByRole('radio', { name: '사용자' }))
+  await user.type(screen.getByLabelText('이메일'), 'user@example.com')
+  await user.type(screen.getByLabelText('비밀번호'), 'password1234')
+  await user.click(screen.getByRole('button', { name: '로그인' }))
+  await screen.findByRole('heading', { name: /소희 홈/i })
+}
+
 function findFetchCall(path, method = 'GET') {
   return globalThis.fetch.mock.calls.find(([url, init = {}]) => {
+    return url === `${API_BASE_URL}${path}` && (init.method || 'GET').toUpperCase() === method
+  })
+}
+
+function findWearablePairingCompleteCalls() {
+  return globalThis.fetch.mock.calls.filter(([url, init = {}]) => {
+    return (
+      url.startsWith(`${API_BASE_URL}/api/wearable/pairing-sessions/`) &&
+      url.endsWith('/complete') &&
+      (init.method || 'GET').toUpperCase() === 'POST'
+    )
+  })
+}
+
+function restoreCameraFrameTimeoutEnv() {
+  if (ORIGINAL_CAMERA_FRAME_TIMEOUT_ENV === undefined) {
+    delete import.meta.env.VITE_CAMERA_FRAME_TIMEOUT_MS
+  } else {
+    import.meta.env.VITE_CAMERA_FRAME_TIMEOUT_MS = ORIGINAL_CAMERA_FRAME_TIMEOUT_ENV
+  }
+
+  if (ORIGINAL_ABLE_BAND_CAMERA_FRAME_TIMEOUT_ENV === undefined) {
+    delete import.meta.env.VITE_ABLE_BAND_CAMERA_FRAME_TIMEOUT_MS
+    return
+  }
+
+  import.meta.env.VITE_ABLE_BAND_CAMERA_FRAME_TIMEOUT_MS = ORIGINAL_ABLE_BAND_CAMERA_FRAME_TIMEOUT_ENV
+}
+
+function findFetchCalls(path, method = 'GET') {
+  return globalThis.fetch.mock.calls.filter(([url, init = {}]) => {
     return url === `${API_BASE_URL}${path}` && (init.method || 'GET').toUpperCase() === method
   })
 }
