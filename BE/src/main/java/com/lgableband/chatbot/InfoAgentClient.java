@@ -28,11 +28,14 @@ public class InfoAgentClient {
 		);
 	}
 
-	public Optional<Map<String, Object>> query(String query, String accessibilityType, int topK) {
+	public Optional<Map<String, Object>> query(String query, String accessibilityType, int topK, Map<String, Object> context) {
 		Map<String, Object> payload = new LinkedHashMap<>();
 		payload.put("query", query);
 		payload.put("userAccessibilityType", accessibilityType);
 		payload.put("topK", topK);
+		if (context != null && !context.isEmpty()) {
+			payload.put("context", context);
+		}
 		return this.client.post(payload)
 			.filter(response -> Boolean.TRUE.equals(response.get("success")));
 	}

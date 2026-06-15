@@ -39,6 +39,14 @@ CATEGORY_LABELS = {
 }
 URGENT_QUERY_KEYWORDS = ("폭염", "화재", "재난", "대피", "긴급", "위험", "응급")
 SIGN_LANGUAGE_KEYWORDS = ("수어", "수어통역", "수화통역", "문자통역", "의사소통 지원")
+FOLLOWUP_KEYWORDS_BY_TYPE = {
+    "ELIGIBILITY": ("지원 대상", "대상", "누구"),
+    "APPLY_METHOD": ("신청 방법", "이용 방법", "신청"),
+    "CONTACT": ("담당 기관", "전화번호", "문의"),
+    "DOCUMENTS": ("필요 서류", "서류"),
+    "DEADLINE": ("언제까지", "마감", "기간"),
+    "DETAIL": ("자세히", "더 알려줘"),
+}
 
 
 def _recommended_action(category: str, priority: str) -> str:
@@ -171,6 +179,53 @@ def _source_documents(results: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return [{field: result.get(field, "") for field in fields} for result in results]
 
 
+def classify_followup_type(query: str) -> str | None:
+    normalized = str(query or "").strip()
+    for followup_type, keywords in FOLLOWUP_KEYWORDS_BY_TYPE.items():
+        if any(keyword in normalized for keyword in keywords):
+            return followup_type
+    return None
+
+
+def build_followup_answer(
+    followup_type: str,
+    last_info_agent: dict[str, Any],
+) -> dict[str, str]:
+    title = str(last_info_agent.get("title") or "해당 정보").strip()
+    source = str(last_info_agent.get("source") or "").strip()
+    summary = str(last_info_agent.get("summary") or "관련 지원 및 이용 안내 정보입니다.").strip()
+    answers = {
+        "ELIGIBILITY": (
+            f"{title} 지원 대상은 장애 유형, 소득 기준, 거주지 조건 등에 따라 달라질 수 있습니다. "
+            "출처 링크에서 대상 조건을 확인해 주세요."
+        ),
+        "APPLY_METHOD": (
+            f"{title} 신청 방법은 서비스나 지역에 따라 다를 수 있습니다. "
+            "출처 링크에서 신청 절차를 확인하거나 관할 복지 담당 부서에 문의해 주세요."
+        ),
+        "CONTACT": (
+            f"{title} 문의는 출처 링크를 먼저 확인하고, 필요한 경우 주민등록지 관할 읍·면·동 "
+            "주민센터나 복지 담당 부서에 문의해 주세요."
+        ),
+        "DOCUMENTS": (
+            f"{title} 신청에 필요한 서류는 기관과 서비스 조건에 따라 다를 수 있습니다. "
+            "출처 링크나 담당 기관에서 제출 서류를 확인해 주세요."
+        ),
+        "DEADLINE": (
+            f"{title} 신청 기간은 공고나 지역별 운영 일정에 따라 달라질 수 있습니다. "
+            "최신 일정은 출처 링크에서 확인해 주세요."
+        ),
+        "DETAIL": f"{title}은(는) {summary} 자세한 내용은 출처 링크에서 확인해 주세요.",
+    }
+    answer = answers[followup_type]
+    return {
+        "type": followup_type,
+        "topic": title,
+        "answer": answer,
+        "source": source,
+    }
+
+
 def _response_note(
     query: str,
     classification: dict[str, str],
@@ -209,6 +264,7 @@ def build_info_response(
     query: str,
     user_accessibility_type: str = "ALL",
     top_k: int = 5,
+    context: dict[str, Any] | None = None,
 ) -> dict:
     """Convert classified RAG results into user-facing response formats."""
     if not isinstance(query, str) or not query.strip():
@@ -225,6 +281,43 @@ def build_info_response(
     category = classification["category"]
     priority = classification["priority"]
     results = rag_result.get("results", [])
+    request_context = context if isinstance(context, dict) else {}
+    last_info_agent = request_context.get("lastInfoAgent")
+    followup_type = classify_followup_type(query)
+    is_followup = (
+        isinstance(last_info_agent, dict)
+        and bool(last_info_agent.get("title"))
+        and followup_type is not None
+        and (request_context.get("isFollowup") is True or bool(last_info_agent))
+    )
+    if is_followup:
+        followup_answer = build_followup_answer(followup_type, last_info_agent)
+        answer = followup_answer["answer"]
+        return {
+            "responseType": "FOLLOWUP_ANSWER",
+            "intent": "INFO_AGENT_FOLLOWUP",
+            "action": "ANSWER_FOLLOWUP",
+            "answerText": answer,
+            "voiceText": _truncate(answer, 180),
+            "infoCard": None,
+            "query": rag_result.get("query", query.strip()),
+            "classification": classification,
+            "userAccessibilityType": user_type,
+            "appCard": None,
+            "followupAnswer": followup_answer,
+            "bandMessage": "",
+            "voiceMessage": _truncate(answer, 180),
+            "notificationTabMessage": "",
+            "recommendedChannels": ["APP"],
+            "notifyGuardian": False,
+            "note": "",
+            "sourceDocuments": _source_documents(results),
+            "rag": {
+                "resultCount": rag_result.get("resultCount", len(results)),
+                "fallbackUsed": rag_result.get("fallbackUsed", False),
+                "fallbackLevel": rag_result.get("fallbackLevel", "all"),
+            },
+        }
     note = _response_note(
         query,
         classification,
@@ -256,18 +349,34 @@ def build_info_response(
         or user_type == "VISUAL_HEARING_IMPAIRED"
         or (category == "재난/안전" and priority in {"HIGH", "URGENT"})
     )
+    response_type = (
+        "NO_RESULT"
+        if not results
+        else "URGENT_INFO_CARD"
+        if priority == "URGENT"
+        else "INFO_CARD"
+    )
+    app_card = {
+        "title": title,
+        "summary": app_summary,
+        "recommendedAction": action,
+        "source": source,
+        "url": url,
+    } if results else None
+    answer_text = notification
 
     return {
+        "responseType": response_type,
+        "intent": "INFO_AGENT_QUERY",
+        "action": "INFO_AGENT_NO_RESULT" if response_type == "NO_RESULT" else "SHOW_INFO_CARD",
+        "answerText": answer_text,
+        "voiceText": voice,
+        "infoCard": app_card,
         "query": rag_result.get("query", query.strip()),
         "classification": classification,
         "userAccessibilityType": user_type,
-        "appCard": {
-            "title": title,
-            "summary": app_summary,
-            "recommendedAction": action,
-            "source": source,
-            "url": url,
-        },
+        "appCard": app_card,
+        "followupAnswer": None,
         "bandMessage": band_message,
         "voiceMessage": voice,
         "notificationTabMessage": notification,
