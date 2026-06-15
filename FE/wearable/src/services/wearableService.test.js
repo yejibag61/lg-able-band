@@ -70,6 +70,30 @@ describe('wearableService', () => {
     })
   })
 
+  it('uses the Vite proxy API path when no explicit API base URL is configured', async () => {
+    const apiFetch = vi.fn(async () =>
+      jsonResponse({
+        pairingSessionId: 'pairing-api-relative-001',
+        deviceId: 'able-band-relative-001',
+        pairingCode: 'ABLE-REL-001',
+        nonce: 'nonce-relative-001',
+        pairingPayload: 'lg-able-band://pair?pairingSessionId=pairing-api-relative-001',
+        status: 'WAITING',
+      }),
+    )
+    const service = createWearableService({
+      fetchImpl: apiFetch,
+      fallbackEnabled: false,
+    })
+
+    await service.createPairingSession()
+
+    expect(apiFetch).toHaveBeenCalledWith(
+      '/api/wearable/pairing-sessions',
+      expect.objectContaining({ method: 'POST' }),
+    )
+  })
+
   it('polls pairing session status with device id and nonce', async () => {
     const apiFetch = vi.fn(async () =>
       jsonResponse({

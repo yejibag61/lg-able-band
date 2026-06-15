@@ -1,4 +1,3 @@
-const DEFAULT_API_BASE_URL = 'http://localhost:8080'
 export const ACCESS_TOKEN_STORAGE_KEY = 'lg-able-band.accessToken'
 
 export async function wearableApiRequest(path, options = {}) {
@@ -54,7 +53,8 @@ export function clearWearableAccessToken() {
 }
 
 function apiBaseUrl() {
-  return import.meta.env.VITE_API_BASE_URL?.trim() || DEFAULT_API_BASE_URL
+  const configuredBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim()
+  return configuredBaseUrl ? configuredBaseUrl.replace(/\/$/, '') : ''
 }
 
 async function parseResponse(response) {
