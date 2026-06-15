@@ -1,10 +1,11 @@
-import { useState } from 'react'
+import { useLayoutEffect, useState } from 'react'
 import './App.css'
 import { GuardianPlaceholder } from './components/GuardianPlaceholder'
 import { HomeScreen } from './components/HomeScreen'
 import { LoginScreen } from './components/LoginScreen'
 import { SignupScreen } from './components/SignupScreen'
 import { getStoredSession, login, logout, signup } from './services/authService'
+import { AUTHENTICATION_EXPIRED_EVENT } from './services/apiClient'
 import {
   getDefaultAccessibilitySettings,
   storeAccessibilitySettings,
@@ -55,6 +56,25 @@ function App() {
     submitting: false,
     errors: [],
   })
+
+  useLayoutEffect(() => {
+    function handleAuthenticationExpired() {
+      logout()
+      setSession(null)
+      setScreen('login')
+      setLoginForm((current) => ({ ...current, password: '' }))
+      setLoginState({
+        submitting: false,
+        error: '로그인 세션이 만료되었습니다. 다시 로그인해주세요.',
+        message: '',
+      })
+    }
+
+    window.addEventListener(AUTHENTICATION_EXPIRED_EVENT, handleAuthenticationExpired)
+    return () => {
+      window.removeEventListener(AUTHENTICATION_EXPIRED_EVENT, handleAuthenticationExpired)
+    }
+  }, [])
 
   async function handleLoginSubmit(event) {
     event.preventDefault()

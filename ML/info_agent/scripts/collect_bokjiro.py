@@ -43,11 +43,14 @@ def main() -> int:
             base_url=base_url,
             service_key=service_key,
             output_path=INFO_AGENT_DIR / "data" / "bokjiro_documents.csv",
+            max_detail_requests=max(
+                1, min(99, int(os.getenv("BOKJIRO_DAILY_DETAIL_LIMIT", "99")))
+            ),
         )
     except Exception as error:
         print(f"복지로 수집 중 오류가 발생했습니다: {type(error).__name__}: {error}")
         return 1
-    print(f"복지로 상세 문서 {len(documents)}건을 data/bokjiro_documents.csv에 저장했습니다.")
+    print(f"복지로 신규 상세 문서 {len(documents)}건을 누적 저장했습니다.")
     return 0
 
 

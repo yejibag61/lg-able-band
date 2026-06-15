@@ -1,5 +1,6 @@
 const DEFAULT_API_BASE_URL = 'http://localhost:8080'
 const ACCESS_TOKEN_STORAGE_KEY = 'lg-able-band.accessToken'
+export const AUTHENTICATION_EXPIRED_EVENT = 'lg-able-band:authentication-expired'
 
 export class ApiRequestError extends Error {
   constructor(message, { status = 0, code = '', details = null } = {}) {
@@ -54,6 +55,10 @@ export async function apiRequest(path, options = {}) {
   const data = await parseResponse(response)
 
   if (!response.ok) {
+    if (requireAuth && response.status === 401) {
+      window.dispatchEvent(new CustomEvent(AUTHENTICATION_EXPIRED_EVENT))
+    }
+
     throw new ApiRequestError(data?.message || '요청을 처리하지 못했습니다.', {
       status: response.status,
       code: data?.code || '',

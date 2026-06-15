@@ -1,4 +1,4 @@
-export const ACCESS_TOKEN_STORAGE_KEY = 'lg-able-band.accessToken'
+export const ACCESS_TOKEN_STORAGE_KEY = 'lg-able-band.wearableAccessToken'
 
 export async function wearableApiRequest(path, options = {}) {
   const {

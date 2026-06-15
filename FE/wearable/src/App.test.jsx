@@ -104,13 +104,29 @@ describe('Wearable MVP', () => {
     expect(screen.queryByRole('button', { name: '휴대폰 연동 완료' })).toBeNull()
   })
 
+  it('ignores an app login token left on the shared ngrok origin', async () => {
+    localStorage.setItem('lg-able-band.accessToken', 'db-app-login-token')
+    const apiFetch = setupPairingApi({ statuses: ['WAITING'] })
+
+    render(<App />)
+
+    expect(await screen.findByRole('heading', { name: '휴대폰으로 연동' })).toBeTruthy()
+    const [, createOptions] = apiFetch.mock.calls.find(
+      ([url, options = {}]) =>
+        String(url) === '/api/wearable/pairing-sessions' && options.method === 'POST',
+    )
+    expect(createOptions.headers.get('Authorization')).toBeNull()
+    expect(localStorage.getItem('lg-able-band.accessToken')).toBe('db-app-login-token')
+    expect(localStorage.getItem('lg-able-band.wearableAccessToken')).toBeNull()
+  })
+
   it('syncs app alerts to the wearable after automatic backend pairing', async () => {
     const apiFetch = setupPairingApi()
     render(<App />)
 
     expect(await screen.findByRole('heading', { name: '연동 완료' })).toBeTruthy()
     expect(await screen.findByRole('heading', { name: '전기레인지 과열 주의' })).toBeTruthy()
-    expect(localStorage.getItem('lg-able-band.accessToken')).toBe('paired-api-token')
+    expect(localStorage.getItem('lg-able-band.wearableAccessToken')).toBe('paired-api-token')
     expect(apiFetch).toHaveBeenCalledWith(
       '/api/wearable/pairing-sessions/pairing-api-001?deviceId=able-band-api-001&nonce=nonce-api-001',
       expect.objectContaining({ method: 'GET' }),
@@ -136,7 +152,7 @@ describe('Wearable MVP', () => {
   })
 
   it('restores paired wearable state after refresh without generating a new QR', async () => {
-    localStorage.setItem('lg-able-band.accessToken', 'paired-api-token')
+    localStorage.setItem('lg-able-band.wearableAccessToken', 'paired-api-token')
     localStorage.setItem(
       'lg-able-band.pairingSession',
       JSON.stringify({
@@ -160,7 +176,7 @@ describe('Wearable MVP', () => {
   })
 
   it('clears stale paired state and shows QR when restored token is rejected', async () => {
-    localStorage.setItem('lg-able-band.accessToken', 'expired-api-token')
+    localStorage.setItem('lg-able-band.wearableAccessToken', 'expired-api-token')
     localStorage.setItem(
       'lg-able-band.pairingSession',
       JSON.stringify({
@@ -176,7 +192,7 @@ describe('Wearable MVP', () => {
     expect(await screen.findByRole('heading', { name: '휴대폰으로 연동' })).toBeTruthy()
     expect(screen.getByRole('status').textContent).toContain('스캔 대기')
     expect(screen.queryByRole('heading', { name: '알림 상태 확인 필요' })).toBeNull()
-    expect(localStorage.getItem('lg-able-band.accessToken')).toBeNull()
+    expect(localStorage.getItem('lg-able-band.wearableAccessToken')).toBeNull()
     expect(localStorage.getItem('lg-able-band.pairingSession')).toBeNull()
   })
 
@@ -244,13 +260,13 @@ describe('Wearable MVP', () => {
 
     const initialQrSrc = (await screen.findByAltText('Able Band 연동 QR 코드')).getAttribute('src')
     expect(await screen.findByRole('heading', { name: '전기레인지 과열 주의' })).toBeTruthy()
-    expect(localStorage.getItem('lg-able-band.accessToken')).toBe('paired-api-token')
+    expect(localStorage.getItem('lg-able-band.wearableAccessToken')).toBe('paired-api-token')
 
     fireEvent.click(screen.getByRole('button', { name: '대기' }))
     fireEvent.click(await screen.findByRole('button', { name: '연동 해제' }))
 
     expect(await screen.findByText('연결이 해제되었습니다')).toBeTruthy()
-    expect(localStorage.getItem('lg-able-band.accessToken')).toBeNull()
+    expect(localStorage.getItem('lg-able-band.wearableAccessToken')).toBeNull()
     expect(apiFetch).toHaveBeenCalledWith(
       '/api/wearable/pairing-sessions/pairing-api-001/unpair',
       expect.objectContaining({
@@ -371,7 +387,7 @@ describe('Wearable MVP', () => {
   it('wearableEmergencyUsesPairedAccessToken', async () => {
     const apiFetch = await renderPairedApp()
 
-    expect(localStorage.getItem('lg-able-band.accessToken')).toBe('paired-api-token')
+    expect(localStorage.getItem('lg-able-band.wearableAccessToken')).toBe('paired-api-token')
     await screen.findByRole('button', { name: '대기' })
     fireEvent.click(screen.getByRole('button', { name: '대기' }))
     fireEvent.click(screen.getByRole('button', { name: '긴급 요청' }))

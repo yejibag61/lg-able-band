@@ -45,6 +45,10 @@ APPLICATION_KEYWORDS = (
     "읍면동", "읍·면·동", "행정복지센터", "문의", "제출서류",
 )
 TAG_PATTERN = re.compile(r"<[^>]+>")
+PRIORITY_DETAIL_KEYWORDS = (
+    "장애인의료비", "장애인 의료비", "장애인활동지원", "장애인 활동지원",
+    "장애인", "시각장애", "청각장애", "보조기기", "의료비", "신청",
+)
 
 
 def clean_text(value: Any) -> str:
@@ -222,13 +226,36 @@ def save_documents(documents: list[dict[str, str]], output_path: Path) -> None:
         writer.writerows({field: document.get(field, "") for field in FIELDS} for document in documents)
 
 
+def load_documents(output_path: Path) -> list[dict[str, str]]:
+    if not output_path.is_file() or not output_path.stat().st_size:
+        return []
+    try:
+        with output_path.open("r", encoding="utf-8-sig", newline="") as file:
+            return list(csv.DictReader(file))
+    except (OSError, csv.Error, UnicodeError):
+        return []
+
+
+def _detail_priority(record: dict[str, Any]) -> tuple[int, str]:
+    text = " ".join(_values(record, (*TITLE_FIELDS, *SUMMARY_FIELDS, *SUPPORT_FIELDS)))
+    score = sum(keyword in text for keyword in PRIORITY_DETAIL_KEYWORDS)
+    return -score, _first(record, ID_FIELDS)
+
+
+def _is_quota_error(error: Exception) -> bool:
+    response = getattr(error, "response", None)
+    return getattr(response, "status_code", None) == 429 or "quota" in str(error).lower()
+
+
 def collect_bokjiro(
     *,
     base_url: str,
     service_key: str,
     output_path: Path,
     max_items: int = 1000,
-    rows_per_page: int = 100,
+    rows_per_page: int = 1000,
+    max_list_requests: int = 1,
+    max_detail_requests: int = 99,
     sleep_seconds: float = 0.1,
     request_get: Callable[..., Any] = requests.get,
 ) -> list[dict[str, str]]:
@@ -238,12 +265,14 @@ def collect_bokjiro(
     detail_url = f"{detail_base}/{DETAIL_OPERATION}"
     records: list[dict[str, Any]] = []
     page = 1
-    while len(records) < max_items:
+    list_requests = 0
+    while len(records) < max_items and list_requests < max_list_requests:
         response = request_get(
             list_url,
             params={"serviceKey": service_key, "pageNo": page, "numOfRows": rows_per_page, "callTp": "L", "srchKeyCode": "003"},
             timeout=30,
         )
+        list_requests += 1
         response.raise_for_status()
         page_records = _records(_parse_payload(response))
         if not page_records:
@@ -254,16 +283,35 @@ def collect_bokjiro(
         page += 1
         time.sleep(sleep_seconds)
 
+    existing_documents = load_documents(output_path)
+    detail_fields = ("supportTarget", "selectionCriteria", "applicationMethod", "contact")
+    existing_ids = {
+        str(document.get("docId", "")).removeprefix("BOKJIRO-")
+        for document in existing_documents
+        if str(document.get("detailStatus", "")).strip() == "DETAIL_OK"
+        or any(str(document.get(field, "")).strip() for field in detail_fields)
+    }
+    pending_records = [
+        record for record in records
+        if _first(record, ID_FIELDS) not in existing_ids
+    ]
+    pending_records.sort(key=_detail_priority)
+
     documents: list[dict[str, str]] = []
     detail_success = 0
     detail_failure = 0
+    detail_requests = 0
     first_detail_error = ""
-    for record in records:
+    quota_exceeded = False
+    for record in pending_records:
+        if detail_requests >= max_detail_requests:
+            break
         service_id = _first(record, ID_FIELDS)
         detail: Any = {}
         detail_status = "DETAIL_ID_MISSING"
         if service_id:
             try:
+                detail_requests += 1
                 response = request_get(
                     detail_url,
                     params={"serviceKey": service_key, "servId": service_id},
@@ -279,12 +327,21 @@ def collect_bokjiro(
                 detail_failure += 1
                 if not first_detail_error:
                     first_detail_error = str(error)
+                if _is_quota_error(error):
+                    quota_exceeded = True
+                    break
             time.sleep(sleep_seconds)
         document = normalize_service(record, detail, detail_status)
         if document["title"] and detail_status == "DETAIL_OK":
             documents.append(document)
-    if documents:
-        save_documents(documents, output_path)
+    merged = {
+        document.get("docId", ""): document
+        for document in existing_documents
+        if document.get("docId")
+    }
+    merged.update({document["docId"]: document for document in documents})
+    if documents or existing_documents:
+        save_documents(list(merged.values()), output_path)
     elif records:
         print(
             "상세조회에 성공한 문서가 없어 기존 bokjiro_documents.csv를 유지합니다."
@@ -292,12 +349,15 @@ def collect_bokjiro(
     else:
         save_documents([], output_path)
     print(
-        f"복지로 목록 {len(records)}건, 상세조회 성공 {detail_success}건, "
-        f"실패 {detail_failure}건을 저장했습니다."
+        f"복지로 목록 호출 {list_requests}회/{len(records)}건, 기존 상세 {len(existing_ids)}건, "
+        f"이번 상세 호출 {detail_requests}회/성공 {detail_success}건/실패 {detail_failure}건, "
+        f"누적 저장 {len(merged)}건입니다."
     )
     if detail_failure:
         print(
             "상세조회 실패 문서는 목록 정보만 포함합니다. "
             f"API 할당량과 키 권한을 확인하세요. 첫 오류: {first_detail_error}"
         )
+    if quota_exceeded:
+        print("일일 API 할당량 초과를 감지해 추가 상세조회를 즉시 중단했습니다.")
     return documents

@@ -209,7 +209,7 @@ describe('wearableService', () => {
   })
 
   it('unpairs a wearable session through the final api and clears the stored token', async () => {
-    localStorage.setItem('lg-able-band.accessToken', 'paired-api-token')
+    localStorage.setItem('lg-able-band.wearableAccessToken', 'paired-api-token')
     const apiFetch = vi.fn(async () => jsonResponse({ status: 'UNPAIRED' }))
     const service = createWearableService({
       baseUrl: 'http://api.test',
@@ -234,7 +234,7 @@ describe('wearableService', () => {
       }),
     )
     expect(response.status).toBe('UNPAIRED')
-    expect(localStorage.getItem('lg-able-band.accessToken')).toBeNull()
+    expect(localStorage.getItem('lg-able-band.wearableAccessToken')).toBeNull()
   })
 
   it('falls back to a mock pairing session when explicit development fallback is enabled', async () => {
@@ -568,12 +568,12 @@ describe('wearableService', () => {
   })
 
   it('unpairs through the default service without a session and clears the token locally', async () => {
-    localStorage.setItem('lg-able-band.accessToken', 'paired-api-token')
+    localStorage.setItem('lg-able-band.wearableAccessToken', 'paired-api-token')
 
     const response = await unpairWearable(null)
 
     expect(response.status).toBe('UNPAIRED')
-    expect(localStorage.getItem('lg-able-band.accessToken')).toBeNull()
+    expect(localStorage.getItem('lg-able-band.wearableAccessToken')).toBeNull()
   })
 })
 
