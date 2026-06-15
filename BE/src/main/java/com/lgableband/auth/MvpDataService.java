@@ -23,6 +23,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.dao.DataAccessException;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
@@ -151,7 +152,24 @@ public class MvpDataService {
 		String token = extractToken(authorization);
 		SessionPrincipal principal = this.dbSessions.get(token);
 		JdbcTemplate jdbcTemplate = jdbcTemplate();
-		if (jdbcTemplate == null || principal == null) {
+		if (jdbcTemplate == null) {
+			MockDataStore.UserProfile user = this.mockDataStore.requireUser(authorization);
+			MockDataStore.Account account = this.mockDataStore.accountById(user.accountId());
+			return new CurrentUser(
+				AccountRole.USER,
+				user.userId(),
+				account.name(),
+				account.email(),
+				user.accessibilityType(),
+				user.notificationPrefs(),
+				!this.mockDataStore.guardians(user.userId()).isEmpty()
+			);
+		}
+		if (principal == null) {
+			CurrentUser wearableUser = currentUserFromPairedWearableToken(jdbcTemplate, token);
+			if (wearableUser != null) {
+				return wearableUser;
+			}
 			MockDataStore.UserProfile user = this.mockDataStore.requireUser(authorization);
 			MockDataStore.Account account = this.mockDataStore.accountById(user.accountId());
 			return new CurrentUser(
@@ -169,6 +187,44 @@ public class MvpDataService {
 		}
 		DbUser user = findDbUser(jdbcTemplate, principal.userId());
 		DbAccount account = findDbAccount(jdbcTemplate, principal.accountId());
+		return new CurrentUser(
+			AccountRole.USER,
+			user.userId(),
+			user.name(),
+			account.email(),
+			user.accessibilityType(),
+			notificationPrefs(jdbcTemplate, user.userId()),
+			hasGuardian(jdbcTemplate, user.userId())
+		);
+	}
+
+	private CurrentUser currentUserFromPairedWearableToken(JdbcTemplate jdbcTemplate, String token) {
+		Long userId;
+		try {
+			userId = jdbcTemplate.query(
+				"""
+				SELECT linked_user_id
+				FROM wearable_pairing_session
+				WHERE wearable_access_token = ?
+				  AND status = 'PAIRED'
+				  AND linked_user_id IS NOT NULL
+				ORDER BY paired_at DESC, updated_at DESC
+				LIMIT 1
+				""",
+				(rs, rowNum) -> rs.getLong("linked_user_id"),
+				token
+			).stream().findFirst().orElse(null);
+		}
+		catch (DataAccessException ex) {
+			return null;
+		}
+		if (userId == null) {
+			return null;
+		}
+
+		DbUser user = findDbUser(jdbcTemplate, userId);
+		DbAccount account = findDbAccount(jdbcTemplate, user.accountId());
+		this.dbSessions.put(token, new SessionPrincipal(account.accountId(), AccountRole.USER, user.userId(), null));
 		return new CurrentUser(
 			AccountRole.USER,
 			user.userId(),
