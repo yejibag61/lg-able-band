@@ -213,11 +213,7 @@ def build_clean_summary(
     fields = important_fields or {}
     summary = fields.get("supportContent") or content
     summary = clean_repeated_phrases(summary, title, category)
-    for field in (
-        "eligibility", "applicationTarget", "selectionCriteria", "ageCondition",
-        "incomeCondition", "regionCondition", "applyMethod", "applicationMethod",
-        "contact",
-    ):
+    for field in ("applyMethod", "applicationMethod", "contact"):
         field_value = clean_repeated_phrases(fields.get(field, ""))
         if field_value and field_value != summary:
             summary = summary.replace(field_value, " ")
@@ -251,8 +247,6 @@ def build_recommended_action(
         return _truncate(apply_method, 180)
     if contact:
         return _truncate(f"자세한 신청 조건은 출처에서 확인하고, 문의는 {contact}에서 확인해 주세요.", 180)
-    if category not in {"재난/안전"} and priority != "URGENT":
-        return "정확한 내용은 공식 기관 확인이 필요합니다."
     return _recommended_action(category, priority)
 
 
@@ -553,6 +547,38 @@ def _source_documents(results: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return [{field: result.get(field, "") for field in fields} for result in results]
 
 
+def _sanitize_important_field(field: str, value: str, document: dict[str, Any]) -> str:
+    text = clean_repeated_phrases(value)
+    if not text:
+        return ""
+    if field in {"applyMethod", "applicationMethod"}:
+        labeled = re.search(r"신청방법\s*[:：]\s*(.+)$", text)
+        if labeled:
+            text = labeled.group(1).strip()
+        route = re.fullmatch(r"(.+?)\s*(?:->|→)\s*(.+)", text)
+        if route:
+            applicant = route.group(1).strip().replace("퇴소장애인", "퇴소 장애인")
+            destination = route.group(2).strip().replace("구군", "구·군")
+            return _truncate(f"{applicant}이 {destination}에 신청합니다.", 180)
+        if len(text) > 180:
+            return ""
+    if field in {"supportTarget", "eligibility", "applicationTarget"} and (
+        len(text) > 120
+        or any(marker in text for marker in ("신청방법:", "신청방법：", "현금지급", "현물지급", "상단 지원대상"))
+    ):
+        title_summary = " ".join(
+            str(document.get(name) or "") for name in ("title", "summary")
+        )
+        target = re.search(
+            r"((?:저소득\s+|등록\s+|중증\s+|탈시설\s+|시각\s+|청각\s+|발달\s+)?장애인)",
+            title_summary,
+        )
+        return target.group(1).strip() if target else ""
+    if field == "selectionCriteria" and len(text) > 200:
+        return ""
+    return _truncate(text, 300)
+
+
 def _important_fields(document: dict[str, Any]) -> dict[str, str]:
     value = document.get("importantFields", {})
     if isinstance(value, str):
@@ -602,8 +628,10 @@ def _important_fields(document: dict[str, Any]) -> dict[str, str]:
                 "출처에서 확인 필요",
                 "공식 기관 확인 필요",
             }:
-                fields[field] = direct_value
-                break
+                sanitized = _sanitize_important_field(field, direct_value, document)
+                if sanitized:
+                    fields[field] = sanitized
+                    break
     return fields
 
 
@@ -648,6 +676,16 @@ def _eligibility_answer(title: str, fields: dict[str, str]) -> str:
             "정확한 조건은 공식 출처에서 확인해야 합니다."
         )
     hint_text = _truncate(", ".join(hints), 300)
+    if primary_target and len(primary_target) <= 80:
+        details = [
+            value for value in hints
+            if value != primary_target and value not in primary_target
+        ]
+        detail_text = f" 추가 조건으로는 {', '.join(dict.fromkeys(details))} 등이 확인됩니다." if details else ""
+        return (
+            f"지원 대상은 {primary_target}입니다.{detail_text} "
+            "최종 자격 여부는 공식 출처나 담당 기관에서 확인해 주세요."
+        )
     return (
         f"문서 기준으로는 {hint_text} 조건과 관련된 대상이 지원받을 수 있는 것으로 보입니다. "
         "정확한 연령, 소득, 거주지 조건은 공식 출처나 담당 기관에서 확인해야 합니다."
@@ -676,6 +714,28 @@ def _missing_field_followup_answer(
     source: str,
     category: str = "",
 ) -> str:
+    if followup_type == "APPLY_METHOD":
+        return (
+            f"현재 '{title}' 문서에는 신청방법이 명확히 제공되지 않았습니다. "
+            "정확한 내용은 공식 기관 확인이 필요합니다. "
+            "자세히 보기에서 공식 출처를 확인하거나, 관할 주민센터 또는 복지 담당 부서에 문의해 주세요."
+        )
+    if followup_type == "CONTACT":
+        return (
+            f"현재 '{title}' 문서에는 담당 기관의 전화번호나 문의처가 제공되지 않았습니다. "
+            f"자세히 보기에서 문의처를 확인하거나, 관할 주민센터에 '{title} 문의'라고 말씀해 주세요."
+        )
+    if followup_type == "DOCUMENTS":
+        return (
+            f"현재 '{title}' 문서에는 필요한 제출 서류가 제공되지 않았습니다. "
+            "신청 전에 공식 출처 또는 담당 기관에서 준비 서류를 확인해 주세요."
+        )
+    if followup_type == "DEADLINE":
+        return (
+            f"현재 '{title}' 문서에는 신청 기간이나 마감일이 제공되지 않았습니다. "
+            "자세히 보기 또는 담당 기관에서 최신 일정을 확인해 주세요."
+        )
+
     confirmed = [f"'{title}' 정보를 기준으로 안내할게요."]
     safe_summary = _safe_summary(summary)
     if safe_summary:
@@ -752,6 +812,24 @@ def _field_value_for_followup(followup_type: str, fields: dict[str, str]) -> str
         if value:
             return value
     return ""
+
+
+def _detail_answer(title: str, summary: str, fields: dict[str, str], source: str) -> str:
+    parts = [f"{title}: {_safe_summary(summary)}"]
+    target = fields.get("supportTarget") or fields.get("eligibility")
+    method = fields.get("applicationMethod") or fields.get("applyMethod")
+    contact = fields.get("contact")
+    if target:
+        parts.append(f"지원 대상은 {target}입니다.")
+    if method:
+        parts.append(
+            f"신청방법: {method}" if method.endswith((".", "요.", "다.")) else f"신청방법은 {method}입니다."
+        )
+    if contact:
+        parts.append(f"문의처는 {contact}입니다.")
+    elif source:
+        parts.append("추가 조건과 문의처는 자세히 보기의 공식 출처에서 확인해 주세요.")
+    return " ".join(parts)
 
 
 def _missing_core_fields(fields: dict[str, str]) -> list[str]:
@@ -852,7 +930,18 @@ def build_followup_answer(
     source = str(last_info_agent.get("source") or "").strip()
     summary = str(last_info_agent.get("summary") or "관련 지원 및 이용 안내 정보입니다.").strip()
     category = str(last_info_agent.get("category") or "").strip()
-    retrieved_fields = _important_fields(retrieved_document or {})
+    retrieved_title = str((retrieved_document or {}).get("title") or "").strip()
+    normalized_topic = re.sub(r"\s+", "", title)
+    normalized_retrieved_title = re.sub(r"\s+", "", retrieved_title)
+    same_topic = bool(
+        normalized_topic
+        and normalized_retrieved_title
+        and (
+            normalized_topic in normalized_retrieved_title
+            or normalized_retrieved_title in normalized_topic
+        )
+    )
+    retrieved_fields = _important_fields(retrieved_document or {}) if same_topic else {}
     inferred_fields = {
         **_condition_hint_fields(retrieved_document or {}),
         **_condition_hint_fields(last_info_agent),
@@ -880,6 +969,8 @@ def build_followup_answer(
                 source=source,
                 category=category,
             )
+    elif followup_type == "DETAIL":
+        answer = _detail_answer(title, summary, fields, source)
     else:
         value = _field_value_for_followup(followup_type, fields)
         answer = _truncate(value, 240) if value else _missing_field_followup_answer(

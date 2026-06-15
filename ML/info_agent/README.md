@@ -8,6 +8,8 @@
 
 `.env`에 `DATA_GO_KR_SERVICE_KEY` 또는 `BOKJIRO_SERVICE_KEY`와
 `BOKJIRO_API_URL` 또는 `PUBLIC_WELFARE_API_URL`을 설정한 뒤 실행합니다.
+일일 100회 한도에 맞춰 기본적으로 목록 1회와 상세조회 최대 99회를 사용합니다.
+수집 결과는 누적 저장되며 이미 상세 수집한 서비스는 다음 실행에서 건너뜁니다.
 
 ```powershell
 python ML/info_agent/scripts/collect_bokjiro.py

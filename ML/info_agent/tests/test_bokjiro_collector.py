@@ -89,6 +89,42 @@ def test_detail_failure_is_visible_and_does_not_stop_collection(tmp_path):
     assert not output.exists()
 
 
+def test_collector_resumes_and_honors_daily_detail_limit(tmp_path):
+    output = tmp_path / "bokjiro_documents.csv"
+    pd.DataFrame([{
+        "docId": "BOKJIRO-WLF-1", "title": "기존 상세", "supportTarget": "등록장애인",
+        "detailStatus": "DETAIL_OK",
+    }]).to_csv(output, index=False, encoding="utf-8-sig")
+    calls = []
+
+    def fake_get(url, params, timeout):
+        calls.append((url, params))
+        if url.endswith("NationalWelfarelistV001"):
+            return FakeResponse({"items": [
+                {"servId": "WLF-1", "servNm": "기존 상세"},
+                {"servId": "WLF-2", "servNm": "장애인의료비지원"},
+                {"servId": "WLF-3", "servNm": "일반 복지"},
+            ]})
+        return FakeResponse({"item": {
+            "servId": params["servId"], "servNm": "장애인의료비지원",
+            "sportTrgetCn": "등록장애인",
+        }})
+
+    documents = collect_bokjiro(
+        base_url="https://example.test/api",
+        service_key="key",
+        output_path=output,
+        max_detail_requests=1,
+        sleep_seconds=0,
+        request_get=fake_get,
+    )
+    detail_calls = [params for url, params in calls if url.endswith("NationalWelfaredetailedV001")]
+    assert len(detail_calls) == 1
+    assert detail_calls[0]["servId"] == "WLF-2"
+    assert documents[0]["docId"] == "BOKJIRO-WLF-2"
+    assert len(pd.read_csv(output, encoding="utf-8-sig")) == 2
+
+
 def test_missing_key_script_exits_cleanly():
     env = os.environ.copy()
     for name in ("DATA_GO_KR_SERVICE_KEY", "BOKJIRO_SERVICE_KEY"):

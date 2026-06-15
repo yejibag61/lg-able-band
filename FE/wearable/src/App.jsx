@@ -59,6 +59,7 @@ function App() {
   const resetPairingSession = useCallback((message = '') => {
     window.clearTimeout(pairingCompleteTimerRef.current)
     window.clearTimeout(pairingPollTimerRef.current)
+    clearWearableAccessToken()
     clearStoredPairedPairingSession()
     pairingCompletedRef.current = false
     isUwbPollingRef.current = true

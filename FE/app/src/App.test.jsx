@@ -163,6 +163,33 @@ describe('App login to home flow', () => {
     expect(screen.getByRole('button', { name: '긴급 지원 요청' })).toBeTruthy()
   })
 
+  it('clears a stale stored session and returns to login when an authenticated request gets 401', async () => {
+    window.localStorage.setItem('lg-able-band.accessToken', 'expired-user-token')
+    window.localStorage.setItem(
+      'lg-able-band.session',
+      JSON.stringify(
+        createLoginResponse({
+          accountId: 1,
+          userId: 1,
+          accessToken: 'expired-user-token',
+          role: 'USER',
+          name: '김사용',
+          email: 'user@example.com',
+          accessibilityType: 'VISUAL',
+        }),
+      ),
+    )
+
+    render(<App />)
+
+    expect(await screen.findByRole('heading', { name: /able band 로그인/i })).toBeTruthy()
+    expect(screen.getByRole('alert').textContent).toContain(
+      '로그인 세션이 만료되었습니다. 다시 로그인해주세요.',
+    )
+    expect(window.localStorage.getItem('lg-able-band.accessToken')).toBeNull()
+    expect(window.localStorage.getItem('lg-able-band.session')).toBeNull()
+  })
+
   it('sends USER emergency requests and refreshes emergency alert data', async () => {
     const user = userEvent.setup()
     render(<App />)
