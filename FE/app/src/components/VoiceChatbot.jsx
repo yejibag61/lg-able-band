@@ -20,9 +20,17 @@ const wakeKeywords = [
   '에이아이켜줘',
 ]
 
-export function VoiceChatbot({ embedded = false, onClose, preview, session, summary }) {
-  const [isOpen, setIsOpen] = useState(embedded)
-  const [assistantMode, setAssistantMode] = useState('select')
+export function VoiceChatbot({
+  embedded = false,
+  initialOpen = false,
+  initialQuestionCategoryId = null,
+  onClose,
+  preview,
+  session,
+  summary,
+}) {
+  const [isOpen, setIsOpen] = useState(embedded || initialOpen)
+  const [assistantMode, setAssistantMode] = useState(initialOpen ? 'talk' : 'select')
   const [isListening, setIsListening] = useState(false)
   const [inputText, setInputText] = useState('')
   const [status, setStatus] = useState('대기 중')
@@ -32,7 +40,7 @@ export function VoiceChatbot({ embedded = false, onClose, preview, session, summ
   const [error, setError] = useState('')
   const [isRequesting, setIsRequesting] = useState(false)
   const [showResetConfirm, setShowResetConfirm] = useState(false)
-  const [selectedQuestionCategoryId, setSelectedQuestionCategoryId] = useState(null)
+  const [selectedQuestionCategoryId, setSelectedQuestionCategoryId] = useState(initialQuestionCategoryId)
   const recognitionRef = useRef(null)
   const wakeRecognitionRef = useRef(null)
   const latestTranscriptRef = useRef('')
