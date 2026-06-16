@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { LivingSignalSettingsScreen } from './LivingSignalSettingsScreen'
 import { livingSignalMock } from './livingSignalMock'
@@ -19,21 +19,6 @@ function createFakeAudioHandlers() {
         },
       }
     },
-    async createAmbientDetectionSession({ onLevel, onMatch }) {
-      onLevel(0.42)
-      onMatch({
-        predicted: true,
-        registeredSoundName: '우리 아파트 방송음',
-        soundType: 'apartment_announcement',
-        soundTypeLabel: '아파트 방송',
-        similarity: 0.93,
-        detectedAt: '2026-06-10T16:01:00+09:00',
-      })
-
-      return {
-        async stop() {},
-      }
-    },
   }
 }
 
@@ -41,7 +26,6 @@ function createFakeDataHandlers() {
   let state = {
     threshold: livingSignalMock.threshold,
     workflow: livingSignalMock.workflow,
-    detections: livingSignalMock.detections,
     sounds: livingSignalMock.sounds.map((sound) => ({
       ...sound,
       recordings: sound.recordings.map((recording) => ({
@@ -62,8 +46,7 @@ function createFakeDataHandlers() {
         soundId: nextSoundId,
         registeredSoundName: sound.registeredSoundName,
         soundType: sound.soundType,
-        soundTypeLabel:
-          sound.soundType === 'appliance_done' ? '가전 완료음' : sound.soundType,
+        soundTypeLabel: sound.soundType === 'appliance_done' ? '가전 완료음' : sound.soundType,
         notes: sound.notes,
         updatedAt: '2026-06-10T16:00:00+09:00',
         recordings: sound.recordings.map((recording) => ({
@@ -143,10 +126,9 @@ describe('LivingSignalSettingsScreen', () => {
     await user.click(screen.getByRole('button', { name: '알림음 추가' }))
 
     expect(screen.getByRole('heading', { name: '알림음 추가' })).toBeTruthy()
-    expect(screen.getByLabelText('이 소리가 무엇인가요?')).toBeTruthy()
 
-    await user.type(screen.getByLabelText('이 소리가 무엇인가요?'), '전자레인지 완료음')
-    await user.selectOptions(screen.getByLabelText('알림 유형'), 'appliance_done')
+    await user.type(screen.getByPlaceholderText('예: 우리 아파트 방송음'), '전자레인지 완료음')
+    await user.selectOptions(screen.getByRole('combobox'), 'appliance_done')
     await user.click(screen.getByRole('button', { name: '녹음 시작' }))
     await user.click(screen.getByRole('button', { name: '녹음 완료' }))
     await user.click(screen.getByRole('button', { name: '추가 완료' }))
@@ -171,7 +153,7 @@ describe('LivingSignalSettingsScreen', () => {
 
     expect(screen.getByRole('heading', { name: '알림음 수정' })).toBeTruthy()
 
-    const nameInput = screen.getByLabelText('이 소리가 무엇인가요?')
+    const nameInput = screen.getByDisplayValue('우리 아파트 방송음')
     await user.clear(nameInput)
     await user.type(nameInput, '수정된 방송음')
     await user.click(screen.getByRole('button', { name: '기존 샘플 교체' }))
@@ -184,9 +166,7 @@ describe('LivingSignalSettingsScreen', () => {
     expect(screen.queryByText('apt-chime-1')).toBeNull()
   })
 
-  it('starts ambient listening and shows detection result', async () => {
-    const user = userEvent.setup()
-
+  it('shows threshold settings and wearable-only listening 안내', async () => {
     render(
       <LivingSignalSettingsScreen
         livingSignals={livingSignalMock}
@@ -196,10 +176,8 @@ describe('LivingSignalSettingsScreen', () => {
       />,
     )
 
-    await user.click(screen.getByRole('button', { name: '감지 시작' }))
-
-    await waitFor(() => {
-      expect(screen.getByText('우리 아파트 방송음 감지')).toBeTruthy()
-    })
+    expect(screen.getByRole('heading', { name: '상시 감지' })).toBeTruthy()
+    expect(screen.getByText(/웨어러블에서만 실행됩니다/)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '감지 시작' })).toBeNull()
   })
 })

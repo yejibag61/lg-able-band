@@ -1,11 +1,21 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useBleProximityGuide } from './features/ble/useBleProximityGuide'
 import { ModeSwitch } from './components/ModeSwitch'
 import { WearableFrame } from './components/WearableFrame'
 import { VoiceChatbot } from './components/VoiceChatbot'
 import { CurrentAlertScreen } from './features/alerts/CurrentAlertScreen'
 import { WearableEmergencyScreen } from './features/emergency/WearableEmergencyScreen'
+import {
+  createWearableLivingSignalSession,
+  isMicrophoneSupported,
+} from './features/living-signal/wearableLivingSignalAudio'
 import { PairingQrScreen } from './features/pairing/PairingQrScreen'
 import { UwbGuideScreen } from './features/uwb/UwbGuideScreen'
+import {
+  createLivingSignalDetectionAlert,
+  getWearableLivingSignalState,
+} from './services/livingSignalService'
+import { clearWearableAccessToken, getWearableAccessToken } from './services/wearableApiClient'
 import {
   confirmAlert,
   createPairingSession,
@@ -20,8 +30,7 @@ import {
   stopUwbSession,
   unpairWearable,
 } from './services/wearableService'
-import { clearWearableAccessToken, getWearableAccessToken } from './services/wearableApiClient'
-import { triggerVibration } from './services/vibrationService'
+import { triggerVibration, vibrationPatternForAlert } from './services/vibrationService'
 import {
   getPairingPollIntervalMs,
   getPairingSuccessTransitionMs,
@@ -30,6 +39,8 @@ import {
 import './App.css'
 
 const PAIRED_PAIRING_STORAGE_KEY = 'lg-able-band.pairingSession'
+const LIVING_SIGNAL_REPORT_COOLDOWN_MS = 15000
+const ALERT_POLL_INTERVAL_MS = 3000
 
 function App() {
   const initialPairing = getStoredPairedPairingSession()
@@ -47,36 +58,97 @@ function App() {
   const [uwbTargets, setUwbTargets] = useState([])
   const [isUwbTargetLoading, setIsUwbTargetLoading] = useState(false)
   const [isUwbPolling, setIsUwbPolling] = useState(true)
-  const isUwbPollingRef = useRef(true)
   const [statusMessage, setStatusMessage] = useState('')
   const [isBusy, setIsBusy] = useState(false)
   const [syncedTime, setSyncedTime] = useState(() => new Date())
+  const [selectedGuideTarget, setSelectedGuideTarget] = useState(null)
+  const [livingSignalState, setLivingSignalState] = useState({
+    isListening: false,
+    threshold: 0.8,
+    sounds: [],
+    level: 0,
+    error: '',
+    lastMatch: null,
+  })
+
+  const isUwbPollingRef = useRef(true)
   const pairingPollTimerRef = useRef(null)
   const pairingCompleteTimerRef = useRef(null)
   const pairingCompletedRef = useRef(false)
-  const selectedAlert = alertQueue[alertIndex] || null
+  const livingSignalSessionRef = useRef(null)
+  const livingSignalCooldownRef = useRef({ key: '', at: 0 })
+  const knownAlertIdsRef = useRef(new Set())
+  const announcedAlertIdRef = useRef(null)
+  const announcedUwbMessageRef = useRef('')
+  const bleGuide = useBleProximityGuide()
 
-  const resetPairingSession = useCallback((message = '') => {
-    window.clearTimeout(pairingCompleteTimerRef.current)
-    window.clearTimeout(pairingPollTimerRef.current)
-    clearWearableAccessToken()
-    clearStoredPairedPairingSession()
-    pairingCompletedRef.current = false
-    isUwbPollingRef.current = true
-    setIsPaired(false)
-    setMode('alert')
-    setPairing(null)
-    setPairingStatus('waiting')
-    setPairingGeneration((current) => current + 1)
-    setAlertQueue([])
-    setAlertIndex(0)
-    setAlertStatuses({})
-    setUwbSession(null)
-    setUwbTargets([])
-    setIsUwbTargetLoading(false)
-    setIsUwbPolling(true)
-    setStatusMessage(message)
+  const selectedAlert = alertQueue[alertIndex] || null
+  const activeUwbSession = useMemo(
+    () => buildActiveGuideSession(bleGuide, uwbSession, selectedGuideTarget),
+    [bleGuide, selectedGuideTarget, uwbSession],
+  )
+
+  const speakText = useCallback((text) => {
+    if (!text || typeof window === 'undefined' || !('speechSynthesis' in window)) {
+      return
+    }
+
+    window.speechSynthesis.cancel()
+    const utterance = new SpeechSynthesisUtterance(text)
+    utterance.lang = 'ko-KR'
+    window.speechSynthesis.speak(utterance)
   }, [])
+
+  const stopLivingSignalMonitoring = useCallback(async () => {
+    const session = livingSignalSessionRef.current
+    if (!session) {
+      return
+    }
+
+    livingSignalSessionRef.current = null
+    await session.stop()
+    setLivingSignalState((current) => ({
+      ...current,
+      isListening: false,
+      level: 0,
+    }))
+  }, [])
+
+  const resetPairingSession = useCallback(
+    async (message = '') => {
+      window.clearTimeout(pairingCompleteTimerRef.current)
+      window.clearTimeout(pairingPollTimerRef.current)
+      clearWearableAccessToken()
+      clearStoredPairedPairingSession()
+      pairingCompletedRef.current = false
+      isUwbPollingRef.current = true
+      await stopLivingSignalMonitoring()
+      setIsPaired(false)
+      setMode('alert')
+      setPairing(null)
+      setPairingStatus('waiting')
+      setPairingGeneration((current) => current + 1)
+      setAlertQueue([])
+      setAlertIndex(0)
+      setAlertStatuses({})
+      knownAlertIdsRef.current = new Set()
+      setUwbSession(null)
+      setUwbTargets([])
+      setSelectedGuideTarget(null)
+      setIsUwbTargetLoading(false)
+      setIsUwbPolling(true)
+      setLivingSignalState({
+        isListening: false,
+        threshold: 0.8,
+        sounds: [],
+        level: 0,
+        error: '',
+        lastMatch: null,
+      })
+      setStatusMessage(message)
+    },
+    [stopLivingSignalMonitoring],
+  )
 
   const completePairing = useCallback((pairedSession = {}) => {
     if (pairingCompletedRef.current) {
@@ -108,8 +180,10 @@ function App() {
     () => () => {
       window.clearTimeout(pairingPollTimerRef.current)
       window.clearTimeout(pairingCompleteTimerRef.current)
+      stopLivingSignalMonitoring()
+      window.speechSynthesis?.cancel()
     },
-    [],
+    [stopLivingSignalMonitoring],
   )
 
   useEffect(() => {
@@ -184,11 +258,12 @@ function App() {
   }, [completePairing, isPaired, pairingGeneration, pairingStatus])
 
   useEffect(() => {
-    if (!isPaired || mode !== 'alert') {
+    if (!isPaired) {
       return undefined
     }
 
     let isMounted = true
+    let intervalId = null
 
     async function loadAlert() {
       try {
@@ -197,8 +272,14 @@ function App() {
           const nextAlerts = alerts
             .map((item) => applyStoredAlertStatus(item, alertStatuses))
             .filter((item) => item.status !== 'CONFIRMED')
+          const hasNewAlert = nextAlerts.some((item) => !knownAlertIdsRef.current.has(item.alertId))
+          knownAlertIdsRef.current = new Set(nextAlerts.map((item) => item.alertId))
           setAlertQueue(nextAlerts)
           setAlertIndex((current) => Math.min(current, Math.max(nextAlerts.length - 1, 0)))
+
+          if (hasNewAlert && nextAlerts.length > 0 && mode === 'idle') {
+            setMode('alert')
+          }
         }
       } catch (error) {
         if (isMounted) {
@@ -214,11 +295,173 @@ function App() {
     }
 
     loadAlert()
+    intervalId = window.setInterval(loadAlert, ALERT_POLL_INTERVAL_MS)
 
     return () => {
       isMounted = false
+      window.clearInterval(intervalId)
     }
   }, [alertStatuses, isPaired, mode, resetPairingSession])
+
+  useEffect(() => {
+    if (!isPaired || mode === 'uwb' || mode === 'emergency') {
+      stopLivingSignalMonitoring()
+      return undefined
+    }
+
+    if (!isMicrophoneSupported()) {
+      setLivingSignalState((current) => ({
+        ...current,
+        isListening: false,
+        error: '이 브라우저에서는 웨어러블 마이크 상시 감지를 사용할 수 없습니다.',
+      }))
+      return undefined
+    }
+
+    let isMounted = true
+
+    async function startMonitoring() {
+      try {
+        const state = await getWearableLivingSignalState()
+        if (!isMounted) {
+          return
+        }
+
+        setLivingSignalState((current) => ({
+          ...current,
+          threshold: state.threshold ?? 0.8,
+          sounds: state.sounds || [],
+          error: '',
+        }))
+
+        if (!state.sounds?.length) {
+          return
+        }
+
+        const session = await createWearableLivingSignalSession({
+          sounds: state.sounds,
+          threshold: state.threshold ?? 0.8,
+          onLevel: (level) => {
+            if (!isMounted) {
+              return
+            }
+
+            setLivingSignalState((current) => ({
+              ...current,
+              isListening: true,
+              level,
+            }))
+          },
+          onMatch: async (match) => {
+            if (!match?.predicted || !isMounted) {
+              return
+            }
+
+            const detectionKey = `${match.soundId}:${match.soundType}`
+            const now = Date.now()
+            if (
+              livingSignalCooldownRef.current.key === detectionKey &&
+              now - livingSignalCooldownRef.current.at < LIVING_SIGNAL_REPORT_COOLDOWN_MS
+            ) {
+              return
+            }
+
+            livingSignalCooldownRef.current = {
+              key: detectionKey,
+              at: now,
+            }
+
+            try {
+              const createdAlert = await createLivingSignalDetectionAlert({
+                registeredSoundName: match.registeredSoundName,
+                soundType: match.soundType,
+                similarity: Number(match.similarity.toFixed(4)),
+                detectedAt: match.detectedAt,
+              })
+
+              if (!isMounted) {
+                return
+              }
+
+              announcedAlertIdRef.current = createdAlert.alertId
+              setLivingSignalState((current) => ({
+                ...current,
+                lastMatch: match,
+                error: '',
+              }))
+              setAlertQueue((current) => [createdAlert, ...current.filter((item) => item.alertId !== createdAlert.alertId)])
+              setAlertIndex(0)
+              setMode('alert')
+              setStatusMessage(`${match.registeredSoundName} 감지`)
+              triggerVibration(vibrationPatternForAlert(createdAlert))
+              speakText(createdAlert.voiceGuide || createdAlert.message)
+            } catch (error) {
+              if (!isMounted) {
+                return
+              }
+
+              setLivingSignalState((current) => ({
+                ...current,
+                error: error.message || '생활 신호 감지 알림 생성에 실패했습니다.',
+              }))
+            }
+          },
+        })
+
+        livingSignalSessionRef.current = session
+        setLivingSignalState((current) => ({
+          ...current,
+          isListening: true,
+          error: '',
+        }))
+      } catch (error) {
+        if (!isMounted) {
+          return
+        }
+
+        setLivingSignalState((current) => ({
+          ...current,
+          isListening: false,
+          error: error.message || '생활 신호 감지를 시작하지 못했습니다.',
+        }))
+      }
+    }
+
+    startMonitoring()
+
+    return () => {
+      isMounted = false
+      stopLivingSignalMonitoring()
+    }
+  }, [isPaired, mode, speakText, stopLivingSignalMonitoring])
+
+  useEffect(() => {
+    if (!selectedAlert?.alertId) {
+      return
+    }
+
+    if (announcedAlertIdRef.current === selectedAlert.alertId) {
+      return
+    }
+
+    announcedAlertIdRef.current = selectedAlert.alertId
+    triggerVibration(vibrationPatternForAlert(selectedAlert))
+    speakText(selectedAlert.voiceGuide || selectedAlert.message)
+  }, [selectedAlert, speakText])
+
+  useEffect(() => {
+    if (mode !== 'uwb' || !activeUwbSession?.voiceGuide) {
+      return
+    }
+
+    const voiceKey = `${activeUwbSession.sessionId}:${activeUwbSession.navigationStatus}:${activeUwbSession.voiceGuide}`
+    if (announcedUwbMessageRef.current === voiceKey) {
+      return
+    }
+
+    announcedUwbMessageRef.current = voiceKey
+    speakText(activeUwbSession.voiceGuide)
+  }, [activeUwbSession, mode, speakText])
 
   useEffect(() => {
     if (!isPaired || mode !== 'deviceSelect') {
@@ -314,7 +557,7 @@ function App() {
         setAlertIndex((currentIndex) => Math.min(currentIndex, Math.max(nextQueue.length - 1, 0)))
         return nextQueue
       })
-      setStatusMessage('확인한 알림을 삭제했습니다.')
+      setStatusMessage('확인한 알림을 정리했습니다.')
     } catch {
       setStatusMessage('확인 처리에 실패했습니다.')
     } finally {
@@ -323,6 +566,22 @@ function App() {
   }
 
   async function handleStopUwb(sessionId) {
+    if (bleGuide.isActive || bleGuide.isConnecting || selectedGuideTarget) {
+      setIsBusy(true)
+      try {
+        await bleGuide.stopGuide()
+        setSelectedGuideTarget(null)
+        setUwbSession(null)
+        setMode('deviceSelect')
+        setStatusMessage('위치 안내를 종료했습니다. 다른 가전을 선택할 수 있습니다.')
+      } catch {
+        setStatusMessage('안내 종료에 실패했습니다.')
+      } finally {
+        setIsBusy(false)
+      }
+      return
+    }
+
     const currentSessionId = sessionId || uwbSession?.sessionId
     if (!currentSessionId) {
       return
@@ -336,9 +595,9 @@ function App() {
       triggerVibration(stopped.vibrationPattern)
       setUwbSession(stopped)
       setMode('deviceSelect')
-      setStatusMessage('탐색을 종료했습니다. 다른 가전을 선택할 수 있습니다.')
+      setStatusMessage('위치 안내를 종료했습니다. 다른 가전을 선택할 수 있습니다.')
     } catch {
-      setStatusMessage('탐색 종료에 실패했습니다.')
+      setStatusMessage('안내 종료에 실패했습니다.')
     } finally {
       setIsBusy(false)
     }
@@ -348,12 +607,12 @@ function App() {
     setIsBusy(true)
     setStatusMessage('긴급 요청을 보내는 중입니다.')
     try {
-      const response = await requestEmergencyHelp('손목 웨어러블에서 긴급 요청')
+      const response = await requestEmergencyHelp('웨어러블에서 긴급 요청')
       triggerVibration('LONG_TWICE')
       setStatusMessage(
         response.message
-          ? `${response.message} 보호자 앱 수신을 확인했습니다.`
-          : '보호자에게 긴급 요청을 보냈습니다. 보호자 앱 수신을 확인했습니다.',
+          ? `${response.message} 보호자에게도 확인 요청을 전달했습니다.`
+          : '보호자에게 긴급 요청을 보냈습니다. 보호자에게도 확인 요청을 전달했습니다.',
       )
     } catch (error) {
       setStatusMessage(formatEmergencyErrorMessage(error))
@@ -366,7 +625,7 @@ function App() {
     setIsBusy(true)
     try {
       await unpairWearable(pairing)
-      resetPairingSession('연결이 해제되었습니다')
+      await resetPairingSession('연결을 해제했습니다.')
     } catch {
       setStatusMessage('연동 해제에 실패했습니다.')
     } finally {
@@ -382,6 +641,11 @@ function App() {
             activeMode={mode === 'deviceSelect' ? 'uwb' : mode}
             onModeChange={(nextMode) => {
               setStatusMessage('')
+              if (mode === 'uwb' && nextMode !== 'uwb') {
+                void bleGuide.stopGuide()
+                setSelectedGuideTarget(null)
+                setUwbSession(null)
+              }
               if (nextMode === 'uwb') {
                 setMode('deviceSelect')
                 isUwbPollingRef.current = false
@@ -427,10 +691,12 @@ function App() {
 
         {isPaired && mode === 'uwb' ? (
           <UwbGuideScreen
-            session={uwbSession}
+            session={activeUwbSession}
             actionMessage={statusMessage}
             isBusy={isBusy}
             onStandby={() => {
+              void bleGuide.stopGuide()
+              setSelectedGuideTarget(null)
               setMode('idle')
               setStatusMessage('')
             }}
@@ -441,28 +707,23 @@ function App() {
         {isPaired && mode === 'idle' ? (
           <section className="state-screen standby-screen" aria-label="웨어러블 대기">
             <p className="eyebrow">Able Band</p>
-            <h1>손목에서 대기 중</h1>
-            <p>알림이나 위치 안내가 시작되면 바로 표시합니다.</p>
+            <h1>웨어러블에서 대기 중</h1>
+            <p>생활 신호 감지와 위치 안내가 시작되면 바로 표시됩니다.</p>
             <dl className="standby-meta">
               <div>
-                <dt>배터리</dt>
-                <dd>배터리 82%</dd>
+                <dt>마이크 감지</dt>
+                <dd>{livingSignalState.isListening ? '실행 중' : '준비 중'}</dd>
               </div>
               <div>
                 <dt>연동</dt>
-                <dd>휴대폰 연결됨</dd>
+                <dd>앱과 연결됨</dd>
               </div>
             </dl>
             <div className="action-row">
               <button className="primary-action" type="button" onClick={() => setMode('emergency')}>
                 긴급 요청
               </button>
-              <button
-                className="secondary-action"
-                disabled={isBusy}
-                type="button"
-                onClick={handleUnpair}
-              >
+              <button className="secondary-action" disabled={isBusy} type="button" onClick={handleUnpair}>
                 연동 해제
               </button>
             </div>
@@ -473,16 +734,18 @@ function App() {
           <DeviceSelectScreen
             actionMessage={statusMessage}
             devices={uwbTargets}
+            isBusy={isBusy}
             isLoading={isUwbTargetLoading}
             onSelect={async (device) => {
               setIsBusy(true)
+              setSelectedGuideTarget(device)
+              setMode('uwb')
+              setStatusMessage('')
+              isUwbPollingRef.current = false
+              setIsUwbPolling(false)
+              setUwbSession(null)
               try {
-                const session = await startUwbSession(device.deviceId)
-                setUwbSession(session)
-                setStatusMessage('')
-                setMode('uwb')
-                isUwbPollingRef.current = true
-                setIsUwbPolling(true)
+                await bleGuide.startGuide(device.name)
               } catch {
                 setStatusMessage('위치 안내를 시작하지 못했습니다.')
               } finally {
@@ -518,7 +781,7 @@ function App() {
   )
 }
 
-function DeviceSelectScreen({ actionMessage, devices = [], isLoading, onSelect }) {
+function DeviceSelectScreen({ actionMessage, devices = [], isBusy, isLoading, onSelect }) {
   const displayDevices = devices
 
   return (
@@ -530,21 +793,31 @@ function DeviceSelectScreen({ actionMessage, devices = [], isLoading, onSelect }
         </div>
         <strong>{isLoading ? '확인 중' : `${displayDevices.length}개`}</strong>
       </div>
+      <p className="device-select-description">
+        위치 안내를 시작하면 블루투스 기기 선택창이 열립니다. `ABLE-ESP` 기기를 선택해 주세요.
+      </p>
       <div className="device-select-grid">
         {displayDevices.map((device) => (
-          <button
-            className="device-select-card"
-            type="button"
-            key={device.deviceId || device.name}
-            onClick={() => onSelect(device)}
-          >
-            <span className={`device-select-icon icon-${device.iconTone}`} aria-hidden="true">
-              {device.icon}
-            </span>
-            <span className={`device-status-dot status-${device.statusTone}`} aria-hidden="true" />
-            <span className="device-select-name">{device.name}</span>
-            <span className="device-select-status">{device.status}</span>
-          </button>
+          <article className="device-select-card" key={device.deviceId || device.name}>
+            <div className="device-select-card-top">
+              <span className={`device-select-icon icon-${device.iconTone}`} aria-hidden="true">
+                {device.icon}
+              </span>
+              <span className={`device-status-dot status-${device.statusTone}`} aria-hidden="true" />
+            </div>
+            <div className="device-select-copy">
+              <span className="device-select-name">{device.name}</span>
+              <span className="device-select-status">{device.status}</span>
+            </div>
+            <button
+              className="primary-action device-select-action"
+              type="button"
+              disabled={isBusy}
+              onClick={() => onSelect(device)}
+            >
+              {isBusy ? '연결 중...' : '위치 안내 시작'}
+            </button>
+          </article>
         ))}
       </div>
       {actionMessage ? (
@@ -658,15 +931,67 @@ function mergePairingSession(currentSession, nextSession) {
 
 function formatEmergencyErrorMessage(error) {
   const messages = {
-    EMERGENCY_DUPLICATE_COOLDOWN:
-      '이미 긴급 요청을 보냈습니다. 잠시 후 다시 시도해주세요.',
-    NO_GUARDIAN: '연결된 보호자가 없습니다. 휴대폰 앱에서 보호자를 먼저 연결해주세요.',
-    DELIVERY_FAILED: '보호자에게 알림을 보내지 못했습니다. 잠시 후 다시 시도해주세요.',
-    UNAUTHORIZED: '연동 인증이 만료되었습니다. 휴대폰에서 다시 연동해주세요.',
-    SERVER_ERROR: '긴급 요청을 보내지 못했습니다. 잠시 후 다시 시도해주세요.',
+    EMERGENCY_DUPLICATE_COOLDOWN: '이미 긴급 요청을 보냈습니다. 잠시 뒤 다시 시도해 주세요.',
+    NO_GUARDIAN: '연결된 보호자가 없습니다. 앱에서 보호자를 먼저 연결해 주세요.',
+    DELIVERY_FAILED: '보호자에게 알림을 보내지 못했습니다. 잠시 뒤 다시 시도해 주세요.',
+    UNAUTHORIZED: '연동 인증이 만료되었습니다. 앱에서 다시 연동해 주세요.',
+    SERVER_ERROR: '긴급 요청을 보내지 못했습니다. 잠시 뒤 다시 시도해 주세요.',
   }
 
   return messages[error?.code] || error?.message || messages.SERVER_ERROR
+}
+
+function buildActiveGuideSession(bleGuide, uwbSession, selectedGuideTarget) {
+  if (selectedGuideTarget || bleGuide.targetName || bleGuide.status !== 'idle') {
+    const distanceM = Number.isFinite(bleGuide.distanceM) ? Number(bleGuide.distanceM.toFixed(1)) : 0
+    const guideStatus = mapBleGuideStatusToNavigation(bleGuide.status, bleGuide.distanceM)
+
+    return {
+      sessionId: `ble-${selectedGuideTarget?.deviceId || bleGuide.targetName || 'guide'}`,
+      targetDeviceName: selectedGuideTarget?.name || bleGuide.targetName || '가전',
+      distanceM,
+      confidence: bleGuide.status === 'error' ? 0.2 : distanceM > 0 ? 0.92 : 0.6,
+      navigationStatus: guideStatus,
+      voiceGuide: bleGuide.helperText || '위치 안내를 준비하고 있어요.',
+      vibrationPattern: vibrationPatternForBleDistance(bleGuide.distanceM),
+      locationName: selectedGuideTarget?.locationName || selectedGuideTarget?.roomName || '집 안',
+      updatedAt: new Date().toISOString(),
+    }
+  }
+
+  return uwbSession
+}
+
+function mapBleGuideStatusToNavigation(status, distanceM) {
+  if (status === 'error') {
+    return 'FAILED'
+  }
+
+  if (Number.isFinite(distanceM) && distanceM <= 1) {
+    return 'ARRIVED'
+  }
+
+  if (status === 'selecting' || status === 'connecting' || status === 'active') {
+    return 'ACTIVE'
+  }
+
+  return 'READY'
+}
+
+function vibrationPatternForBleDistance(distanceM) {
+  if (!Number.isFinite(distanceM)) {
+    return 'NONE'
+  }
+
+  if (distanceM <= 1) {
+    return 'LONG_TWICE'
+  }
+
+  if (distanceM <= 3) {
+    return 'MEDIUM'
+  }
+
+  return 'SLOW'
 }
 
 export default App

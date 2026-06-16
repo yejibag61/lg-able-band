@@ -7,7 +7,7 @@ export function UwbGuideScreen({ session, actionMessage = '', isBusy, onStandby,
       <section className="state-screen" aria-label="UWB 안내 없음">
         <p className="eyebrow">UWB</p>
         <h1>위치 안내 없음</h1>
-        <p>앱에서 위치 안내를 시작하면 손목 화면에 거리와 진동이 표시됩니다.</p>
+        <p>웨어러블에서 위치 안내를 시작하면 손목 화면에 거리와 진동이 표시됩니다.</p>
         {actionMessage ? (
           <p className="live-message" role="status">
             {actionMessage}

@@ -1,5 +1,6 @@
 package com.lgableband.livingsignal;
 
+import com.lgableband.alert.AlertService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -67,6 +68,22 @@ public class LivingSignalController {
 		return this.livingSignalService.updateThreshold(authorization, request.threshold());
 	}
 
+	@PostMapping("/detections")
+	public AlertService.AlertView createDetectionAlert(
+		@RequestHeader("Authorization") String authorization,
+		@Valid @RequestBody DetectionAlertRequest request
+	) {
+		return this.livingSignalService.createDetectionAlert(
+			authorization,
+			new LivingSignalService.DetectionAlertRequest(
+				request.registeredSoundName(),
+				request.soundType(),
+				request.similarity(),
+				request.detectedAt()
+			)
+		);
+	}
+
 	private LivingSignalService.SoundUpsertRequest toServiceRequest(SoundUpsertRequest request) {
 		return new LivingSignalService.SoundUpsertRequest(
 			request.registeredSoundName(),
@@ -103,6 +120,14 @@ public class LivingSignalController {
 		double durationSec,
 		String audioDataUrl,
 		List<Double> embedding
+	) {
+	}
+
+	public record DetectionAlertRequest(
+		@NotBlank String registeredSoundName,
+		@NotBlank String soundType,
+		@Min(0) @Max(1) double similarity,
+		OffsetDateTime detectedAt
 	) {
 	}
 }

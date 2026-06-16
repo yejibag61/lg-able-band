@@ -2043,3 +2043,22 @@ button:focus-visible {
     font-size: 0.76rem;
   }
 }
+
+.wearable-screen {
+  align-items: center;
+}
+
+.pairing-screen {
+  align-content: center !important;
+  justify-items: center;
+}
+
+.qr-panel {
+  gap: 14px;
+  padding: 16px;
+}
+
+.qr-code {
+  width: 204px;
+  height: 204px;
+}

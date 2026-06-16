@@ -1,7 +1,13 @@
 package com.lgableband.livingsignal;
 
+import com.lgableband.alert.AlertService;
 import com.lgableband.auth.MvpDataService;
+import com.lgableband.common.AlertType;
 import com.lgableband.common.ApiException;
+import com.lgableband.common.DeviceType;
+import com.lgableband.common.Severity;
+import com.lgableband.common.AlertStatus;
+import com.lgableband.mock.MockDataStore;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.sql.PreparedStatement;
@@ -35,6 +41,8 @@ public class LivingSignalService {
 
 	private final ObjectProvider<JdbcTemplate> jdbcTemplateProvider;
 	private final MvpDataService dataService;
+	private final AlertService alertService;
+	private final MockDataStore mockDataStore;
 
 	private final Map<Long, FallbackState> fallbackStates = new ConcurrentHashMap<>();
 	private final AtomicLong fallbackSoundSequence = new AtomicLong(100);
@@ -42,10 +50,14 @@ public class LivingSignalService {
 
 	public LivingSignalService(
 		ObjectProvider<JdbcTemplate> jdbcTemplateProvider,
-		MvpDataService dataService
+		MvpDataService dataService,
+		AlertService alertService,
+		MockDataStore mockDataStore
 	) {
 		this.jdbcTemplateProvider = jdbcTemplateProvider;
 		this.dataService = dataService;
+		this.alertService = alertService;
+		this.mockDataStore = mockDataStore;
 	}
 
 	public LivingSignalStateResponse state(String authorization) {
@@ -194,6 +206,75 @@ public class LivingSignalService {
 		}
 	}
 
+	public AlertService.AlertView createDetectionAlert(String authorization, DetectionAlertRequest request) {
+		JdbcTemplate jdbcTemplate = jdbcTemplate();
+		MvpDataService.CurrentUser user = this.dataService.currentUser(authorization);
+		OffsetDateTime detectedAt = request.detectedAt() == null ? OffsetDateTime.now() : request.detectedAt();
+		String registeredSoundName = request.registeredSoundName().trim();
+		String soundType = request.soundType().trim();
+		AlertType alertType = alertTypeForSoundType(soundType);
+		Severity severity = severityForSoundType(soundType);
+		String title = registeredSoundName + " 감지";
+		String message = detectionMessage(registeredSoundName, soundType);
+		String voiceGuide = detectionVoiceGuide(registeredSoundName, soundType);
+		String recommendedAction = recommendedActionForSoundType(soundType);
+		boolean requiresGuardianNotify = requiresGuardianNotify(soundType);
+
+		if (jdbcTemplate == null) {
+			this.mockDataStore.addContextAlert(
+				user.userId(),
+				alertType,
+				severity,
+				title,
+				message,
+				"웨어러블",
+				detectedAt,
+				voiceGuide
+			);
+
+			return this.alertService.alert(
+				authorization,
+				this.mockDataStore.alerts(user.userId(), null, null, 1).getFirst().alertId()
+			);
+		}
+
+		try {
+			Long wearableDeviceId = findWearableDeviceId(jdbcTemplate, user.userId());
+			Long eventId = wearableDeviceId == null
+				? null
+				: insertDetectionEvent(
+					jdbcTemplate,
+					wearableDeviceId,
+					alertType,
+					severity,
+					registeredSoundName,
+					soundType,
+					request.similarity(),
+					recommendedAction,
+					requiresGuardianNotify,
+					detectedAt
+				);
+			long alertId = insertDetectionAlert(
+				jdbcTemplate,
+				user.userId(),
+				eventId,
+				alertType,
+				severity,
+				title,
+				message,
+				voiceGuide,
+				detectedAt
+			);
+			return this.alertService.alert(authorization, alertId);
+		} catch (DataAccessException exception) {
+			throw new ApiException(
+				HttpStatus.INTERNAL_SERVER_ERROR,
+				"LIVING_SIGNAL_ALERT_FAILED",
+				"생활 신호 감지 알림을 생성하지 못했습니다."
+			);
+		}
+	}
+
 	private LivingSignalStateResponse fallbackStateResponse(long userId) {
 		FallbackState fallbackState = fallbackStates.computeIfAbsent(userId, ignored -> defaultFallbackState());
 		return new LivingSignalStateResponse(
@@ -299,6 +380,134 @@ public class LivingSignalService {
 			ps.setString(2, request.registeredSoundName());
 			ps.setString(3, request.soundType());
 			ps.setString(4, blankToNull(request.notes()));
+			return ps;
+		}, keyHolder);
+
+		return keyHolder.getKey().longValue();
+	}
+
+	private Long findWearableDeviceId(JdbcTemplate jdbcTemplate, long userId) {
+		List<Long> linkedWearables = jdbcTemplate.query(
+			"""
+			SELECT linked_device_id
+			FROM wearable_pairing_session
+			WHERE linked_user_id = ?
+			  AND status = 'PAIRED'
+			  AND linked_device_id IS NOT NULL
+			ORDER BY updated_at DESC
+			LIMIT 1
+			""",
+			(rs, rowNum) -> rs.getLong("linked_device_id"),
+			userId
+		);
+		if (!linkedWearables.isEmpty()) {
+			return linkedWearables.getFirst();
+		}
+
+		List<Long> wearableDevices = jdbcTemplate.query(
+			"""
+			SELECT device_id
+			FROM device
+			WHERE user_id = ?
+			  AND device_type = 'WEARABLE'
+			ORDER BY created_at DESC, device_id DESC
+			LIMIT 1
+			""",
+			(rs, rowNum) -> rs.getLong("device_id"),
+			userId
+		);
+
+		return wearableDevices.isEmpty() ? null : wearableDevices.getFirst();
+	}
+
+	private Long insertDetectionEvent(
+		JdbcTemplate jdbcTemplate,
+		long deviceId,
+		AlertType alertType,
+		Severity severity,
+		String registeredSoundName,
+		String soundType,
+		double similarity,
+		String recommendedAction,
+		boolean requiresGuardianNotify,
+		OffsetDateTime detectedAt
+	) {
+		KeyHolder keyHolder = new GeneratedKeyHolder();
+		jdbcTemplate.update(connection -> {
+			PreparedStatement ps = connection.prepareStatement(
+				"""
+				INSERT INTO device_event (
+					device_id,
+					event_type,
+					event_level,
+					payload_json,
+					occurred_at
+				) VALUES (?, ?, ?, ?, ?)
+				""",
+				Statement.RETURN_GENERATED_KEYS
+			);
+			ps.setLong(1, deviceId);
+			ps.setString(2, alertType.name());
+			ps.setString(3, severity.name());
+			ps.setString(
+				4,
+				detectionPayloadJson(
+					registeredSoundName,
+					soundType,
+					similarity,
+					recommendedAction,
+					requiresGuardianNotify
+				)
+			);
+			ps.setTimestamp(5, Timestamp.valueOf(detectedAt.toLocalDateTime()));
+			return ps;
+		}, keyHolder);
+
+		return keyHolder.getKey() == null ? null : keyHolder.getKey().longValue();
+	}
+
+	private long insertDetectionAlert(
+		JdbcTemplate jdbcTemplate,
+		long userId,
+		Long eventId,
+		AlertType alertType,
+		Severity severity,
+		String title,
+		String message,
+		String voiceGuide,
+		OffsetDateTime detectedAt
+	) {
+		KeyHolder keyHolder = new GeneratedKeyHolder();
+		jdbcTemplate.update(connection -> {
+			PreparedStatement ps = connection.prepareStatement(
+				"""
+				INSERT INTO alert (
+					user_id,
+					event_id,
+					alert_type,
+					severity,
+					title,
+					message,
+					voice_guide,
+					status,
+					occurred_at
+				) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+				""",
+				Statement.RETURN_GENERATED_KEYS
+			);
+			ps.setLong(1, userId);
+			if (eventId == null) {
+				ps.setObject(2, null);
+			} else {
+				ps.setLong(2, eventId);
+			}
+			ps.setString(3, alertType.name());
+			ps.setString(4, severity.name());
+			ps.setString(5, title);
+			ps.setString(6, message);
+			ps.setString(7, voiceGuide);
+			ps.setString(8, AlertStatus.UNREAD.name());
+			ps.setTimestamp(9, Timestamp.valueOf(detectedAt.toLocalDateTime()));
 			return ps;
 		}, keyHolder);
 
@@ -468,6 +677,74 @@ public class LivingSignalService {
 		return value == null || value.isBlank() ? null : value;
 	}
 
+	private String detectionPayloadJson(
+		String registeredSoundName,
+		String soundType,
+		double similarity,
+		String recommendedAction,
+		boolean requiresGuardianNotify
+	) {
+		return """
+			{"deviceName":"%s","locationName":"사용자 주변","registeredSoundName":"%s","soundType":"%s","similarity":%s,"recommendedAction":"%s","requiresGuardianNotify":%s}
+			""".formatted(
+			"웨어러블",
+			escapeJson(registeredSoundName),
+			escapeJson(soundType),
+			BigDecimal.valueOf(similarity).setScale(4, RoundingMode.HALF_UP).stripTrailingZeros().toPlainString(),
+			escapeJson(recommendedAction),
+			requiresGuardianNotify
+		);
+	}
+
+	private String escapeJson(String value) {
+		return value == null ? "" : value.replace("\\", "\\\\").replace("\"", "\\\"");
+	}
+
+	private AlertType alertTypeForSoundType(String soundType) {
+		return "fire_alarm".equals(soundType) ? AlertType.DANGER : AlertType.LIFE;
+	}
+
+	private Severity severityForSoundType(String soundType) {
+		return switch (soundType) {
+			case "fire_alarm" -> Severity.HIGH;
+			case "apartment_announcement", "doorbell" -> Severity.MEDIUM;
+			default -> Severity.LOW;
+		};
+	}
+
+	private String detectionMessage(String registeredSoundName, String soundType) {
+		return switch (soundType) {
+			case "apartment_announcement" -> registeredSoundName + "이(가) 감지되었습니다. 방송 내용을 확인해 주세요.";
+			case "doorbell" -> registeredSoundName + "이(가) 감지되었습니다. 방문 여부를 확인해 주세요.";
+			case "fire_alarm" -> registeredSoundName + "이(가) 감지되었습니다. 즉시 주변 위험을 확인해 주세요.";
+			case "appliance_done" -> registeredSoundName + "이(가) 감지되었습니다. 가전 상태를 확인해 주세요.";
+			default -> registeredSoundName + "이(가) 감지되었습니다.";
+		};
+	}
+
+	private String detectionVoiceGuide(String registeredSoundName, String soundType) {
+		return switch (soundType) {
+			case "fire_alarm" -> registeredSoundName + " 감지. 즉시 확인하세요.";
+			case "doorbell" -> registeredSoundName + " 감지. 현관을 확인하세요.";
+			case "apartment_announcement" -> registeredSoundName + " 감지. 방송을 확인하세요.";
+			default -> registeredSoundName + " 감지";
+		};
+	}
+
+	private String recommendedActionForSoundType(String soundType) {
+		return switch (soundType) {
+			case "apartment_announcement" -> "방송 내용을 확인해 주세요.";
+			case "doorbell" -> "현관 또는 도어센서를 확인해 주세요.";
+			case "fire_alarm" -> "즉시 주변 위험을 확인하고 필요하면 대피해 주세요.";
+			case "appliance_done" -> "완료된 가전 상태를 확인해 주세요.";
+			default -> "감지된 생활 신호를 확인해 주세요.";
+		};
+	}
+
+	private boolean requiresGuardianNotify(String soundType) {
+		return "fire_alarm".equals(soundType);
+	}
+
 	private String soundTypeLabel(String soundType) {
 		return switch (soundType) {
 			case "apartment_announcement" -> "아파트 방송";
@@ -541,6 +818,14 @@ public class LivingSignalService {
 		double durationSec,
 		String audioDataUrl,
 		List<Double> embedding
+	) {
+	}
+
+	public record DetectionAlertRequest(
+		String registeredSoundName,
+		String soundType,
+		double similarity,
+		OffsetDateTime detectedAt
 	) {
 	}
 }

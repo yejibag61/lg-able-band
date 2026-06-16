@@ -39,7 +39,7 @@ const channelLabels = {
   THINQ_LIGHT: 'ThinQ 조명',
   THINQ_ON_LIGHT: 'ThinQ 조명',
   GUARDIAN_PUSH: '보호자 알림',
-  GUARDIAN_CALL: '보호자 전화',
+  GUARDIAN_CALL: '보호자 통화',
 }
 
 const vibrationLabels = {
@@ -57,7 +57,12 @@ const screenModeLabels = {
   EMERGENCY_FULL_SCREEN: '긴급 전체 화면',
 }
 
-export function AlertsTab({ accessibilityType, alerts }) {
+export function AlertsTab({
+  accessibilityType,
+  alerts,
+  alertView = 'list',
+  onCloseStats = () => {},
+}) {
   const [alertItems, setAlertItems] = useState(alerts)
   const [activeFilter, setActiveFilter] = useState('ALL')
   const [selectedAlertId, setSelectedAlertId] = useState(null)
@@ -74,22 +79,34 @@ export function AlertsTab({ accessibilityType, alerts }) {
     [activeFilter, alertItems],
   )
 
+  const alertStats = useMemo(() => buildAlertStats(alertItems), [alertItems])
+
   async function handleSelectAlert(alertId) {
     setSelectedAlertId(alertId)
     setFeedbackMessage('')
     setWarningRecommendation(null)
 
     const alert = alertItems.find((item) => item.alertId === alertId)
-    if (alert) {
-      setWarningRecommendation(await getWarningRecommendation(alert, accessibilityType))
+    if (!alert) {
+      return
     }
+
+    setWarningRecommendation(await getWarningRecommendation(alert, accessibilityType))
   }
 
   async function handleConfirmAlert(alertId) {
     try {
       await confirmAlert(alertId)
-      setAlertItems((currentAlerts) => currentAlerts.filter((alert) => alert.alertId !== alertId))
-      setSelectedAlertId(null)
+      setAlertItems((currentAlerts) =>
+        currentAlerts.map((alert) =>
+          alert.alertId === alertId
+            ? {
+                ...alert,
+                status: 'CONFIRMED',
+              }
+            : alert,
+        ),
+      )
       setFeedbackMessage('알림을 확인 처리했습니다.')
     } catch (error) {
       setFeedbackMessage(error.message || '알림 확인 처리에 실패했습니다.')
@@ -123,6 +140,18 @@ export function AlertsTab({ accessibilityType, alerts }) {
         setFeedbackMessage(error.message || '알림 다시 듣기에 실패했습니다.')
       }
     }
+  }
+
+  function handleDeleteAlert(alertId) {
+    setAlertItems((currentAlerts) => currentAlerts.filter((alert) => alert.alertId !== alertId))
+    if (selectedAlertId === alertId) {
+      setSelectedAlertId(null)
+    }
+    setFeedbackMessage('알림을 목록에서 삭제했습니다.')
+  }
+
+  if (alertView === 'stats' && !selectedAlert) {
+    return <AlertStatsPanel stats={alertStats} onBack={onCloseStats} />
   }
 
   return (
@@ -166,19 +195,29 @@ export function AlertsTab({ accessibilityType, alerts }) {
             {filteredAlerts.length > 0 ? (
               filteredAlerts.map((alert) => (
                 <article
-                  className={isUrgentAlert(alert) ? 'content-card alert-card urgent' : 'content-card alert-card'}
+                  className={[
+                    'content-card alert-card',
+                    isUrgentAlert(alert) ? 'urgent' : '',
+                    alert.status === 'UNREAD' ? 'unread' : '',
+                  ]
+                    .filter(Boolean)
+                    .join(' ')}
                   key={alert.alertId}
                 >
-                  <div className="alert-card-main">
-                    <span className="alert-card-icon" aria-hidden="true">
-                      {isUrgentAlert(alert) ? '!' : 'i'}
-                    </span>
+                  <div className="alert-card-main no-icon">
                     <div className="alert-card-copy">
                       <div className="alert-card-topline">
                         <span className={`severity severity-${alert.severity.toLowerCase()}`}>
                           {severityLabels[alert.severity] || alert.severity}
                         </span>
-                        <small>{statusLabels[alert.status] || alert.status}</small>
+                        <button
+                          className="device-inline-add-button alert-delete-button"
+                          type="button"
+                          aria-label={`${alert.title} 삭제`}
+                          onClick={() => handleDeleteAlert(alert.alertId)}
+                        >
+                          삭제
+                        </button>
                       </div>
                       <h3>{alert.title}</h3>
                       <p className="alert-card-message">{alert.message}</p>
@@ -187,7 +226,13 @@ export function AlertsTab({ accessibilityType, alerts }) {
                       </small>
                     </div>
                   </div>
-                  <div className="alert-card-actions">
+                  <div
+                    className={
+                      alert.status === 'CONFIRMED'
+                        ? 'alert-card-actions single-action'
+                        : 'alert-card-actions'
+                    }
+                  >
                     <button
                       className="secondary-button compact-button"
                       type="button"
@@ -196,14 +241,16 @@ export function AlertsTab({ accessibilityType, alerts }) {
                     >
                       상세 보기
                     </button>
-                    <button
-                      className="primary-button compact-button"
-                      type="button"
-                      aria-label={`${alert.title} 확인 완료`}
-                      onClick={() => handleConfirmAlert(alert.alertId)}
-                    >
-                      확인 완료
-                    </button>
+                    {alert.status !== 'CONFIRMED' ? (
+                      <button
+                        className="primary-button compact-button"
+                        type="button"
+                        aria-label={`${alert.title} 확인 완료`}
+                        onClick={() => handleConfirmAlert(alert.alertId)}
+                      >
+                        확인 완료
+                      </button>
+                    ) : null}
                   </div>
                 </article>
               ))
@@ -223,22 +270,79 @@ export function AlertsTab({ accessibilityType, alerts }) {
   )
 }
 
+function AlertStatsPanel({ stats, onBack }) {
+  return (
+    <section className="tab-stack alert-tab" aria-labelledby="alert-stats-title">
+      <section className="content-card alert-stats-panel">
+        <div className="alert-detail-hero">
+          <button
+            className="text-button back-button alert-detail-back"
+            type="button"
+            aria-label="목록으로 돌아가기"
+            onClick={onBack}
+          >
+            <span aria-hidden="true">←</span>
+          </button>
+          <strong className="card-title" id="alert-stats-title">
+            통계
+          </strong>
+        </div>
+
+        <div className="alert-stats-grid">
+          {stats.summaryCards.map((item) => (
+            <article className="alert-stats-card" key={item.label}>
+              <p>{item.label}</p>
+              <strong>{item.value}</strong>
+              <span>{item.description}</span>
+            </article>
+          ))}
+        </div>
+
+        <div className="alert-stats-note">
+          <p className="card-label">요약</p>
+          <p>{stats.summaryMessage}</p>
+        </div>
+      </section>
+    </section>
+  )
+}
+
 function AlertDetail({ alert, feedbackMessage, onBack, onConfirm, onReplay, warningRecommendation }) {
   const guide = createAlertGuide(alert)
 
   return (
     <section className="content-card alert-detail-panel" aria-labelledby="alert-detail-title">
-      <button className="text-button back-button" type="button" onClick={onBack}>
-        목록으로 돌아가기
-      </button>
-      <div className="section-title-row">
-        <span className={`severity severity-${alert.severity.toLowerCase()}`}>
-          {severityLabels[alert.severity] || alert.severity}
-        </span>
-        <span>{statusLabels[alert.status] || alert.status}</span>
+      <div className="alert-detail-hero">
+        <button
+          className="text-button back-button alert-detail-back"
+          type="button"
+          aria-label="목록으로 돌아가기"
+          onClick={onBack}
+        >
+          <span aria-hidden="true">←</span>
+        </button>
+        <strong className="card-title">알림 상세</strong>
       </div>
-      <h2 id="alert-detail-title">{alert.title}</h2>
-      <p aria-label="알림 안내">{guide}</p>
+
+      <div className="alert-detail-heading">
+        <div>
+          <span className={`severity severity-${alert.severity.toLowerCase()}`}>
+            {severityLabels[alert.severity] || alert.severity}
+          </span>
+          <strong className="card-title" id="alert-detail-title">
+            {alert.title}
+          </strong>
+        </div>
+        <span className={`alert-status-chip alert-status-${alert.status.toLowerCase()}`}>
+          {statusLabels[alert.status] || alert.status}
+        </span>
+      </div>
+
+      <p className="alert-detail-summary">{alert.message}</p>
+
+      <div className="alert-guide-box" aria-label="알림 안내">
+        <p>{guide}</p>
+      </div>
 
       <dl className="alert-detail-grid">
         <div>
@@ -259,22 +363,24 @@ function AlertDetail({ alert, feedbackMessage, onBack, onConfirm, onReplay, warn
         </div>
       </dl>
 
-      {warningRecommendation ? (
-        <WarningRecommendationCard recommendation={warningRecommendation} />
+      {alert.recommendedAction ? (
+        <div className="alert-followup-box">
+          <p className="card-label">추천 행동</p>
+          <p>{alert.recommendedAction}</p>
+        </div>
       ) : null}
 
-      <div className="action-row">
+      {warningRecommendation ? <WarningRecommendationCard recommendation={warningRecommendation} /> : null}
+
+      <div className={alert.status === 'CONFIRMED' ? 'action-row single-action' : 'action-row'}>
         <button className="secondary-button compact-button" type="button" onClick={onReplay}>
           다시 듣기
         </button>
-        <button
-          className="primary-button compact-button"
-          type="button"
-          disabled={alert.status === 'CONFIRMED'}
-          onClick={onConfirm}
-        >
-          {alert.status === 'CONFIRMED' ? '확인 완료됨' : '확인 완료'}
-        </button>
+        {alert.status !== 'CONFIRMED' ? (
+          <button className="primary-button compact-button" type="button" onClick={onConfirm}>
+            확인 완료
+          </button>
+        ) : null}
       </div>
 
       {feedbackMessage ? (
@@ -290,41 +396,75 @@ function WarningRecommendationCard({ recommendation }) {
   const channelNames = recommendation.recommendedChannels.map(
     (channel) => channelLabels[channel] || channel,
   )
+  const deliverySummary = channelNames.join(' · ')
+  const guidanceSummary = [
+    vibrationLabels[recommendation.vibrationPattern] || recommendation.vibrationPattern,
+    screenModeLabels[recommendation.screenMode] || recommendation.screenMode,
+    recommendation.voiceEnabled ? '음성 안내 사용' : '음성 안내 없음',
+  ].join(' · ')
 
   return (
-    <section className="warning-recommendation-card" aria-label="전달된 알림 방식">
+    <section className="warning-recommendation-card" aria-label="전달 방식">
       <div className="warning-recommendation-header">
         <div>
-          <p className="card-label">전달된 알림</p>
-          <strong>이 알림은 아래 방식으로 전달되었습니다.</strong>
+          <p className="card-label">전달 방식</p>
+          <strong className="card-title">이 알림은 이렇게 전달돼요.</strong>
         </div>
-        <span className={recommendation.notifyGuardian ? 'guardian-badge active' : 'guardian-badge'}>
-          {recommendation.notifyGuardian ? '보호자에게도 전달됨' : '사용자에게만 전달됨'}
-        </span>
       </div>
 
-      <div className="warning-channel-list" aria-label="사용된 전달 수단">
-        {channelNames.map((channel) => (
-          <span key={channel}>{channel}</span>
-        ))}
-      </div>
-
-      <dl className="warning-setting-grid">
+      <dl className="warning-summary-grid">
         <div>
-          <dt>진동 방식</dt>
-          <dd>{vibrationLabels[recommendation.vibrationPattern] || recommendation.vibrationPattern}</dd>
+          <dt>전달 수단</dt>
+          <dd>{deliverySummary}</dd>
         </div>
         <div>
-          <dt>표시 화면</dt>
-          <dd>{screenModeLabels[recommendation.screenMode] || recommendation.screenMode}</dd>
-        </div>
-        <div>
-          <dt>음성 안내</dt>
-          <dd>{recommendation.voiceEnabled ? '사용함' : '사용하지 않음'}</dd>
+          <dt>보조 안내</dt>
+          <dd>{guidanceSummary}</dd>
         </div>
       </dl>
     </section>
   )
+}
+
+function buildAlertStats(alerts) {
+  const unreadCount = alerts.filter((alert) => alert.status === 'UNREAD').length
+  const dangerCount = alerts.filter((alert) => isUrgentAlert(alert)).length
+  const guardianCount = alerts.filter((alert) => alert.requiresGuardianNotify).length
+  const lifeCount = alerts.filter((alert) => alert.type === 'LIFE').length
+
+  return {
+    summaryCards: [
+      {
+        label: '전체 알림',
+        value: `${alerts.length}건`,
+        description: '최근 수신된 알림',
+      },
+      {
+        label: '미확인',
+        value: `${unreadCount}건`,
+        description: '아직 확인 전',
+      },
+      {
+        label: '위험 알림',
+        value: `${dangerCount}건`,
+        description: '긴급 대응 필요',
+      },
+      {
+        label: '보호자 전달',
+        value: `${guardianCount}건`,
+        description: '보호자 알림 대상',
+      },
+      {
+        label: '생활 알림',
+        value: `${lifeCount}건`,
+        description: '일상 안내 중심',
+      },
+    ],
+    summaryMessage:
+      unreadCount > 0
+        ? `현재 미확인 알림 ${unreadCount}건이 있어 먼저 확인이 필요합니다.`
+        : '현재 미확인 알림은 없고, 최근 알림 흐름을 한눈에 확인할 수 있습니다.',
+  }
 }
 
 function filterAlert(alert, activeFilter) {

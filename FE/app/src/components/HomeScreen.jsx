@@ -1,38 +1,35 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import jsQR from 'jsqr'
-import { LivingSignalSettingsScreen } from '../features/living-signal/LivingSignalSettingsScreen'
+import { LivingSignalSettingsScreen } from '../features/living-signal'
 import { getAppPreview, getHomeSummary } from '../services/homeService'
 import { createEmergencyRequest } from '../services/emergencyService'
 import { deleteGuardian, getGuardians, linkGuardianByEmail } from '../services/guardianService'
-import { completeWearablePairing } from '../services/wearablePairingService'
 import { AlertsTab } from './AlertsTab'
 import { DevicesTab } from './DevicesTab'
 import { HomeTab } from './HomeTab'
 import { VoiceChatbot } from './VoiceChatbot'
 
-const statusLabels = {
-  SAFE: '안전',
-  CAUTION: '주의',
-  DANGER: '위험',
-  EMERGENCY: '긴급',
+const statusDisplays = {
+  SAFE: { label: '안전', emoji: '🙂' },
+  CAUTION: { label: '주의', emoji: '😐' },
+  DANGER: { label: '위험', emoji: '😟' },
+  EMERGENCY: { label: '긴급', emoji: '😨' },
 }
 
 const tabs = [
   { id: 'home', label: '홈' },
   { id: 'devices', label: '기기' },
   { id: 'alerts', label: '알림' },
-  { id: 'menu', label: '메뉴' },
+  { id: 'menu', label: '설정' },
 ]
 
 const tabTitles = {
   home: 'Able Band 홈',
   alerts: '실시간 알림',
   devices: '기기와 UWB',
-  menu: '메뉴',
+  menu: '설정',
 }
 
 const MAX_DEVICE_COUNT = 6
-const CAMERA_FRAME_TIMEOUT_MS = 6500
 
 const connectionStatusLabels = {
   CONNECTED: '연결됨',
@@ -41,9 +38,9 @@ const connectionStatusLabels = {
 }
 
 export function HomeScreen({ session, onLogout }) {
-  const initialWearableDestination = getWearableDestination()
-  const [activeTab, setActiveTab] = useState(initialWearableDestination.activeTab)
-  const [menuScreen, setMenuScreen] = useState(initialWearableDestination.menuScreen)
+  const [activeTab, setActiveTab] = useState('home')
+  const [alertsScreen, setAlertsScreen] = useState('list')
+  const [menuScreen, setMenuScreen] = useState('root')
   const [linkedGuardians, setLinkedGuardians] = useState([])
   const [guardianListState, setGuardianListState] = useState({
     loading: true,
@@ -63,7 +60,7 @@ export function HomeScreen({ session, onLogout }) {
 
     async function loadHome() {
       try {
-        const { summary, preview } = await loadHomeData()
+        const [summary, preview] = await Promise.all([getHomeSummary(), getAppPreview()])
 
         if (isMounted) {
           setHomeState({ loading: false, error: '', summary, preview })
@@ -138,6 +135,10 @@ export function HomeScreen({ session, onLogout }) {
     if (nextTab !== 'menu') {
       setMenuScreen('root')
     }
+
+    if (nextTab !== 'alerts') {
+      setAlertsScreen('list')
+    }
   }
 
   async function handleEmergencyRequest() {
@@ -146,20 +147,12 @@ export function HomeScreen({ session, onLogout }) {
     }
 
     setEmergencySubmitting(true)
-    setEmergencyMessage('긴급 요청을 전송하고 있습니다.')
-
+    setEmergencyMessage('긴급 요청을 보내는 중입니다.')
     try {
       const request = await createEmergencyRequest()
-      setEmergencyMessage(formatEmergencyRequestMessage(request))
-
-      try {
-        const { summary, preview } = await loadHomeData()
-        setHomeState({ loading: false, error: '', summary, preview })
-      } catch {
-        setEmergencyMessage((current) => `${current} 홈 정보는 새로고침하지 못했습니다.`)
-      }
+      setEmergencyMessage(request.message || '보호자에게 긴급 요청을 보냈습니다.')
     } catch (error) {
-      setEmergencyMessage(error.message || '긴급 요청 전송에 실패했습니다.')
+      setEmergencyMessage(error.message || '긴급 요청을 보내지 못했습니다.')
     } finally {
       setEmergencySubmitting(false)
     }
@@ -185,7 +178,14 @@ export function HomeScreen({ session, onLogout }) {
             src="/LG_Able_Band_wordmark_transparent.png"
             alt="LG Able Band"
           />
-          <p>홈 정보를 불러오는 중입니다.</p>
+          <p className="home-loading-message">
+            홈화면으로 이동하는 중입니다
+            <span className="home-loading-dots" aria-hidden="true">
+              <span>.</span>
+              <span>.</span>
+              <span>.</span>
+            </span>
+          </p>
         </div>
       </main>
     )
@@ -202,10 +202,12 @@ export function HomeScreen({ session, onLogout }) {
   }
 
   const { preview, summary } = homeState
-  const statusLabel = statusLabels[summary.safetyStatus.level] || summary.safetyStatus.level
+  const statusDisplay = statusDisplays[summary.safetyStatus.level] || {
+    label: summary.safetyStatus.level,
+    emoji: '🙂',
+  }
   const homeUserName = summary.user?.name || session.account.name
   const displayTitle = activeTab === 'home' ? `${homeUserName} 홈` : currentTitle
-  const todayMessage = `${homeUserName}님, ${summary.safetyStatus.message}`
 
   return (
     <main className="phone-screen home-screen app-screen" aria-labelledby="home-title">
@@ -218,8 +220,23 @@ export function HomeScreen({ session, onLogout }) {
               alt="LG Able Band"
             />
           </span>
-          <h1 id="home-title">{displayTitle}</h1>
-          {activeTab === 'home' ? <p className="header-summary">{todayMessage}</p> : null}
+          <div className={activeTab === 'alerts' ? 'app-title-with-icon' : undefined}>
+            <h1 id="home-title">{displayTitle}</h1>
+            {activeTab === 'alerts' ? (
+              <button
+                className="alert-header-stats-icon"
+                type="button"
+                aria-label="알림 통계 보기"
+                onClick={() => setAlertsScreen('stats')}
+              >
+                <svg viewBox="0 0 24 24" focusable="false">
+                  <path d="M5 19V10" />
+                  <path d="M12 19V5" />
+                  <path d="M19 19v-7" />
+                </svg>
+              </button>
+            ) : null}
+          </div>
         </div>
       </header>
 
@@ -228,7 +245,7 @@ export function HomeScreen({ session, onLogout }) {
           <HomeTab
             emergencyMessage={emergencyMessage}
             emergencySubmitting={emergencySubmitting}
-            statusLabel={statusLabel}
+            statusDisplay={statusDisplay}
             summary={summary}
             onEmergencyRequest={handleEmergencyRequest}
             onOpenAlerts={() => handleTabChange('alerts')}
@@ -239,6 +256,8 @@ export function HomeScreen({ session, onLogout }) {
           <AlertsTab
             accessibilityType={session.userProfile?.accessibilityType || 'VISUAL'}
             alerts={preview.alerts}
+            alertView={alertsScreen}
+            onCloseStats={() => setAlertsScreen('list')}
           />
         ) : null}
         {activeTab === 'devices' ? (
@@ -276,18 +295,7 @@ export function HomeScreen({ session, onLogout }) {
           />
         ) : null}
         {activeTab === 'menu' && menuScreen === 'wearablePairing' ? (
-          <WearablePairingScannerScreen
-            onBack={() => setMenuScreen('root')}
-            onPairingComplete={async () => {
-              const { summary: nextSummary, preview: nextPreview } = await loadHomeData()
-              setHomeState({
-                loading: false,
-                error: '',
-                summary: nextSummary,
-                preview: nextPreview,
-              })
-            }}
-          />
+          <WearablePairingScannerScreen onBack={() => setMenuScreen('root')} />
         ) : null}
       </div>
 
@@ -305,71 +313,9 @@ export function HomeScreen({ session, onLogout }) {
           </button>
         ))}
       </nav>
-      <VoiceChatbot
-        initialOpen={initialWearableDestination.chatbotOpen}
-        initialQuestionCategoryId={initialWearableDestination.chatbotCategoryId}
-        preview={preview}
-        session={session}
-        summary={summary}
-      />
+      <VoiceChatbot preview={preview} session={session} summary={summary} />
     </main>
   )
-}
-
-function getWearableDestination() {
-  const destination = {
-    activeTab: 'home',
-    chatbotCategoryId: null,
-    chatbotOpen: false,
-    menuScreen: 'root',
-  }
-
-  if (typeof window === 'undefined') {
-    return destination
-  }
-
-  const params = new URLSearchParams(window.location.search)
-
-  if (params.get('from') !== 'wearable') {
-    return destination
-  }
-
-  const type = params.get('type')
-
-  if (type === 'alert') {
-    return {
-      ...destination,
-      activeTab: 'alerts',
-      chatbotCategoryId: 'alerts',
-    }
-  }
-
-  if (type === 'deviceStatus') {
-    return {
-      ...destination,
-      activeTab: 'devices',
-      chatbotCategoryId: 'devices',
-    }
-  }
-
-  if (type === 'guardianConnect') {
-    return {
-      ...destination,
-      activeTab: 'menu',
-      chatbotCategoryId: 'guardian',
-      menuScreen: 'guardianConnection',
-    }
-  }
-
-  if (type === 'welfare' || type === 'welfareSearch') {
-    return {
-      ...destination,
-      chatbotCategoryId: 'welfare',
-      chatbotOpen: true,
-    }
-  }
-
-  return destination
 }
 
 function MenuTab({
@@ -403,17 +349,17 @@ function MenuTab({
     <section className="tab-stack" aria-labelledby="menu-title">
       <div className="content-card hero-card">
         <p className="card-label">빠른 설정</p>
-        <h2 id="menu-title">자주 바꾸는 설정만 모아 두었어요.</h2>
-        <p>{userName}님의 연결 상태와 보호자, 생활 신호 기능을 여기에서 확인할 수 있습니다.</p>
+        <h2 id="menu-title">자주 바꾸는 설정만 모았어요.</h2>
+        <p>{userName}님의 접근성, 보호자, 생활 신호 기능을 확인합니다.</p>
       </div>
 
       <section className="content-card">
         <div className="section-title-row">
           <h2>접근성 설정</h2>
-          <span>{formatTextSize(accessibility.textSize)}</span>
+          <span>{accessibility.textSize}</span>
         </div>
         <div className="settings-grid">
-          <span>{formatAccessibilityType(accessibility.disabilityType)}</span>
+          <span>{accessibility.disabilityType}</span>
           <span>{accessibility.voiceGuide ? '음성 안내 ON' : '음성 안내 OFF'}</span>
           <span>{accessibility.vibrationGuide ? '진동 안내 ON' : '진동 안내 OFF'}</span>
           <span>{accessibility.highContrast ? '고대비 ON' : '고대비 OFF'}</span>
@@ -424,21 +370,25 @@ function MenuTab({
         <div className="home-member-header">
           <div>
             <p className="card-label">보호자 연결</p>
-            <h2 id="home-member-title">내 멤버</h2>
+            <h2 id="home-member-title">홈 멤버</h2>
             <p>{guardianMembers.length}명</p>
           </div>
           <button
             className="member-more-button"
             type="button"
-            aria-label="내 멤버 관리"
+            aria-label="홈 멤버 관리"
             onClick={onOpenGuardianConnection}
           >
-            관리
+            ›
           </button>
         </div>
 
-        <div className="home-member-list" aria-label="내 멤버 목록">
-          <button className="home-member-item invite" type="button" onClick={onOpenGuardianConnection}>
+        <div className="home-member-list" aria-label="홈 멤버 목록">
+          <button
+            className="home-member-item invite"
+            type="button"
+            onClick={onOpenGuardianConnection}
+          >
             <span className="member-avatar invite-avatar" aria-hidden="true">
               +
             </span>
@@ -458,7 +408,7 @@ function MenuTab({
             >
               <span className={`member-avatar avatar-${member.tone}`} aria-hidden="true">
                 {member.name.slice(0, 1)}
-                {member.id === 'me' ? <small>본인</small> : null}
+                {member.id === 'me' ? <small>집</small> : null}
               </span>
               <span>{member.label}</span>
             </button>
@@ -485,27 +435,26 @@ function MenuTab({
 
       <button className="soft-card settings-link-card" type="button" onClick={onOpenLivingSignals}>
         <p className="card-label">생활 신호 설정</p>
-        <h2>등록된 생활 알림음을 관리하세요.</h2>
+        <h2>등록된 생활 알림음을 관리해요.</h2>
         <p>
           현재 {livingSignals.summary.registeredSoundCount}개 신호, 샘플{' '}
-          {livingSignals.summary.enrolledClipCount}개가 등록되어 있습니다.
+          {livingSignals.summary.enrolledClipCount}개가 등록되어 있어요.
         </p>
       </button>
 
       <button className="secondary-button full-button" type="button" onClick={onLogout}>
-        로그아웃
+        로그인으로 돌아가기
       </button>
     </section>
   )
 }
 
-function WearablePairingScannerScreen({ onBack, onPairingComplete }) {
+function WearablePairingScannerScreen({ onBack }) {
   const [scannerMessage, setScannerMessage] = useState(
-    '웨어러블 화면의 QR 코드를 프레임 안에 맞춰 주세요.',
+    '웨어러블 화면의 QR 코드를 프레임 안에 맞춰주세요.',
   )
   const [scanStatus, setScanStatus] = useState('ready')
   const [detectedValue, setDetectedValue] = useState('')
-  const [hasCameraPreview, setHasCameraPreview] = useState(false)
   const videoRef = useRef(null)
   const canvasRef = useRef(null)
   const streamRef = useRef(null)
@@ -514,7 +463,6 @@ function WearablePairingScannerScreen({ onBack, onPairingComplete }) {
 
   function stopScanResources() {
     activeScanRef.current = false
-    setHasCameraPreview(false)
 
     if (scanFrameRef.current) {
       window.cancelAnimationFrame(scanFrameRef.current)
@@ -539,47 +487,37 @@ function WearablePairingScannerScreen({ onBack, onPairingComplete }) {
   )
 
   async function handleStartScan() {
-    stopScanResources()
     setScanStatus('scanning')
     setDetectedValue('')
 
     if (!navigator.mediaDevices?.getUserMedia) {
-      setScannerMessage('이 환경에서는 카메라를 사용할 수 없어 스캔 화면만 표시됩니다.')
+      setScannerMessage('이 환경에서는 카메라를 사용할 수 없어 스캔 화면만 표시합니다.')
       setScanStatus('blocked')
       return
     }
 
-    const cameraAttempts = await createCameraAttempts()
-    let lastError = null
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+      streamRef.current = stream
 
-    for (const constraints of cameraAttempts) {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia(constraints)
-        streamRef.current = stream
-
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream
-          await videoRef.current.play()
-          await waitForVideoFrame(videoRef.current)
-        }
-
-        const detector = window.BarcodeDetector
-          ? new window.BarcodeDetector({ formats: ['qr_code'] })
-          : null
-
-        activeScanRef.current = true
-        setHasCameraPreview(true)
-        setScannerMessage('카메라가 켜졌습니다. QR 코드를 프레임 안에 맞춰 주세요.')
-        scanQrFrame(detector)
-        return
-      } catch (error) {
-        lastError = error
-        stopScanResources()
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream
+        await videoRef.current.play()
       }
-    }
 
-    setScannerMessage(formatCameraErrorMessage(lastError))
-    setScanStatus('blocked')
+      const detector = window.BarcodeDetector
+        ? new window.BarcodeDetector({ formats: ['qr_code'] })
+        : null
+
+      activeScanRef.current = true
+      setScannerMessage('카메라가 켜졌습니다. QR 코드를 프레임 안에 맞춰주세요.')
+      scanQrFrame(detector)
+    } catch {
+      setScannerMessage(
+        '카메라 권한이 필요합니다. 브라우저 권한을 허용한 뒤 다시 시도해주세요.',
+      )
+      setScanStatus('blocked')
+    }
   }
 
   async function scanQrFrame(detector) {
@@ -595,7 +533,7 @@ function WearablePairingScannerScreen({ onBack, onPairingComplete }) {
       canvas.height = video.videoHeight
       const context = canvas.getContext('2d', { willReadFrequently: true })
       if (!context) {
-        setScannerMessage('카메라 화면을 읽을 수 없습니다. 다시 시도해 주세요.')
+        setScannerMessage('카메라 화면을 읽을 수 없습니다. 다시 시도해주세요.')
         setScanStatus('blocked')
         stopScanResources()
         return
@@ -604,13 +542,14 @@ function WearablePairingScannerScreen({ onBack, onPairingComplete }) {
       context.drawImage(video, 0, 0, canvas.width, canvas.height)
 
       try {
-        const rawValue = await detectQrValue({ canvas, context, detector })
+        const codes = detector ? await detector.detect(canvas) : []
+        const rawValue = codes[0]?.rawValue
 
-        if (rawValue && (await handleQrDetected(rawValue))) {
+        if (rawValue && handleQrDetected(rawValue)) {
           return
         }
       } catch {
-        setScannerMessage('QR을 읽는 중 문제가 발생했습니다. 카메라를 다시 켜 주세요.')
+        setScannerMessage('QR을 읽는 중 문제가 생겼습니다. 카메라를 다시 켜주세요.')
         setScanStatus('blocked')
         stopScanResources()
         return
@@ -620,38 +559,29 @@ function WearablePairingScannerScreen({ onBack, onPairingComplete }) {
     scanFrameRef.current = window.requestAnimationFrame(() => scanQrFrame(detector))
   }
 
-  async function handleQrDetected(rawValue) {
+  function handleQrDetected(rawValue) {
     const pairing = parseWearablePairingPayload(rawValue)
 
     if (!pairing) {
       setScannerMessage(
-        'Able Band 연동용 QR이 아닙니다. 웨어러블 첫 화면의 QR을 다시 비춰 주세요.',
+        'Able Band 연동 QR이 아닙니다. 웨어러블 첫 화면의 QR을 다시 비춰주세요.',
       )
       return false
     }
 
     stopScanResources()
-    setScanStatus('verifying')
+    setScanStatus('paired')
     setDetectedValue(rawValue)
-    setScannerMessage('연동 정보를 확인하는 중입니다.')
-
-    try {
-      const result = await completeWearablePairing(pairing)
-      await onPairingComplete?.(result).catch(() => null)
-      setScanStatus('paired')
-      setScannerMessage(result?.message || '웨어러블 연동이 완료되었습니다.')
-    } catch (error) {
-      setScanStatus('invalid')
-      setScannerMessage(error.message || '웨어러블 연동에 실패했습니다. QR을 다시 확인해 주세요.')
-    }
-
+    setScannerMessage(
+      `${pairing.deviceName} ${pairing.pairingCode}를 인식했습니다. 웨어러블 연동이 완료되었습니다.`,
+    )
     return true
   }
 
   function handleStopScan() {
     stopScanResources()
     setScanStatus('ready')
-    setScannerMessage('스캔을 중지했습니다. 다시 시작하려면 카메라를 켜 주세요.')
+    setScannerMessage('스캔을 중지했습니다. 다시 시작하려면 카메라를 켜주세요.')
   }
 
   return (
@@ -664,22 +594,15 @@ function WearablePairingScannerScreen({ onBack, onPairingComplete }) {
         <p className="card-label">웨어러블 연동</p>
         <h2 id="wearable-scanner-title">밴드 QR을 스캔해주세요.</h2>
         <p>
-          웨어러블 첫 화면 또는 연동 화면에 표시된 QR 코드를 카메라로 비춰 주세요.
+          웨어러블의 첫 화면 또는 연동 화면에 표시된 QR 코드를 카메라로 비춰주세요.
         </p>
 
         <div className={`qr-scanner-preview scanner-${scanStatus}`} aria-label="QR 카메라 스캔 영역">
-          <video
-            ref={videoRef}
-            className={hasCameraPreview ? 'scanner-video video-ready' : 'scanner-video'}
-            muted
-            autoPlay
-            playsInline
-            aria-hidden="true"
-          />
+          <video ref={videoRef} className="scanner-video" muted playsInline aria-hidden="true" />
           <canvas ref={canvasRef} className="scanner-canvas" aria-hidden="true" />
           <div className="scanner-top-bar">
             <span>QR 스캔</span>
-            <span>{formatScannerStatus(scanStatus)}</span>
+            <span>{scanStatus === 'paired' ? '연동 완료' : '대기 중'}</span>
           </div>
           <div className="scanner-frame" aria-hidden="true">
             <span className="scanner-corner corner-tl" />
@@ -689,7 +612,7 @@ function WearablePairingScannerScreen({ onBack, onPairingComplete }) {
           </div>
           <div className="scanner-bottom-bar">
             <span />
-            <strong>QR을 프레임 안에 맞춰 주세요</strong>
+            <strong>QR을 프레임에 맞춰주세요.</strong>
             <span />
           </div>
         </div>
@@ -714,163 +637,6 @@ function WearablePairingScannerScreen({ onBack, onPairingComplete }) {
   )
 }
 
-function waitForVideoFrame(video) {
-  const timeoutMs = getCameraFrameTimeoutMs()
-
-  return new Promise((resolve, reject) => {
-    let timeoutId = 0
-    let frameId = 0
-    let videoFrameCallbackId = 0
-
-    function cleanup() {
-      window.clearTimeout(timeoutId)
-      window.cancelAnimationFrame(frameId)
-      if (videoFrameCallbackId && video.cancelVideoFrameCallback) {
-        video.cancelVideoFrameCallback(videoFrameCallbackId)
-      }
-      video.removeEventListener('loadedmetadata', checkFrame)
-      video.removeEventListener('canplay', checkFrame)
-      video.removeEventListener('playing', checkFrame)
-      video.removeEventListener('resize', checkFrame)
-    }
-
-    function checkFrame() {
-      if (hasReadableVideoFrame(video)) {
-        cleanup()
-        resolve()
-        return
-      }
-
-      frameId = window.requestAnimationFrame(checkFrame)
-    }
-
-    timeoutId = window.setTimeout(() => {
-      cleanup()
-      reject(new Error('NO_VIDEO_FRAME'))
-    }, timeoutMs)
-
-    if (video.requestVideoFrameCallback) {
-      videoFrameCallbackId = video.requestVideoFrameCallback(() => {
-        cleanup()
-        resolve()
-      })
-    }
-
-    video.addEventListener('loadedmetadata', checkFrame)
-    video.addEventListener('canplay', checkFrame)
-    video.addEventListener('playing', checkFrame)
-    video.addEventListener('resize', checkFrame)
-    checkFrame()
-  })
-}
-
-function getCameraFrameTimeoutMs() {
-  return (
-    parsePositiveTimeoutMs(window.__ABLE_BAND_CAMERA_FRAME_TIMEOUT_MS__) ??
-    parsePositiveTimeoutMs(import.meta.env.VITE_CAMERA_FRAME_TIMEOUT_MS) ??
-    parsePositiveTimeoutMs(import.meta.env.VITE_ABLE_BAND_CAMERA_FRAME_TIMEOUT_MS) ??
-    CAMERA_FRAME_TIMEOUT_MS
-  )
-}
-
-function parsePositiveTimeoutMs(value) {
-  const timeoutMs = Number(value)
-  return Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : null
-}
-
-function hasReadableVideoFrame(video) {
-  return video.readyState >= 2 && video.videoWidth > 0 && video.videoHeight > 0
-}
-
-async function createCameraAttempts() {
-  const defaultCamera = { video: true }
-  const rearCamera = { video: { facingMode: { ideal: 'environment' } } }
-  const deviceCameraAttempts = await createVideoDeviceAttempts()
-
-  if (isTouchCameraDevice()) {
-    return uniqueCameraAttempts([rearCamera, ...deviceCameraAttempts, defaultCamera])
-  }
-
-  return uniqueCameraAttempts([...deviceCameraAttempts, defaultCamera, rearCamera])
-}
-
-async function createVideoDeviceAttempts() {
-  if (!navigator.mediaDevices?.enumerateDevices) {
-    return []
-  }
-
-  try {
-    const devices = await navigator.mediaDevices.enumerateDevices()
-    return devices
-      .filter((device) => device.kind === 'videoinput' && device.deviceId)
-      .sort(compareVideoDevices)
-      .map((device) => ({
-        video: {
-          deviceId: {
-            exact: device.deviceId,
-          },
-        },
-      }))
-  } catch {
-    return []
-  }
-}
-
-function compareVideoDevices(firstDevice, secondDevice) {
-  return videoDevicePriority(firstDevice) - videoDevicePriority(secondDevice)
-}
-
-function videoDevicePriority(device) {
-  const label = device.label.toLowerCase()
-
-  if (label.includes('virtual') || label.includes('mirametrix')) {
-    return 2
-  }
-
-  if (label.includes('usb') || label.includes('webcam') || label.includes('camera')) {
-    return 0
-  }
-
-  return 1
-}
-
-function uniqueCameraAttempts(attempts) {
-  const seen = new Set()
-  return attempts.filter((attempt) => {
-    const key = JSON.stringify(attempt)
-    if (seen.has(key)) {
-      return false
-    }
-
-    seen.add(key)
-    return true
-  })
-}
-
-function isTouchCameraDevice() {
-  return navigator.maxTouchPoints > 0 && window.matchMedia?.('(pointer: coarse)').matches
-}
-
-function formatCameraErrorMessage(error) {
-  if (error instanceof Error && error.name === 'NotAllowedError') {
-    return '카메라 권한이 필요합니다. 브라우저 권한을 허용한 뒤 다시 시도해 주세요.'
-  }
-
-  if (error instanceof Error && error.name === 'NotReadableError') {
-    return '카메라가 다른 앱에서 사용 중입니다. 다른 앱을 종료한 뒤 다시 시도해 주세요.'
-  }
-
-  if (error instanceof Error && error.name === 'NotFoundError') {
-    return '사용 가능한 카메라를 찾지 못했습니다. 카메라 연결 상태를 확인해 주세요.'
-  }
-
-  if (error instanceof Error && error.message === 'NO_VIDEO_FRAME') {
-    return '카메라는 켜졌지만 화면을 읽을 수 없습니다. 다른 카메라 앱을 종료한 뒤 다시 시도해 주세요.'
-  }
-
-  return '카메라를 시작하지 못했습니다. 브라우저 권한과 카메라 상태를 확인해 주세요.'
-}
-
 function parseWearablePairingPayload(rawValue) {
   try {
     const url = new URL(rawValue)
@@ -887,9 +653,8 @@ function parseWearablePairingPayload(rawValue) {
     const pairingSessionId = params.get('pairingSessionId')
     const deviceId = params.get('deviceId')
     const pairingCode = params.get('pairingCode')
-    const nonce = params.get('nonce')
 
-    if (!pairingSessionId || !deviceId || !pairingCode || !nonce) {
+    if (!pairingSessionId || !deviceId || !pairingCode) {
       return null
     }
 
@@ -897,56 +662,11 @@ function parseWearablePairingPayload(rawValue) {
       pairingSessionId,
       deviceId,
       pairingCode,
-      nonce,
-      issuedAt: params.get('issuedAt') || '',
-      expiresAt: params.get('expiresAt') || '',
-      deviceName: params.get('deviceName') || (deviceId.includes('able-band') ? 'LG Able Band' : '웨어러블'),
+      deviceName: deviceId.includes('able-band') ? 'LG Able Band' : '웨어러블',
     }
   } catch {
     return null
   }
-}
-
-async function detectQrValue({ canvas, context, detector }) {
-  if (detector) {
-    const codes = await detector.detect(canvas)
-    const rawValue = codes[0]?.rawValue
-
-    if (rawValue) {
-      return rawValue
-    }
-  }
-
-  if (!context.getImageData) {
-    return ''
-  }
-
-  const imageData = context.getImageData(0, 0, canvas.width, canvas.height)
-  const customDecoder = window.__ABLE_BAND_QR_DECODER__
-
-  if (typeof customDecoder === 'function') {
-    const decoded = customDecoder(imageData, canvas.width, canvas.height)
-    return typeof decoded === 'string' ? decoded : decoded?.data || ''
-  }
-
-  const decoded = jsQR(imageData.data, imageData.width || canvas.width, imageData.height || canvas.height)
-  return decoded?.data || ''
-}
-
-function formatScannerStatus(scanStatus) {
-  if (scanStatus === 'paired') {
-    return '연동 완료'
-  }
-
-  if (scanStatus === 'verifying') {
-    return '확인 중'
-  }
-
-  if (scanStatus === 'invalid') {
-    return '다시 확인'
-  }
-
-  return '대기 중'
 }
 
 function formatPairingResult(rawValue) {
@@ -974,7 +694,12 @@ function GuardianConnectionScreen({
   const [message, setMessage] = useState({ tone: '', text: '' })
   const [submitting, setSubmitting] = useState(false)
   const [deletingGuardianId, setDeletingGuardianId] = useState(null)
-  const isPrimarySelected = guardians.length === 0 || form.isPrimary
+
+  useEffect(() => {
+    if (guardians.length === 0) {
+      setForm((current) => (current.isPrimary ? current : { ...current, isPrimary: true }))
+    }
+  }, [guardians.length])
 
   function handleChange(field, value) {
     setForm((current) => ({
@@ -990,12 +715,12 @@ function GuardianConnectionScreen({
     const email = form.email.trim()
 
     if (!email) {
-      setMessage({ tone: 'error', text: '보호자 계정 이메일을 입력해 주세요.' })
+      setMessage({ tone: 'error', text: '보호자 계정 이메일을 입력해주세요.' })
       return
     }
 
     if (!isValidEmail(email)) {
-      setMessage({ tone: 'error', text: '올바른 이메일 형식으로 입력해 주세요.' })
+      setMessage({ tone: 'error', text: '올바른 이메일 형식으로 입력해주세요.' })
       return
     }
 
@@ -1003,7 +728,7 @@ function GuardianConnectionScreen({
     try {
       const guardian = await onLinkGuardian({
         email,
-        isPrimary: isPrimarySelected,
+        isPrimary: form.isPrimary,
         notifyOnDanger: form.notifyOnDanger,
       })
       setMessage({
@@ -1018,7 +743,7 @@ function GuardianConnectionScreen({
     } catch (error) {
       setMessage({
         tone: 'error',
-        text: error.message || '보호자 연결에 실패했습니다.',
+        text: error.message || '보호자 연결을 저장하지 못했습니다.',
       })
     } finally {
       setSubmitting(false)
@@ -1041,7 +766,7 @@ function GuardianConnectionScreen({
     } catch (error) {
       setMessage({
         tone: 'error',
-        text: error.message || '보호자 연결 해제에 실패했습니다.',
+        text: error.message || '보호자 연결을 해제하지 못했습니다.',
       })
     } finally {
       setDeletingGuardianId(null)
@@ -1056,7 +781,7 @@ function GuardianConnectionScreen({
 
       <form className="content-card guardian-form-card" onSubmit={handleSubmit}>
         <p className="card-label">보호자 연결</p>
-        <h2 id="guardian-connection-title">긴급 알림을 받을 보호자를 등록해 주세요.</h2>
+        <h2 id="guardian-connection-title">긴급 알림을 받을 보호자를 등록해요.</h2>
 
         <label className="field">
           <span>보호자 이메일</span>
@@ -1073,8 +798,7 @@ function GuardianConnectionScreen({
           <label className="guardian-option-card">
             <input
               type="checkbox"
-              checked={isPrimarySelected}
-              disabled={guardians.length === 0}
+              checked={form.isPrimary}
               onChange={(event) => handleChange('isPrimary', event.target.checked)}
             />
             <span>
@@ -1177,49 +901,8 @@ function upsertGuardian(currentGuardians, guardian) {
   return [...nextGuardians, guardian]
 }
 
-async function loadHomeData() {
-  const [summary, preview] = await Promise.all([getHomeSummary(), getAppPreview()])
-  return { summary, preview }
-}
-
-function formatEmergencyRequestMessage(request) {
-  if (request?.guardianNotified) {
-    return '보호자에게 긴급 요청을 보냈습니다.'
-  }
-
-  if (request?.status === 'SENT') {
-    return '긴급 요청을 보냈습니다.'
-  }
-
-  return request?.message || '긴급 요청이 접수되었습니다.'
-}
-
 function formatConnectionStatus(status) {
   return connectionStatusLabels[status] || status || '연결됨'
-}
-
-function formatAccessibilityType(type) {
-  if (type === 'VISUAL' || type === '시각') {
-    return '시각 안내'
-  }
-
-  if (type === 'HEARING' || type === '청각') {
-    return '청각 안내'
-  }
-
-  return type || '기본 안내'
-}
-
-function formatTextSize(textSize) {
-  if (!textSize) {
-    return '기본 글씨'
-  }
-
-  if (textSize === 'LARGE') {
-    return '큰 글씨'
-  }
-
-  return textSize
 }
 
 function isValidEmail(email) {

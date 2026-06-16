@@ -8,7 +8,7 @@ const severityLabels = {
 export function HomeTab({
   emergencyMessage,
   emergencySubmitting,
-  statusLabel,
+  statusDisplay,
   summary,
   onEmergencyRequest,
   onOpenAlerts,
@@ -20,21 +20,18 @@ export function HomeTab({
 
   return (
     <>
-      <section className="home-guide-card" aria-label="Able Band 상태 안내">
-        <span className="guide-indicator" aria-hidden="true" />
-        <div>
-          <p className="card-label">실시간 안내</p>
-          <h2>Able Band가 실시간 안전 상태를 확인 중입니다.</h2>
-        </div>
-      </section>
-
-      <section className={`status-card status-${summary.safetyStatus.level.toLowerCase()}`}>
+      <section className={`status-card home-safety-card status-${summary.safetyStatus.level.toLowerCase()}`}>
         <div className="status-card-header">
           <div>
             <p className="card-label">오늘의 안전 상태</p>
-            <strong>{statusLabel}</strong>
+            <strong className="card-title safety-status-title">
+              <span>{statusDisplay?.label || summary.safetyStatus.level}</span>
+              <span className="safety-status-emoji" aria-hidden="true">
+                {statusDisplay?.emoji || '🙂'}
+              </span>
+            </strong>
           </div>
-          <span className="status-badge">마지막 확인: 방금 전</span>
+          <span className="status-badge">방금 전</span>
         </div>
         <p className="status-copy">{summary.safetyStatus.message}</p>
         <div className="home-metric-row" aria-label="오늘 알림 요약">
@@ -47,8 +44,8 @@ export function HomeTab({
       <section className="emergency-card">
         <div>
           <p className="card-label">긴급 지원 요청</p>
-          <h2>{guardianName}에게 바로 알림</h2>
-          <p>버튼을 누르면 보호자에게 현재 상황을 즉시 전달합니다.</p>
+          <strong className="card-title">{guardianName}에게 바로 알림</strong>
+          <p className="emergency-card-copy">버튼을 누르면 보호자에게 상황을 즉시 알립니다.</p>
         </div>
         <button
           className="sos-button"
@@ -66,14 +63,32 @@ export function HomeTab({
         ) : null}
       </section>
 
+      <section className="content-card device-summary-card">
+        <div className="section-title-row">
+          <div>
+            <p className="card-label">기기 연결 상태</p>
+            <strong className="card-title">
+              연결된 기기 {summary.deviceSummary.connectedCount}/{summary.deviceSummary.totalCount}개
+            </strong>
+          </div>
+          <button className="device-inline-add-button" type="button" onClick={onOpenDevices}>
+            기기 확인
+          </button>
+        </div>
+        <div className="device-stat-grid" aria-label="기기 상태 요약">
+          <span className="device-stat">주의 필요 {summary.deviceSummary.warningCount}개</span>
+          <span className="device-stat">UWB 지원 {summary.deviceSummary.uwbSupportedCount}개</span>
+        </div>
+      </section>
+
       <section className="content-card alert-summary-card">
         <div className="section-title-row">
           <div>
             <p className="card-label">실시간 알림 요약</p>
-            <h2>최근 알림</h2>
+            <strong className="card-title">최근 알림</strong>
           </div>
-          <button className="text-button" type="button" onClick={onOpenAlerts}>
-            알림 전체 보기
+          <button className="device-inline-add-button" type="button" onClick={onOpenAlerts}>
+            전체 보기
           </button>
         </div>
         <div className="alert-list">
@@ -96,24 +111,6 @@ export function HomeTab({
           ) : (
             <p className="empty-state">최근 알림이 없습니다.</p>
           )}
-        </div>
-      </section>
-
-      <section className="content-card device-summary-card">
-        <div className="section-title-row">
-          <div>
-            <p className="card-label">기기 연결 상태</p>
-            <h2>
-              연결된 기기 {summary.deviceSummary.connectedCount}/{summary.deviceSummary.totalCount}개
-            </h2>
-          </div>
-          <button className="secondary-button compact-button" type="button" onClick={onOpenDevices}>
-            기기 확인
-          </button>
-        </div>
-        <div className="device-stat-grid" aria-label="기기 상태 요약">
-          <span className="device-stat">주의 필요 {summary.deviceSummary.warningCount}개</span>
-          <span className="device-stat">UWB 지원 {summary.deviceSummary.uwbSupportedCount}개</span>
         </div>
       </section>
     </>

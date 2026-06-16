@@ -132,7 +132,7 @@ export function GuardianPlaceholder({ account, onLogout }) {
       <div className="app-content guardian-content">
         <section className={`guardian-status-card status-${safetyTone}`}>
           <p className="card-label">현재 상태</p>
-          <h2>{dashboard.summary.safetyMessage}</h2>
+          <strong className="card-title">{dashboard.summary.safetyMessage}</strong>
           <p>
             {dashboard.user.name} · {dashboard.user.accessibilityType}
           </p>
@@ -161,9 +161,9 @@ export function GuardianPlaceholder({ account, onLogout }) {
           <div className="section-title-row">
             <div>
               <p className="card-label">긴급 도움 요청</p>
-              <h2 id="guardian-emergency-title">
+              <strong className="card-title" id="guardian-emergency-title">
                 {latestEmergency ? latestEmergency.message : '진행 중인 긴급 요청이 없습니다'}
-              </h2>
+              </strong>
             </div>
           </div>
           <p>
@@ -190,7 +190,7 @@ export function GuardianPlaceholder({ account, onLogout }) {
             <div className="section-title-row">
               <div>
                 <p className="card-label">사용자 연락</p>
-                <h2 id="guardian-contact-title">{contactMessage}</h2>
+                <strong className="card-title" id="guardian-contact-title">{contactMessage}</strong>
               </div>
               <button className="text-button" type="button" onClick={() => setActiveActionPanel('')}>
                 닫기
@@ -226,9 +226,9 @@ export function GuardianPlaceholder({ account, onLogout }) {
           <div className="section-title-row">
             <div>
               <p className="card-label">위험 알림</p>
-              <h2 id="guardian-alert-title">
+              <strong className="card-title" id="guardian-alert-title">
                 {latestDangerAlert ? latestDangerAlert.title : '최근 위험 알림 없음'}
-              </h2>
+              </strong>
             </div>
             {latestDangerAlert ? (
               <span>{severityLabels[latestDangerAlert.severity] || latestDangerAlert.severity}</span>
@@ -263,7 +263,7 @@ export function GuardianPlaceholder({ account, onLogout }) {
 
         <section className="content-card guardian-list-panel" aria-labelledby="guardian-list-title">
           <div className="section-title-row">
-            <h2 id="guardian-list-title">최근 전달 내역</h2>
+            <strong className="card-title" id="guardian-list-title">최근 전달 내역</strong>
             <span>{dashboard.dangerAlerts.length}건</span>
           </div>
           <div className="guardian-event-list">

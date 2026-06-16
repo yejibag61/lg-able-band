@@ -25,8 +25,8 @@ import org.springframework.stereotype.Service;
 @Service
 public class MockDataStore {
 
-	private final AtomicLong accountSequence = new AtomicLong(2);
-	private final AtomicLong userSequence = new AtomicLong(1);
+	private final AtomicLong accountSequence = new AtomicLong(3);
+	private final AtomicLong userSequence = new AtomicLong(2);
 	private final AtomicLong guardianProfileSequence = new AtomicLong(1);
 	private final AtomicLong guardianSequence = new AtomicLong(1);
 	private final AtomicLong deviceSequence = new AtomicLong(12);
@@ -51,6 +51,8 @@ public class MockDataStore {
 		Account guardianAccount = new Account(2, AccountRole.GUARDIAN, "guardian@example.com", "password1234", "김보호");
 		this.accounts.put(userAccount.accountId(), userAccount);
 		this.accounts.put(guardianAccount.accountId(), guardianAccount);
+		Account adminAccount = new Account(3, AccountRole.USER, "admin@example.com", "password1234", "관리자");
+		this.accounts.put(adminAccount.accountId(), adminAccount);
 
 		UserProfile user = new UserProfile(
 			1,
@@ -59,6 +61,15 @@ public class MockDataStore {
 			new NotificationPrefs(List.of(NotificationChannel.VOICE, NotificationChannel.VIBRATION), true, true)
 		);
 		this.users.put(user.userId(), user);
+		this.users.put(
+			2L,
+			new UserProfile(
+				2,
+				3,
+				AccessibilityType.VISUAL,
+				new NotificationPrefs(List.of(NotificationChannel.VOICE, NotificationChannel.VIBRATION), true, true)
+			)
+		);
 		this.guardianProfiles.put(1L, new GuardianProfile(1, 2, 1L, "FAMILY", "010-0000-0000"));
 		this.guardiansByUserId.put(1L, new ArrayList<>(List.of(
 			new Guardian(1, "김보호", "010-0000-0000", true, true, ConnectionStatus.CONNECTED)
@@ -77,6 +88,11 @@ public class MockDataStore {
 			new EventHistory(502, 102, AlertType.DANGER, Severity.HIGH, "공기질 주의", "공기질 센서", OffsetDateTime.now().minusMinutes(35), AlertStatus.UNREAD)
 		)));
 		this.emergenciesByUserId.put(1L, new ArrayList<>());
+		this.guardiansByUserId.put(2L, new ArrayList<>());
+		this.devicesByUserId.put(2L, new ArrayList<>());
+		this.alertsByUserId.put(2L, new ArrayList<>());
+		this.eventsByUserId.put(2L, new ArrayList<>());
+		this.emergenciesByUserId.put(2L, new ArrayList<>());
 	}
 
 	public Account signup(
@@ -202,6 +218,10 @@ public class MockDataStore {
 			throw new ApiException(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND", "사용자 프로필을 찾을 수 없습니다.");
 		}
 		return user;
+	}
+
+	public List<Long> userIds() {
+		return this.users.keySet().stream().sorted().toList();
 	}
 
 	public Device addDevice(long userId, String name, DeviceType type, boolean locationSupported) {

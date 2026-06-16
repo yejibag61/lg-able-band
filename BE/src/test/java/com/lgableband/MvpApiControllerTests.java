@@ -2,6 +2,7 @@ package com.lgableband;
 
 import static org.hamcrest.Matchers.blankOrNullString;
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.hamcrest.Matchers.not;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -108,6 +109,73 @@ class MvpApiControllerTests {
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.status").value("REPLAYED"))
 			.andExpect(jsonPath("$.voiceGuide", not(blankOrNullString())));
+	}
+
+	@Test
+	void adminCanBroadcastAlertToAllUsers() throws Exception {
+		String adminToken = loginToken("USER", "admin@example.com");
+		String userToken = loginToken("USER", "user@example.com");
+
+		this.mockMvc.perform(get("/api/admin/alert-templates").header("Authorization", "Bearer " + adminToken))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.items[0].templateId").exists())
+			.andExpect(jsonPath("$.items[0].categoryName").exists());
+
+		this.mockMvc.perform(post("/api/admin/alerts/broadcast")
+				.header("Authorization", "Bearer " + adminToken)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "templateId": "washer-complete",
+					  "audience": "ALL"
+					}
+					"""))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.templateId").value("washer-complete"))
+			.andExpect(jsonPath("$.audience").value("ALL"))
+			.andExpect(jsonPath("$.dispatchedUserCount").value(greaterThanOrEqualTo(2)));
+
+		this.mockMvc.perform(get("/api/alerts").header("Authorization", "Bearer " + userToken))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.items[0].title").value("세탁 완료 알림"));
+	}
+
+	@Test
+	void nonAdminUserCannotBroadcastAlert() throws Exception {
+		String userToken = loginToken("USER", "user@example.com");
+
+		this.mockMvc.perform(post("/api/admin/alerts/broadcast")
+				.header("Authorization", "Bearer " + userToken)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "templateId": "washer-complete",
+					  "audience": "ALL"
+					}
+					"""))
+			.andExpect(status().isForbidden())
+			.andExpect(jsonPath("$.code").value("FORBIDDEN"));
+	}
+
+	@Test
+	void adminCanBroadcastAlertToSpecificAccessibilityGroup() throws Exception {
+		String adminToken = loginToken("USER", "admin@example.com");
+		String suffix = "hearing-broadcast-" + System.nanoTime();
+		signupUserAndToken(suffix);
+
+		this.mockMvc.perform(post("/api/admin/alerts/broadcast")
+				.header("Authorization", "Bearer " + adminToken)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "templateId": "tv-power-status",
+					  "audience": "HEARING"
+					}
+					"""))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.templateId").value("tv-power-status"))
+			.andExpect(jsonPath("$.audience").value("HEARING"))
+			.andExpect(jsonPath("$.dispatchedUserCount").value(greaterThanOrEqualTo(1)));
 	}
 
 	@Test
@@ -422,6 +490,31 @@ class MvpApiControllerTests {
 		this.mockMvc.perform(delete("/api/living-signals/sounds/" + soundId)
 				.header("Authorization", "Bearer " + token))
 			.andExpect(status().isOk());
+	}
+
+	@Test
+	void wearableDetectionCanCreateLivingSignalAlert() throws Exception {
+		String token = userToken();
+
+		this.mockMvc.perform(post("/api/living-signals/detections")
+				.header("Authorization", "Bearer " + token)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "registeredSoundName": "우리 아파트 방송음",
+					  "soundType": "apartment_announcement",
+					  "similarity": 0.87,
+					  "detectedAt": "2026-06-16T10:30:00+09:00"
+					}
+					"""))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.title").value("우리 아파트 방송음 감지"))
+			.andExpect(jsonPath("$.message", containsString("우리 아파트 방송음")))
+			.andExpect(jsonPath("$.status").value("UNREAD"));
+
+		this.mockMvc.perform(get("/api/alerts").header("Authorization", "Bearer " + token))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.items[0].title").value("우리 아파트 방송음 감지"));
 	}
 
 	@Test

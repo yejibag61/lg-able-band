@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+﻿import { useEffect, useMemo, useState } from 'react'
 import { useBleProximityGuide } from '../features/ble/useBleProximityGuide'
 import { createDevice } from '../services/deviceService'
 
@@ -116,24 +116,10 @@ export function DevicesTab({ devices = [], maxDeviceCount, uwb }) {
   const selectedDevice =
     connectedDevices.find((device) => device.deviceId === selectedDeviceId) || null
 
-  const connectedCount = connectedDevices.filter(
-    (device) => device.connectionStatus === 'CONNECTED',
-  ).length
-  const warningCount = connectedDevices.filter((device) =>
-    ['WARNING', 'ERROR'].includes(device.connectionStatus),
-  ).length
-  const locationSupportedCount = connectedDevices.filter(
-    (device) => device.locationSupported,
-  ).length
-
   const registeredDeviceTypes = useMemo(
     () => new Set(connectedDevices.map((device) => device.type)),
     [connectedDevices],
   )
-
-  const availableDeviceCount = deviceCatalog.filter(
-    (device) => !registeredDeviceTypes.has(device.type),
-  ).length
 
   const uwbTarget = getGuideTarget(connectedDevices, selectedDevice, uwb)
   const isGuidingCurrentTarget = Boolean(
@@ -143,14 +129,17 @@ export function DevicesTab({ devices = [], maxDeviceCount, uwb }) {
     selectedDevice && bleGuide.isActive && bleGuide.targetName === selectedDevice.name,
   )
 
-  function handleFindNearbyDevices() {
-    if (availableDeviceCount === 0) {
-      setConnectionMessage('모든 가전이 이미 연결되어 있습니다.')
-      return
+  useEffect(() => {
+    if (!connectionMessage) {
+      return undefined
     }
 
-    setConnectionMessage(`연결 가능한 가전 ${availableDeviceCount}종을 확인했습니다.`)
-  }
+    const timeoutId = window.setTimeout(() => {
+      setConnectionMessage('')
+    }, 2200)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [connectionMessage])
 
   function handleToggleDevicePicker() {
     setIsDevicePickerOpen((current) => !current)
@@ -268,16 +257,12 @@ export function DevicesTab({ devices = [], maxDeviceCount, uwb }) {
     return (
       <section className="tab-stack device-tab" aria-labelledby="device-add-title">
         <section className="content-card device-add-editor">
-          <button className="text-button back-button" type="button" onClick={closeCreatePage}>
-            목록으로 돌아가기
-          </button>
-
           <div className="device-add-hero">
-            <p className="card-label">가전 추가</p>
-            <h2 id="device-add-title">{template?.name || '가전'} 연결</h2>
-            <p>
-              선택한 가전을 계정에 연결하고, 이후 알림과 위치 안내를 바로 사용할 수 있게 등록합니다.
-            </p>
+            <button className="text-button back-button" type="button" onClick={closeCreatePage}>
+              <span aria-hidden="true">←</span>
+              <span className="sr-only">목록으로 돌아가기</span>
+            </button>
+            <strong className="card-title" id="device-add-title">가전 추가</strong>
           </div>
 
           <div className="device-add-preview-card">
@@ -363,47 +348,15 @@ export function DevicesTab({ devices = [], maxDeviceCount, uwb }) {
   }
 
   return (
-    <section className="tab-stack device-tab" aria-labelledby="devices-title">
-      <div className="content-card device-hero-card">
-        <div>
-          <p className="card-label">LG ThinQ 연동</p>
-          <h2 id="devices-title">우리 집 가전을 연결해요.</h2>
-          <p>세탁기, TV, 전기레인지, 도어센서, 공기질 센서, 냉장고를 한 화면에서 관리합니다.</p>
-        </div>
-        <button className="device-find-button" type="button" onClick={handleFindNearbyDevices}>
-          주변 기기 찾기
-        </button>
-      </div>
-
-      <div className="device-overview-grid" aria-label="기기 연결 요약">
-        <span>
-          <strong>{connectedCount}</strong>
-          연결됨
-        </span>
-        <span>
-          <strong>{warningCount}</strong>
-          주의
-        </span>
-        <span>
-          <strong>{locationSupportedCount}</strong>
-          UWB
-        </span>
-        <span>
-          <strong>
-            {connectedDevices.length}/{maxDeviceCount}
-          </strong>
-          등록 현황
-        </span>
-      </div>
+    <section className="tab-stack device-tab" aria-labelledby="connected-devices-title">
 
       {uwbTarget ? (
         <section className="content-card uwb-card">
           <div className="uwb-card-header">
             <div>
               <p className="card-label">UWB 위치 안내</p>
-              <h2>{bleGuide.targetName || uwbTarget.name} 찾기</h2>
+              <strong className="card-title">{bleGuide.targetName || uwbTarget.name} 찾기</strong>
             </div>
-            <span className="uwb-device-badge">{bleGuide.bleDevicePrefix}</span>
           </div>
 
           <div className="uwb-distance-panel" aria-live="polite">
@@ -440,7 +393,7 @@ export function DevicesTab({ devices = [], maxDeviceCount, uwb }) {
           <div className="section-title-row">
             <div>
               <p className="card-label">UWB 위치 안내</p>
-              <h2>연결된 가전이 없습니다</h2>
+              <strong className="card-title">연결된 가전이 없습니다</strong>
             </div>
           </div>
           <p>가전을 먼저 연결하면 이 화면에서 위치 안내를 바로 시작할 수 있습니다.</p>
@@ -453,123 +406,16 @@ export function DevicesTab({ devices = [], maxDeviceCount, uwb }) {
             <p className="card-label">연결된 가전</p>
             <h2 id="connected-devices-title">내 가전 목록</h2>
           </div>
-          <span>{connectedDevices.length}개</span>
+          <button
+            className={isDevicePickerOpen ? 'device-inline-add-button active' : 'device-inline-add-button'}
+            type="button"
+            aria-expanded={isDevicePickerOpen}
+            aria-controls="device-catalog-grid"
+            onClick={handleToggleDevicePicker}
+          >
+            추가
+          </button>
         </div>
-
-        {connectedDevices.length > 0 ? (
-          <div className="device-product-grid">
-            {connectedDevices.map((device) => (
-              <button
-                className={
-                  selectedDevice?.deviceId === device.deviceId
-                    ? 'device-product-card selected'
-                    : 'device-product-card'
-                }
-                key={device.deviceId}
-                type="button"
-                aria-label={`${device.name} 관리 열기`}
-                aria-pressed={selectedDevice?.deviceId === device.deviceId}
-                onClick={() => handleSelectConnectedDevice(device.deviceId)}
-              >
-                <DeviceIcon type={device.type} />
-                <span className={`connection-dot connection-${device.connectionStatus.toLowerCase()}`} />
-                <strong>{device.name}</strong>
-                <small>{connectionLabels[device.connectionStatus] || device.connectionStatus}</small>
-              </button>
-            ))}
-          </div>
-        ) : (
-          <p className="empty-state">
-            아직 연결된 가전이 없습니다. 아래의 가전 추가하기로 먼저 연결해 주세요.
-          </p>
-        )}
-      </section>
-
-      {selectedDevice ? (
-        <section
-          className="content-card device-manager-card"
-          aria-label={`${selectedDevice.name} 관리`}
-        >
-          <div className="section-title-row">
-            <div>
-              <p className="card-label">{selectedDevice.room}</p>
-              <h2>{selectedDevice.name} 관리</h2>
-            </div>
-            <span className={`manager-status status-${selectedDevice.connectionStatus.toLowerCase()}`}>
-              {connectionLabels[selectedDevice.connectionStatus] || selectedDevice.connectionStatus}
-            </span>
-          </div>
-          <p>{selectedDevice.detail}</p>
-          <dl className="device-detail-grid">
-            <div>
-              <dt>기기 유형</dt>
-              <dd>{selectedDevice.typeLabel}</dd>
-            </div>
-            <div>
-              <dt>최근 이벤트</dt>
-              <dd>{selectedDevice.lastEventLabel}</dd>
-            </div>
-            <div>
-              <dt>위치 안내</dt>
-              <dd>임시 BLE 테스트 가능</dd>
-            </div>
-            <div>
-              <dt>주요 알림</dt>
-              <dd>{selectedDevice.primarySignal}</dd>
-            </div>
-          </dl>
-          <div className="device-feature-list" aria-label={`${selectedDevice.name} 관리 기능`}>
-            {selectedDevice.management.map((feature) => (
-              <span key={feature}>{feature}</span>
-            ))}
-          </div>
-          <div className="device-action-grid">
-            <button
-              className="secondary-button compact-button"
-              type="button"
-              onClick={handleRefreshSelectedDevice}
-            >
-              상태 새로고침
-            </button>
-            <button
-              className="secondary-button compact-button device-location-button"
-              type="button"
-              disabled={bleGuide.isConnecting}
-              onClick={() => handleToggleLocationGuide(selectedDevice)}
-            >
-              {bleGuide.isConnecting
-                ? '연결 중...'
-                : isGuidingSelectedDevice
-                  ? '위치 안내 종료'
-                  : '위치 안내 시작'}
-            </button>
-          </div>
-        </section>
-      ) : null}
-
-      {connectionMessage ? (
-        <p className="limit-message" role="status">
-          {connectionMessage}
-        </p>
-      ) : null}
-
-      <section className="device-register-card" aria-labelledby="device-register-title">
-        <div className="section-title-row">
-          <div>
-            <p className="card-label">연동 가능한 가전</p>
-            <h2 id="device-register-title">가전 추가</h2>
-          </div>
-          <span>{availableDeviceCount}종</span>
-        </div>
-        <button
-          className={isDevicePickerOpen ? 'device-add-button active' : 'device-add-button'}
-          type="button"
-          aria-expanded={isDevicePickerOpen}
-          aria-controls="device-catalog-grid"
-          onClick={handleToggleDevicePicker}
-        >
-          {isDevicePickerOpen ? '추가 가능한 가전 닫기' : '가전 추가하기'}
-        </button>
 
         {isDevicePickerOpen ? (
           <section
@@ -602,7 +448,95 @@ export function DevicesTab({ devices = [], maxDeviceCount, uwb }) {
             })}
           </section>
         ) : null}
+
+        {!isDevicePickerOpen ? (
+          connectedDevices.length > 0 ? (
+            <div className="device-product-grid">
+              {connectedDevices.map((device) => (
+                <button
+                  className={
+                    selectedDevice?.deviceId === device.deviceId
+                      ? 'device-product-card selected'
+                      : 'device-product-card'
+                  }
+                  key={device.deviceId}
+                  type="button"
+                  aria-label={`${device.name} 관리 열기`}
+                  aria-pressed={selectedDevice?.deviceId === device.deviceId}
+                  onClick={() => handleSelectConnectedDevice(device.deviceId)}
+                >
+                  <DeviceIcon type={device.type} />
+                  <span
+                    className={`connection-dot connection-${device.connectionStatus.toLowerCase()}`}
+                  />
+                  <strong>{device.name}</strong>
+                  <small>{connectionLabels[device.connectionStatus] || device.connectionStatus}</small>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <p className="empty-state">
+              아직 연결된 가전이 없습니다. 아래의 가전 추가하기로 먼저 연결해 주세요.
+            </p>
+          )
+        ) : null}
       </section>
+
+      {selectedDevice ? (
+        <section
+          className="content-card device-manager-card"
+          aria-label={`${selectedDevice.name} 관리`}
+        >
+          <div className="device-manager-header">
+            <div>
+              <p className="card-label">{selectedDevice.room}</p>
+              <strong className="card-title">{selectedDevice.name} 관리</strong>
+            </div>
+            <button
+              className="device-manager-refresh-button"
+              type="button"
+              aria-label={`${selectedDevice.name} 상태 새로고침`}
+              onClick={handleRefreshSelectedDevice}
+            >
+              <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+                <path d="M6.5 7.5A7 7 0 0 1 18 9" />
+                <path d="M17.5 5.5V9h-3.5" />
+                <path d="M17.5 16.5A7 7 0 0 1 6 15" />
+                <path d="M6.5 18.5V15H10" />
+              </svg>
+            </button>
+          </div>
+          <dl className="device-detail-grid">
+            <div>
+              <dt>기기 유형</dt>
+              <dd>{selectedDevice.typeLabel}</dd>
+            </div>
+            <div>
+              <dt>최근 이벤트</dt>
+              <dd>{selectedDevice.lastEventLabel}</dd>
+            </div>
+            <div>
+              <dt>위치 안내</dt>
+              <dd>임시 BLE 테스트 가능</dd>
+            </div>
+            <div>
+              <dt>주요 알림</dt>
+              <dd>{selectedDevice.primarySignal}</dd>
+            </div>
+          </dl>
+          <div className="device-feature-list" aria-label={`${selectedDevice.name} 관리 기능`}>
+            {selectedDevice.management.map((feature) => (
+              <span key={feature}>{feature}</span>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      {connectionMessage ? (
+        <div className="device-toast" role="status" aria-live="polite">
+          <p className="device-toast-message">{connectionMessage}</p>
+        </div>
+      ) : null}
 
       {bleGuide.isShowingOverlay ? (
         <div className="device-guide-overlay" role="status" aria-live="polite">
@@ -762,3 +696,4 @@ function renderDeviceIcon(type) {
     </svg>
   )
 }
+
