@@ -41,8 +41,9 @@ const connectionStatusLabels = {
 }
 
 export function HomeScreen({ session, onLogout }) {
-  const [activeTab, setActiveTab] = useState('home')
-  const [menuScreen, setMenuScreen] = useState('root')
+  const initialWearableDestination = getWearableDestination()
+  const [activeTab, setActiveTab] = useState(initialWearableDestination.activeTab)
+  const [menuScreen, setMenuScreen] = useState(initialWearableDestination.menuScreen)
   const [linkedGuardians, setLinkedGuardians] = useState([])
   const [guardianListState, setGuardianListState] = useState({
     loading: true,
@@ -304,9 +305,71 @@ export function HomeScreen({ session, onLogout }) {
           </button>
         ))}
       </nav>
-      <VoiceChatbot preview={preview} session={session} summary={summary} />
+      <VoiceChatbot
+        initialOpen={initialWearableDestination.chatbotOpen}
+        initialQuestionCategoryId={initialWearableDestination.chatbotCategoryId}
+        preview={preview}
+        session={session}
+        summary={summary}
+      />
     </main>
   )
+}
+
+function getWearableDestination() {
+  const destination = {
+    activeTab: 'home',
+    chatbotCategoryId: null,
+    chatbotOpen: false,
+    menuScreen: 'root',
+  }
+
+  if (typeof window === 'undefined') {
+    return destination
+  }
+
+  const params = new URLSearchParams(window.location.search)
+
+  if (params.get('from') !== 'wearable') {
+    return destination
+  }
+
+  const type = params.get('type')
+
+  if (type === 'alert') {
+    return {
+      ...destination,
+      activeTab: 'alerts',
+      chatbotCategoryId: 'alerts',
+    }
+  }
+
+  if (type === 'deviceStatus') {
+    return {
+      ...destination,
+      activeTab: 'devices',
+      chatbotCategoryId: 'devices',
+    }
+  }
+
+  if (type === 'guardianConnect') {
+    return {
+      ...destination,
+      activeTab: 'menu',
+      chatbotCategoryId: 'guardian',
+      menuScreen: 'guardianConnection',
+    }
+  }
+
+  if (type === 'welfare' || type === 'welfareSearch') {
+    return {
+      ...destination,
+      chatbotCategoryId: 'welfare',
+      chatbotOpen: true,
+    }
+  }
+
+  return destination
 }
 
 function MenuTab({

@@ -505,6 +505,311 @@ h1 {
   font-weight: 900;
 }
 
+.wearable-chat-screen {
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  display: grid;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border-radius: inherit;
+  padding: 22px 18px 18px;
+  background: linear-gradient(180deg, #ffffff 0%, #f7f8fa 100%);
+}
+
+.wearable-chat-back {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 2;
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--wearable-text);
+  font: inherit;
+  font-size: 1.9rem;
+  font-weight: 430;
+  line-height: 1;
+}
+
+.wearable-chat-content {
+  display: grid;
+  min-height: 0;
+  width: 100%;
+  align-content: center;
+  justify-items: center;
+  gap: 10px;
+  text-align: center;
+}
+
+.wearable-chat-header {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  padding-inline: 24px;
+}
+
+.wearable-chat-header h2 {
+  margin: 0;
+  color: var(--wearable-text);
+  font-size: 1.18rem;
+  font-weight: 540;
+  line-height: 1.15;
+  letter-spacing: 0;
+}
+
+.wearable-chat-header p,
+.wearable-chat-footnote {
+  margin: 0;
+  color: var(--wearable-text-soft);
+  font-size: 0.76rem;
+  font-weight: 430;
+  line-height: 1.35;
+}
+
+.wearable-chat-menu,
+.wearable-chat-options {
+  display: grid;
+  width: 100%;
+  gap: 8px;
+}
+
+.wearable-chat-choice,
+.wearable-chat-option,
+.wearable-chat-bottom-action,
+.wearable-chat-app-action,
+.wearable-chat-link {
+  min-width: 0;
+  border: 1px solid var(--wearable-border);
+  border-radius: 16px;
+  background: var(--wearable-surface);
+  color: var(--wearable-text);
+  box-shadow: var(--wearable-shadow-sm);
+  font: inherit;
+}
+
+.wearable-chat-choice {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 10px;
+  min-height: 64px;
+  padding: 10px 12px;
+  text-align: left;
+}
+
+.wearable-chat-choice-primary {
+  border-color: #f0d7df;
+  background: var(--wearable-primary-soft);
+}
+
+.wearable-chat-choice-secondary {
+  background: var(--wearable-surface-soft);
+}
+
+.wearable-chat-choice-icon {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border-radius: 999px;
+  background: #ffffff;
+  font-size: 1.18rem;
+}
+
+.wearable-chat-choice strong,
+.wearable-chat-choice small,
+.wearable-chat-option strong,
+.wearable-chat-detail-row strong,
+.wearable-chat-detail-row small {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.wearable-chat-choice strong,
+.wearable-chat-option strong {
+  color: var(--wearable-text);
+  font-size: 0.9rem;
+  font-weight: 520;
+  line-height: 1.2;
+}
+
+.wearable-chat-choice small {
+  margin-top: 2px;
+  color: var(--wearable-text-soft);
+  font-size: 0.72rem;
+  font-weight: 430;
+  line-height: 1.2;
+}
+
+.wearable-chat-mic {
+  display: grid;
+  width: 52px;
+  height: 52px;
+  place-items: center;
+  border: 0;
+  border-radius: 999px;
+  background: var(--wearable-text);
+  color: #ffffff;
+  box-shadow: 0 12px 24px rgba(17, 24, 39, 0.16);
+  font-size: 1.35rem;
+}
+
+.wearable-chat-list {
+  align-content: center;
+}
+
+.wearable-chat-options {
+  align-self: stretch;
+}
+
+.wearable-chat-option {
+  display: grid;
+  grid-template-columns: 34px 1fr;
+  align-items: center;
+  min-height: 50px;
+  gap: 8px;
+  padding: 8px 12px;
+  text-align: left;
+}
+
+.wearable-chat-option span {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--wearable-surface-soft);
+  font-size: 1.08rem;
+}
+
+.wearable-chat-link {
+  min-height: 36px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--wearable-text);
+  font-size: 0.86rem;
+  font-weight: 520;
+}
+
+.wearable-chat-speaking {
+  gap: 16px;
+}
+
+.wearable-chat-speaker,
+.wearable-chat-answer-icon {
+  display: grid;
+  place-items: center;
+  width: 84px;
+  height: 84px;
+  border: 1px solid #f0d7df;
+  border-radius: 999px;
+  background: var(--wearable-primary-soft);
+  color: var(--wearable-primary-strong);
+  font-size: 2.4rem;
+  box-shadow: 0 0 0 12px rgba(225, 29, 72, 0.05);
+}
+
+.wearable-chat-quote {
+  max-width: 100%;
+  color: var(--wearable-primary-strong);
+  font-size: 1rem;
+  font-weight: 540;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.wearable-chat-bottom-action,
+.wearable-chat-app-action {
+  min-height: 42px;
+  padding: 0 14px;
+  font-size: 0.84rem;
+  font-weight: 520;
+}
+
+.wearable-chat-bottom-action {
+  width: min(100%, 220px);
+  background: var(--wearable-surface-soft);
+}
+
+.wearable-chat-app-action {
+  width: min(100%, 180px);
+  border: 0;
+  background: var(--wearable-text);
+  color: #ffffff;
+}
+
+.wearable-chat-answer {
+  gap: 9px;
+}
+
+.wearable-chat-answer-icon {
+  width: 72px;
+  height: 72px;
+  font-size: 2rem;
+}
+
+.wearable-chat-answer-lines,
+.wearable-chat-guide {
+  margin: 0;
+  white-space: pre-line;
+  color: var(--wearable-text);
+  font-size: 0.98rem;
+  font-weight: 520;
+  line-height: 1.45;
+}
+
+.wearable-chat-guide {
+  color: var(--wearable-text-soft);
+  font-size: 0.86rem;
+  font-weight: 430;
+}
+
+.wearable-chat-detail-card {
+  display: grid;
+  width: 100%;
+  overflow: hidden;
+  border: 1px solid var(--wearable-border);
+  border-radius: 16px;
+  background: var(--wearable-surface);
+  box-shadow: var(--wearable-shadow-sm);
+}
+
+.wearable-chat-detail-row {
+  display: grid;
+  grid-template-columns: 30px 1fr;
+  gap: 8px;
+  align-items: center;
+  min-height: 52px;
+  padding: 8px 12px;
+  text-align: left;
+}
+
+.wearable-chat-detail-row + .wearable-chat-detail-row {
+  border-top: 1px solid var(--wearable-border);
+}
+
+.wearable-chat-detail-row strong {
+  color: var(--wearable-text);
+  font-size: 0.84rem;
+  font-weight: 520;
+  line-height: 1.2;
+}
+
+.wearable-chat-detail-row small {
+  margin-top: 2px;
+  color: var(--wearable-text-soft);
+  font-size: 0.7rem;
+  font-weight: 430;
+  line-height: 1.2;
+}
+
 .alert-pager {
   grid-template-columns: 1fr auto 1fr;
   margin-top: -2px;
@@ -1176,7 +1481,7 @@ h1 {
   font-size: 1.58rem;
   font-weight: 540;
   line-height: 1.12;
-  letter-spacing: -0.03em;
+  letter-spacing: 0;
 }
 
 .pairing-copy p:not(.eyebrow),
@@ -1622,5 +1927,119 @@ button:focus-visible {
   .emergency-copy {
     font-size: 0.76rem;
     line-height: 1.4;
+  }
+
+  .wearable-chat-screen {
+    padding: 18px 14px 14px;
+  }
+
+  .wearable-chat-back {
+    top: 8px;
+    left: 8px;
+    width: 28px;
+    height: 28px;
+    font-size: 1.7rem;
+  }
+
+  .wearable-chat-content {
+    gap: 8px;
+  }
+
+  .wearable-chat-header {
+    gap: 3px;
+    padding-inline: 24px;
+  }
+
+  .wearable-chat-header h2 {
+    font-size: 1.06rem;
+  }
+
+  .wearable-chat-header p,
+  .wearable-chat-footnote {
+    font-size: 0.7rem;
+  }
+
+  .wearable-chat-menu,
+  .wearable-chat-options {
+    gap: 7px;
+  }
+
+  .wearable-chat-choice {
+    min-height: 58px;
+    gap: 8px;
+    border-radius: 14px;
+    padding: 9px 10px;
+  }
+
+  .wearable-chat-choice-icon {
+    width: 34px;
+    height: 34px;
+    font-size: 1rem;
+  }
+
+  .wearable-chat-choice strong,
+  .wearable-chat-option strong {
+    font-size: 0.8rem;
+  }
+
+  .wearable-chat-choice small,
+  .wearable-chat-detail-row small {
+    font-size: 0.64rem;
+  }
+
+  .wearable-chat-mic {
+    width: 46px;
+    height: 46px;
+    font-size: 1.14rem;
+  }
+
+  .wearable-chat-option {
+    grid-template-columns: 30px 1fr;
+    min-height: 44px;
+    border-radius: 14px;
+    padding: 7px 10px;
+  }
+
+  .wearable-chat-option span {
+    width: 26px;
+    height: 26px;
+    font-size: 0.94rem;
+  }
+
+  .wearable-chat-speaker,
+  .wearable-chat-answer-icon {
+    width: 64px;
+    height: 64px;
+    font-size: 1.8rem;
+    box-shadow: 0 0 0 8px rgba(225, 29, 72, 0.05);
+  }
+
+  .wearable-chat-quote,
+  .wearable-chat-answer-lines {
+    font-size: 0.88rem;
+  }
+
+  .wearable-chat-guide {
+    font-size: 0.76rem;
+  }
+
+  .wearable-chat-bottom-action,
+  .wearable-chat-app-action {
+    min-height: 38px;
+    border-radius: 14px;
+    font-size: 0.76rem;
+  }
+
+  .wearable-chat-detail-card {
+    border-radius: 14px;
+  }
+
+  .wearable-chat-detail-row {
+    min-height: 46px;
+    padding: 7px 10px;
+  }
+
+  .wearable-chat-detail-row strong {
+    font-size: 0.76rem;
   }
 }
