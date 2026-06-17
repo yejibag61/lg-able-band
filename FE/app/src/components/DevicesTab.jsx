@@ -2,6 +2,15 @@
 import { useBleProximityGuide } from '../features/ble/useBleProximityGuide'
 import { createDevice } from '../services/deviceService'
 
+function scrollAppContentToTop() {
+  const appContent = document.querySelector('.app-content')
+  if (appContent instanceof HTMLElement) {
+    appContent.scrollTo({ top: 0, left: 0 })
+  }
+
+  window.scrollTo({ top: 0, left: 0 })
+}
+
 const connectionLabels = {
   CONNECTED: '연결됨',
   WARNING: '주의 필요',
@@ -16,7 +25,7 @@ const deviceCatalog = [
     type: 'WASHER',
     typeLabel: '세탁기',
     room: '세탁실',
-    detail: '세탁 완료와 문 열림, 오류 안내를 앱에서 바로 확인할 수 있습니다.',
+    detail: '선택한 가전의 기본 정보를 확인합니다.',
     primarySignal: '세탁 완료 알림',
     locationSupported: true,
     remoteEnabled: true,
@@ -141,6 +150,14 @@ export function DevicesTab({ devices = [], maxDeviceCount, uwb }) {
     return () => window.clearTimeout(timeoutId)
   }, [connectionMessage])
 
+  useEffect(() => {
+    if (screenMode === 'list') {
+      return
+    }
+
+    scrollAppContentToTop()
+  }, [screenMode])
+
   function handleToggleDevicePicker() {
     setIsDevicePickerOpen((current) => !current)
     setConnectionMessage('')
@@ -258,9 +275,13 @@ export function DevicesTab({ devices = [], maxDeviceCount, uwb }) {
       <section className="tab-stack device-tab" aria-labelledby="device-add-title">
         <section className="content-card device-add-editor">
           <div className="device-add-hero">
-            <button className="text-button back-button" type="button" onClick={closeCreatePage}>
+            <button
+              className="text-button back-button alert-detail-back"
+              type="button"
+              aria-label="목록으로 돌아가기"
+              onClick={closeCreatePage}
+            >
               <span aria-hidden="true">←</span>
-              <span className="sr-only">목록으로 돌아가기</span>
             </button>
             <strong className="card-title" id="device-add-title">가전 추가</strong>
           </div>
@@ -404,7 +425,7 @@ export function DevicesTab({ devices = [], maxDeviceCount, uwb }) {
         <div className="section-title-row">
           <div>
             <p className="card-label">연결된 가전</p>
-            <h2 id="connected-devices-title">내 가전 목록</h2>
+            <strong className="card-title" id="connected-devices-title">내 가전 목록</strong>
           </div>
           <button
             className={isDevicePickerOpen ? 'device-inline-add-button active' : 'device-inline-add-button'}
@@ -489,8 +510,12 @@ export function DevicesTab({ devices = [], maxDeviceCount, uwb }) {
         >
           <div className="device-manager-header">
             <div>
-              <p className="card-label">{selectedDevice.room}</p>
-              <strong className="card-title">{selectedDevice.name} 관리</strong>
+              <div className="device-manager-topline">
+                <p className="card-label">{selectedDevice.room}</p>
+              </div>
+              <div className="device-manager-title-row">
+                <strong className="card-title">{selectedDevice.name} 관리</strong>
+              </div>
             </div>
             <button
               className="device-manager-refresh-button"
@@ -601,6 +626,7 @@ function getGuideTarget(devices, selectedDevice, uwb) {
 
   return devices[0] || null
 }
+
 
 function formatLastEvent(value) {
   if (!value) {

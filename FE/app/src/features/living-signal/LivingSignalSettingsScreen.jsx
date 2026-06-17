@@ -16,6 +16,15 @@ import {
   updateLivingSignalThreshold,
 } from './livingSignalService'
 
+function scrollAppContentToTop() {
+  const appContent = document.querySelector('.app-content')
+  if (appContent instanceof HTMLElement) {
+    appContent.scrollTo({ top: 0, left: 0 })
+  }
+
+  window.scrollTo({ top: 0, left: 0 })
+}
+
 const defaultAudioHandlers = {
   createEnrollmentSession,
   isMicrophoneSupported,
@@ -132,6 +141,10 @@ export function LivingSignalSettingsScreen({
       stopEnrollmentSession({ discard: true })
     }
   }, [])
+
+  useEffect(() => {
+    scrollAppContentToTop()
+  }, [screenMode])
 
   function resetRecordingState() {
     setRecordingState({
@@ -353,9 +366,9 @@ export function LivingSignalSettingsScreen({
   if (screenMode === 'create' || screenMode === 'edit') {
     return (
       <section className="living-signal-screen" aria-labelledby="living-signal-editor-title">
-        <div className="living-signal-panel-hero">
+        <div className="living-signal-panel-hero device-add-hero">
           <button
-            className="text-button back-button alert-detail-back living-signal-arrow-back"
+            className="text-button back-button alert-detail-back"
             type="button"
             aria-label="목록으로 돌아가기"
             onClick={closeEditorPage}
@@ -496,34 +509,25 @@ export function LivingSignalSettingsScreen({
   }
 
   return (
-    <section className="living-signal-screen" aria-labelledby="living-signal-title">
-      <div className="living-signal-panel-hero">
-        {showBackButton ? (
-          <button
-            className="text-button back-button alert-detail-back living-signal-arrow-back"
-            type="button"
-            aria-label="설정으로 돌아가기"
-            onClick={onBack}
-          >
-            <span aria-hidden="true">←</span>
-          </button>
-        ) : (
-          <span className="living-signal-hero-spacer" aria-hidden="true" />
-        )}
-        <strong className="card-title" id="living-signal-title">
-          생활 신호 설정
-        </strong>
-        <button className="device-inline-add-button living-signal-inline-add" type="button" onClick={openCreatePage}>
-          알림음 추가
-        </button>
-      </div>
-
+    <section className="living-signal-screen" aria-labelledby="living-signal-list-title">
       <section className="living-signal-list-section" aria-labelledby="living-signal-list-title">
         <div className="living-signal-section-row">
-          <h3 id="living-signal-list-title">등록된 알림음</h3>
-          <span>
-            {sounds.length}개 · 샘플 {totalRecordings}개
-          </span>
+          <div className="device-add-hero">
+            {showBackButton ? (
+              <button
+                className="text-button back-button alert-detail-back"
+                type="button"
+                aria-label="목록으로 돌아가기"
+                onClick={onBack}
+              >
+                <span aria-hidden="true">←</span>
+              </button>
+            ) : null}
+            <strong className="card-title" id="living-signal-list-title">등록된 알림음</strong>
+          </div>
+          <button className="device-inline-add-button living-signal-inline-add" type="button" onClick={openCreatePage}>
+            알림음 추가
+          </button>
         </div>
 
         {sounds.length === 0 ? (

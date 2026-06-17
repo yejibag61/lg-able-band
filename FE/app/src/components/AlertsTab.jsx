@@ -1,6 +1,15 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { confirmAlert, replayAlert } from '../services/alertService'
 import { getWarningRecommendation } from '../services/warningService'
+
+function scrollAppContentToTop() {
+  const appContent = document.querySelector('.app-content')
+  if (appContent instanceof HTMLElement) {
+    appContent.scrollTo({ top: 0, left: 0 })
+  }
+
+  window.scrollTo({ top: 0, left: 0 })
+}
 
 const typeLabels = {
   LIFE: '생활',
@@ -81,6 +90,14 @@ export function AlertsTab({
 
   const alertStats = useMemo(() => buildAlertStats(alertItems), [alertItems])
 
+  useEffect(() => {
+    if (selectedAlertId === null && alertView !== 'stats') {
+      return
+    }
+
+    scrollAppContentToTop()
+  }, [alertView, selectedAlertId])
+
   async function handleSelectAlert(alertId) {
     setSelectedAlertId(alertId)
     setFeedbackMessage('')
@@ -107,7 +124,7 @@ export function AlertsTab({
             : alert,
         ),
       )
-      setFeedbackMessage('알림을 확인 처리했습니다.')
+      setFeedbackMessage('알림을 확인 완료로 처리했습니다.')
     } catch (error) {
       setFeedbackMessage(error.message || '알림 확인 처리에 실패했습니다.')
     }
@@ -274,7 +291,7 @@ function AlertStatsPanel({ stats, onBack }) {
   return (
     <section className="tab-stack alert-tab" aria-labelledby="alert-stats-title">
       <section className="content-card alert-stats-panel">
-        <div className="alert-detail-hero">
+        <div className="alert-detail-hero device-add-hero">
           <button
             className="text-button back-button alert-detail-back"
             type="button"
@@ -312,7 +329,7 @@ function AlertDetail({ alert, feedbackMessage, onBack, onConfirm, onReplay, warn
 
   return (
     <section className="content-card alert-detail-panel" aria-labelledby="alert-detail-title">
-      <div className="alert-detail-hero">
+      <div className="alert-detail-hero device-add-hero">
         <button
           className="text-button back-button alert-detail-back"
           type="button"
@@ -333,9 +350,6 @@ function AlertDetail({ alert, feedbackMessage, onBack, onConfirm, onReplay, warn
             {alert.title}
           </strong>
         </div>
-        <span className={`alert-status-chip alert-status-${alert.status.toLowerCase()}`}>
-          {statusLabels[alert.status] || alert.status}
-        </span>
       </div>
 
       <p className="alert-detail-summary">{alert.message}</p>
@@ -437,7 +451,7 @@ function buildAlertStats(alerts) {
       {
         label: '전체 알림',
         value: `${alerts.length}건`,
-        description: '최근 수신된 알림',
+        description: '최근 수신한 알림',
       },
       {
         label: '미확인',
@@ -463,7 +477,7 @@ function buildAlertStats(alerts) {
     summaryMessage:
       unreadCount > 0
         ? `현재 미확인 알림 ${unreadCount}건이 있어 먼저 확인이 필요합니다.`
-        : '현재 미확인 알림은 없고, 최근 알림 흐름을 한눈에 확인할 수 있습니다.',
+        : '현재 미확인 알림은 없고, 최근 알림 흐름은 차분하게 유지되고 있습니다.',
   }
 }
 
@@ -493,7 +507,19 @@ function isUrgentAlert(alert) {
 }
 
 function formatAlertTime(isoString) {
-  return isoString.slice(11, 16)
+  const date = new Date(isoString)
+
+  if (Number.isNaN(date.getTime())) {
+    return isoString
+  }
+
+  return new Intl.DateTimeFormat('ko-KR', {
+    month: 'numeric',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  }).format(date)
 }
 
 function createAlertGuide(alert) {

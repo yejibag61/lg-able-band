@@ -627,6 +627,7 @@ button:disabled {
 }
 
 .alert-card-message {
+  margin-top: 3px;
   display: -webkit-box;
   overflow: hidden;
   -webkit-box-orient: vertical;
@@ -1129,6 +1130,47 @@ button:disabled {
     #ffffff;
 }
 
+.device-manager-header {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+}
+
+.device-manager-header > div:first-child {
+  flex: 1;
+  min-width: 0;
+}
+
+.device-manager-refresh-button {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid #d1d5db;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #9ca3af;
+  box-shadow: none;
+}
+
+.device-manager-refresh-button svg {
+  width: 18px;
+  height: 18px;
+  stroke: currentColor;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  fill: none;
+}
+
 .manager-status {
   border-radius: 999px;
   padding: 7px 9px;
@@ -1244,6 +1286,54 @@ button:disabled {
     radial-gradient(circle at 100% 0%, rgba(186, 230, 253, 0.92), transparent 34%),
     #eff6ff;
   color: #1d4ed8;
+}
+
+.device-inline-add-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 64px;
+  min-height: 30px;
+  padding: 0 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #6b7280;
+  font: inherit;
+  font-size: 0.76rem;
+  font-weight: 420;
+  line-height: 1;
+  letter-spacing: 0;
+  white-space: nowrap;
+  box-shadow: none;
+  flex-shrink: 0;
+}
+
+.device-inline-add-button.active {
+  border-color: #d1d5db;
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.summary-action-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 78px;
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #6b7280;
+  font: inherit;
+  font-size: 0.76rem;
+  font-weight: 420;
+  line-height: 1;
+  letter-spacing: 0;
+  white-space: nowrap;
+  box-shadow: none;
+  flex-shrink: 0;
 }
 
 .device-register-card p:not(.card-label),
@@ -1443,14 +1533,25 @@ button:disabled {
 }
 
 .invite-avatar {
+  color: transparent;
+  font-size: 0;
+  font-weight: 300;
+  line-height: 1;
+}
+
+.invite-avatar::before {
+  content: '+';
   color: #1e293b;
   font-size: 1.8rem;
   font-weight: 300;
+  line-height: 1;
+  position: relative;
+  top: 3px;
 }
 
 .avatar-self {
-  background: linear-gradient(180deg, #fff8db 0%, #ffffff 100%);
-  color: #b45309;
+  background: linear-gradient(180deg, #fff4f7 0%, #ffffff 100%);
+  color: #be123c;
 }
 
 .avatar-guardian {
@@ -1466,7 +1567,7 @@ button:disabled {
   min-height: 20px;
   border: 2px solid #ffffff;
   border-radius: 999px;
-  background: #2dd4bf;
+  background: #e11d48;
   color: #ffffff;
   font-size: 0.58rem;
   line-height: 18px;
@@ -1516,6 +1617,16 @@ button:disabled {
 .guardian-form-card {
   display: grid;
   gap: 13px;
+}
+
+.guardian-form-hero {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.guardian-form-hero .card-title {
+  margin: 0;
 }
 
 .guardian-form-card h2 {
@@ -1613,7 +1724,7 @@ button:disabled {
 
 .wearable-pairing-card {
   display: grid;
-  grid-template-columns: auto 1fr;
+  grid-template-columns: minmax(0, 1fr) auto;
   width: 100%;
   align-items: center;
   gap: 12px;
@@ -3245,7 +3356,7 @@ h3 {
 }
 
 .voice-chatbot-fab {
-  bottom: 78px;
+  bottom: 82px;
   border: 1px solid rgba(255, 255, 255, 0.84);
   background:
     radial-gradient(circle at 32% 28%, #ffffff 0 13%, transparent 14%),
@@ -4713,7 +4824,7 @@ h2 {
 }
 
 .invite-avatar {
-  font-size: 1.8rem;
+  font-size: 0;
 }
 
 .phone-screen .home-loading-group p {
@@ -5205,18 +5316,21 @@ h2 {
 }
 
 .member-more-button {
-  width: auto;
-  min-width: 0;
-  height: 36px;
-  min-height: 36px;
-  padding: 0 12px;
-  border: 1px solid var(--app-border);
-  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 64px;
+  min-height: 30px;
+  padding: 0 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 999px;
   background: #ffffff;
-  color: var(--app-text-soft);
-  font-size: 0.78rem;
-  font-weight: 520;
+  color: #6b7280;
+  font-size: 0.76rem;
+  font-weight: 420;
   line-height: 1;
+  letter-spacing: 0;
+  white-space: nowrap;
   box-shadow: none;
 }
 
@@ -5395,6 +5509,10 @@ h2 {
 .phone-screen .accessibility-type-badge,
 .phone-screen .manager-status {
   font-weight: 500 !important;
+}
+
+.phone-screen .settings-logout-button {
+  font-weight: 420 !important;
 }
 
 .phone-screen .card-label,
@@ -6345,18 +6463,27 @@ h2 {
   gap: 12px;
 }
 
-.uwb-device-badge {
-  display: inline-flex;
+.uwb-device-badge,
+.device-manager-topline {
+  display: flex;
   align-items: center;
-  justify-content: center;
-  min-width: 78px;
-  min-height: 32px;
-  border-radius: 999px;
-  padding: 0 12px;
-  background: #fff1f2;
-  color: #e11d48;
-  font-size: 0.76rem;
-  font-weight: 520;
+  gap: 10px;
+}
+
+.device-manager-topline .card-label {
+  margin: 0 !important;
+}
+
+.device-manager-title-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+}
+
+.device-manager-title-row .card-title {
+  margin: 0;
 }
 
 .uwb-distance-panel {
@@ -6453,6 +6580,59 @@ h2 {
 
   to {
     transform: rotate(360deg);
+  }
+}
+
+.device-toast {
+  position: fixed;
+  right: 20px;
+  bottom: 104px;
+  left: 20px;
+  z-index: 50;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.device-toast-message {
+  margin: 0;
+  padding: 12px 16px;
+  border: 0;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.98);
+  color: #475569;
+  font-size: 0.82rem;
+  font-weight: 420;
+  line-height: 1.5;
+  text-align: center;
+  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.12);
+  animation: deviceToastFade 2.35s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@keyframes deviceToastFade {
+  0% {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  12% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  68% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  88% {
+    opacity: 0.38;
+    transform: translateY(3px);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translateY(8px);
   }
 }
 
@@ -7230,9 +7410,16 @@ h2 {
   gap: 3px;
 }
 
+.home-loading-message::before {
+  content: '';
+  display: inline-flex;
+  width: 16px;
+  flex: 0 0 16px;
+}
+
 .home-loading-dots {
   display: inline-flex;
-  min-width: 18px;
+  min-width: 16px;
   justify-content: space-between;
 }
 
@@ -7256,6 +7443,10 @@ h2 {
   width: 100%;
 }
 
+.phone-screen .home-header > div {
+  width: 100%;
+}
+
 .alert-header-stats-icon {
   display: inline-flex;
   align-items: center;
@@ -7268,6 +7459,8 @@ h2 {
   background: #ffffff;
   color: #4b5563;
   box-shadow: none;
+  margin-left: auto;
+  flex-shrink: 0;
 }
 
 .alert-header-stats-icon svg {
@@ -7283,20 +7476,135 @@ h2 {
 .safety-status-title {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 0;
 }
 
 .safety-status-emoji {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  margin-left: 3px;
+  margin-left: 2px;
   font-size: 0.98rem;
   line-height: 1;
+  position: relative;
+  top: 1px;
+}
+
+.phone-screen .home-safety-card .status-card-header > div,
+.phone-screen .emergency-card > div,
+.phone-screen .device-connected-card .section-title-row > div,
+.phone-screen .device-summary-card .section-title-row > div,
+.phone-screen .alert-summary-card .section-title-row > div,
+.phone-screen .uwb-card-header > div {
+  display: grid;
+  gap: 3px;
+}
+
+.phone-screen .device-manager-header > div:first-child {
+  display: grid;
+  gap: 6px;
+}
+
+.phone-screen .device-manager-header {
+  margin-bottom: 12px;
+}
+
+.phone-screen .home-safety-card {
+  gap: 4px !important;
+}
+
+.phone-screen .home-safety-card .status-card-header > div > .card-label,
+.phone-screen .emergency-card > div > .card-label,
+.phone-screen .device-connected-card .section-title-row > div > .card-label,
+.phone-screen .device-summary-card .section-title-row > div > .card-label,
+.phone-screen .alert-summary-card .section-title-row > div > .card-label,
+.phone-screen .uwb-card-header > div > .card-label,
+.phone-screen .device-manager-topline .card-label {
+  margin-bottom: 2px !important;
+}
+
+.phone-screen .home-safety-card .card-title,
+.phone-screen .home-safety-card .status-card-header strong,
+.phone-screen .emergency-card .card-title,
+.phone-screen .device-summary-card .card-title,
+.phone-screen .alert-summary-card .card-title {
+  font-size: 0.98rem !important;
+  font-weight: 520 !important;
+  line-height: 1.34 !important;
+  letter-spacing: -0.02em !important;
+}
+
+.phone-screen .home-safety-card .safety-status-title {
+  font-size: 1.1rem !important;
+}
+
+.phone-screen .emergency-card .card-title {
+  color: #172033 !important;
+}
+
+.phone-screen .home-safety-card .status-copy,
+.phone-screen .emergency-card-copy,
+.phone-screen .device-summary-card .device-stat,
+.phone-screen .alert-summary-card .alert-item p,
+.phone-screen .alert-summary-card .alert-item small,
+.phone-screen .alert-summary-card .empty-state {
+  margin-top: 4px !important;
+  font-size: 13.12px !important;
+  font-weight: 430 !important;
+  line-height: 1.56 !important;
+}
+
+.phone-screen .home-safety-card .home-metric-row {
+  margin-top: 18px !important;
+}
+
+.phone-screen .emergency-card .sos-button {
+  margin-top: 15px !important;
+}
+
+.phone-screen .alert-summary-card .alert-list {
+  margin-top: 25px !important;
+}
+
+.phone-screen .emergency-card .sos-button {
+  font-weight: 520 !important;
 }
 
 .phone-screen .home-member-card .member-status-message {
-  padding: 10px 12px !important;
+  margin-top: 8px !important;
+  padding: 11px 12px !important;
+}
+
+.phone-screen .home-member-card {
+  gap: 11px !important;
+  padding-top: 16px !important;
+}
+
+.phone-screen .home-member-header {
+  align-items: flex-start !important;
+}
+
+.phone-screen .guardian-manage-button {
+  align-self: center;
+}
+
+.phone-screen .connected-guardian-card {
+  gap: 0 !important;
+}
+
+.phone-screen .connected-guardian-card .section-title-row {
+  margin-bottom: 0 !important;
+}
+
+.phone-screen .home-member-header > div,
+.phone-screen .wearable-pairing-card > span:first-child,
+.phone-screen .settings-link-card {
+  display: grid;
+  gap: 3px !important;
+}
+
+.phone-screen .settings-link-card {
+  padding: 20px !important;
 }
 
 .phone-screen {
@@ -7316,21 +7624,9 @@ h2 {
 }
 
 .phone-screen .living-signal-panel-hero .card-title {
-  font-size: 1.04rem !important;
+  font-size: 0.98rem !important;
   font-weight: 520 !important;
   line-height: 1.34 !important;
-}
-
-.phone-screen .living-signal-arrow-back {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  padding: 0;
-  color: #111827 !important;
-  font-size: 1.3rem !important;
-  font-weight: 420 !important;
 }
 
 .phone-screen .living-signal-hero-spacer {
@@ -7341,6 +7637,7 @@ h2 {
 .phone-screen .living-signal-inline-add {
   min-height: 32px;
   padding: 0 12px;
+  flex-shrink: 0;
 }
 
 .phone-screen .living-signal-screen {
@@ -7360,7 +7657,7 @@ h2 {
 
 .phone-screen .living-signal-section-row h3,
 .phone-screen .living-signal-item-header h4 {
-  font-size: 1.04rem !important;
+  font-size: 0.98rem !important;
   font-weight: 520 !important;
 }
 
@@ -7382,6 +7679,13 @@ h2 {
   line-height: 1.56 !important;
 }
 
+.phone-screen .living-signal-section-row .back-button span {
+  margin-top: 0 !important;
+  padding: 0 !important;
+  font-size: inherit !important;
+  line-height: inherit !important;
+}
+
 .phone-screen .living-signal-item-actions {
   justify-content: flex-end;
 }
@@ -7398,6 +7702,368 @@ h2 {
 
 .phone-screen .wearable-scanner-card > p:not(.card-label):not(.member-status-message) {
   display: none;
+}
+
+.phone-screen.home-screen.app-screen {
+  padding: 0 !important;
+}
+
+.phone-screen.home-screen.app-screen .home-header {
+  padding: 22px 20px 4px !important;
+}
+
+.phone-screen.home-screen.app-screen .app-content {
+  padding: 6px 18px 110px !important;
+}
+
+.phone-screen.home-screen.app-screen .bottom-tabs {
+  position: absolute;
+  right: 18px;
+  bottom: 14px;
+  left: 18px;
+  z-index: 12;
+  margin: 0;
+}
+
+.phone-screen .home-header.app-header {
+  padding-left: 20px !important;
+  padding-right: 20px !important;
+}
+
+.phone-screen .app-header h1 {
+  font-size: 1.5rem !important;
+  line-height: 1.14 !important;
+}
+
+.phone-screen .content-card .card-label,
+.phone-screen .soft-card .card-label,
+.phone-screen .status-card .card-label,
+.phone-screen .emergency-card .card-label,
+.phone-screen .home-guide-card .card-label,
+.phone-screen .device-hero-card .card-label,
+.phone-screen .wearable-pairing-card .card-label,
+.phone-screen .settings-link-card .card-label,
+.phone-screen .guardian-form-card .card-label,
+.phone-screen .connected-guardian-card .card-label,
+.phone-screen .wearable-scanner-card .card-label,
+.phone-screen .device-manager-card .card-label,
+.phone-screen .device-register-card .card-label,
+.phone-screen .living-signal-header .card-label {
+  margin-bottom: 0 !important;
+  color: #6b7280 !important;
+  font-size: 0.74rem !important;
+  font-weight: 430 !important;
+  line-height: 1.4 !important;
+  letter-spacing: 0 !important;
+}
+
+.phone-screen .header-summary,
+.phone-screen .home-header + p,
+.phone-screen .app-header + p {
+  margin-top: 4px !important;
+  padding: 0 !important;
+  font-size: 13.12px !important;
+  line-height: 1.56 !important;
+}
+
+.phone-screen .status-copy,
+.phone-screen .soft-card p:not(.card-label),
+.phone-screen .alert-card p,
+.phone-screen .empty-state,
+.phone-screen .member-status-message,
+.phone-screen .scanner-result,
+.phone-screen .guardian-action-message,
+.phone-screen .voice-chatbot-status,
+.phone-screen .device-stat,
+.phone-screen .connected-guardian-item p,
+.phone-screen .connected-guardian-item span,
+.phone-screen .home-member-header p,
+.phone-screen .wearable-pairing-card p:not(.card-label),
+.phone-screen .wearable-scanner-card > p:not(.card-label):not(.member-status-message),
+.phone-screen .guardian-status-card p:not(.card-label) {
+  margin-top: 10px !important;
+  padding: 0 !important;
+  font-size: 13.12px !important;
+  line-height: 1.56 !important;
+}
+
+.phone-screen .guardian-form-card > .field:first-of-type {
+  margin-top: 6px;
+}
+
+.phone-screen .alert-card .alert-card-message {
+  margin-top: 3px !important;
+}
+
+.phone-screen .alert-card-main.no-icon {
+  grid-template-columns: 1fr !important;
+  gap: 0 !important;
+}
+
+.phone-screen .alert-card.unread {
+  border-color: #f3c2cd !important;
+}
+
+.phone-screen .status-badge {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-width: 78px !important;
+  min-height: 32px !important;
+  padding: 0 12px !important;
+  border: 0 !important;
+  border-radius: 999px !important;
+  background: #fff1f2 !important;
+  color: #e11d48 !important;
+  font-size: 0.76rem !important;
+  font-weight: 520 !important;
+}
+
+.phone-screen .home-metric-pill.danger {
+  background: #ffffff !important;
+  color: #64748b !important;
+}
+
+.phone-screen .device-summary-card .device-stat {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-height: 44px !important;
+  padding: 13px 12px !important;
+  margin-top: 0 !important;
+  white-space: nowrap !important;
+}
+
+.phone-screen .alert-delete-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 64px;
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #6b7280;
+  font-size: 0.76rem;
+  font-weight: 420;
+  line-height: 1;
+  white-space: nowrap;
+  box-shadow: none;
+  flex-shrink: 0;
+}
+
+.phone-screen .alert-card-actions.single-action {
+  grid-template-columns: 1fr !important;
+}
+
+.phone-screen .alert-detail-hero {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.phone-screen .alert-detail-hero.device-add-hero {
+  align-items: baseline !important;
+  gap: 8px !important;
+}
+
+.phone-screen .alert-detail-hero.device-add-hero .back-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  min-width: 32px;
+  min-height: 32px;
+  flex: 0 0 auto;
+  padding: 0;
+  color: #172033;
+  font-size: 1.55rem;
+  line-height: 1;
+  transform: translateY(1px);
+}
+
+.phone-screen .alert-detail-hero.device-add-hero .card-title {
+  margin: 0;
+}
+
+.phone-screen .alert-detail-heading {
+  display: grid;
+  gap: 10px;
+  justify-items: start;
+}
+
+.phone-screen .alert-detail-heading > div {
+  display: grid;
+  gap: 9px;
+  justify-items: start;
+}
+
+.phone-screen .alert-detail-heading .severity {
+  width: max-content;
+}
+
+.phone-screen .alert-detail-summary,
+.phone-screen .alert-followup-box p:not(.card-label),
+.phone-screen .alert-stats-note p:not(.card-label) {
+  margin: 0;
+  color: var(--app-text);
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+.phone-screen .alert-guide-box,
+.phone-screen .alert-followup-box,
+.phone-screen .alert-stats-note {
+  display: grid;
+  gap: 8px;
+  padding: 16px;
+  border: 1px solid #edf1f5;
+  border-radius: 18px;
+  background: #fafbfc;
+}
+
+.phone-screen .alert-guide-box p {
+  margin: 0;
+  color: var(--app-text);
+  font-size: 0.88rem;
+  line-height: 1.6;
+}
+
+.phone-screen .warning-summary-grid {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+}
+
+.phone-screen .warning-summary-grid div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 10px;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.phone-screen .warning-summary-grid dt,
+.phone-screen .alert-stats-card p {
+  margin: 0;
+  color: #64748b;
+  font-size: 0.7rem;
+  font-weight: 430;
+  line-height: 1.5;
+}
+
+.phone-screen .warning-summary-grid dd {
+  margin: 4px 0 0;
+  color: #172033;
+  font-size: 0.82rem;
+  font-weight: 900;
+  line-height: 1.6;
+  word-break: keep-all;
+}
+
+.phone-screen .alert-stats-panel {
+  display: grid;
+  gap: 16px;
+}
+
+.phone-screen .alert-stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.phone-screen .alert-stats-card {
+  display: grid;
+  gap: 6px;
+  padding: 16px;
+  border: 1px solid #edf1f5;
+  border-radius: 18px;
+  background: #ffffff;
+}
+
+.phone-screen .alert-stats-card strong {
+  color: var(--app-text);
+  font-size: 1.08rem;
+  font-weight: 500;
+  line-height: 1.3;
+}
+
+.phone-screen .alert-stats-card span {
+  color: var(--app-text-soft);
+  font-size: 0.8rem;
+  line-height: 1.55;
+}
+
+.phone-screen .alert-detail-panel .card-title,
+.phone-screen .alert-detail-panel strong,
+.phone-screen .alert-detail-panel dt,
+.phone-screen .alert-detail-panel dd,
+.phone-screen .alert-detail-panel .severity,
+.phone-screen .warning-recommendation-card .card-title,
+.phone-screen .warning-recommendation-card dt,
+.phone-screen .warning-recommendation-card dd,
+.phone-screen .alert-detail-panel .compact-button,
+.phone-screen .warning-recommendation-card strong {
+  font-weight: 420 !important;
+}
+
+.phone-screen .alert-detail-panel .action-row.single-action {
+  grid-template-columns: 1fr !important;
+}
+
+.phone-screen .alert-detail-panel .action-row .compact-button {
+  width: 100%;
+}
+
+.home-guide-card,
+.device-hero-card,
+.status-card,
+.emergency-card,
+.alert-summary-card,
+.device-summary-card,
+.uwb-card,
+.alert-detail-panel,
+.warning-recommendation-card,
+.device-manager-card,
+.connected-guardian-card,
+.guardian-form-card,
+.wearable-pairing-card,
+.settings-link-card,
+.wearable-scanner-card {
+  gap: 11px;
+}
+
+.phone-screen .device-add-hero {
+  display: flex !important;
+  align-items: baseline !important;
+  gap: 8px !important;
+}
+
+.phone-screen .device-add-hero .back-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  min-width: 32px;
+  min-height: 32px;
+  flex: 0 0 auto;
+  padding: 0;
+  color: #172033;
+  font-size: 1.55rem;
+  line-height: 1;
+  transform: translateY(1px);
+}
+
+.phone-screen .device-add-hero .card-title,
+.phone-screen .alert-detail-hero.device-add-hero .card-title {
+  margin: 0;
+  color: #172033 !important;
+  font-size: 0.98rem !important;
+  font-weight: 520 !important;
+  line-height: 1.34 !important;
+  letter-spacing: -0.02em !important;
 }
 
 @keyframes home-loading-dot {
