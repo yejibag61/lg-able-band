@@ -60,11 +60,52 @@ const screenModeLabels = {
   EMERGENCY_FULL_SCREEN: '긴급 전체 화면',
 }
 
+const notificationStatsMock = {
+  periods: [
+    { id: '7d', label: '최근 7일' },
+    { id: '30d', label: '최근 30일' },
+    { id: 'month', label: '이번 달' },
+  ],
+  summary: [
+    { id: 'total', label: '총 알림', value: '126', icon: 'bell' },
+    { id: 'danger', label: '위험 알림', value: '18', icon: 'shield', accent: true },
+    { id: 'topDevice', label: '가장 자주 사용한 가전', value: '세탁기', icon: 'washer' },
+    { id: 'peakTime', label: '알림 피크 시간', value: '19:00-21:00', icon: 'clock' },
+  ],
+  timeAlerts: [
+    { label: '오전 6시', value: 8 },
+    { label: '오전 9시', value: 13 },
+    { label: '오후 12시', value: 16 },
+    { label: '오후 3시', value: 20 },
+    { label: '오후 6시', value: 25 },
+    { label: '오후 9시', value: 44 },
+  ],
+  deviceUsage: [
+    { device: '세탁기', value: 48, icon: 'washer' },
+    { device: '냉장고', value: 32, icon: 'fridge' },
+    { device: 'TV', value: 20, icon: 'tv' },
+    { device: '공기질 센서', value: 14, icon: 'air' },
+    { device: '도어센서', value: 12, icon: 'door' },
+  ],
+  ratios: [
+    { label: '위험', value: 18, color: '#e11d48' },
+    { label: '주의', value: 32, color: '#f59e0b' },
+    { label: '일반', value: 50, color: '#cbd5e1' },
+  ],
+  deviceAlerts: [
+    { device: '세탁기', total: 48, danger: 6, caution: 14, normal: 28, icon: 'washer' },
+    { device: '냉장고', total: 32, danger: 3, caution: 9, normal: 20, icon: 'fridge' },
+    { device: '도어센서', total: 12, danger: 5, caution: 4, normal: 3, icon: 'door' },
+    { device: '공기질 센서', total: 14, danger: 4, caution: 5, normal: 5, icon: 'air' },
+  ],
+  insight:
+    '최근 7일 동안 저녁 시간대(19:00-21:00)에 알림이 가장 많이 발생했습니다. 세탁기와 도어센서 관련 알림 비중이 높아 생활 패턴이 저녁 시간에 집중되는 것으로 보입니다. 위험 알림은 공기질 센서와 도어센서에서 주로 발생했습니다.',
+}
+
 export function AlertsTab({
   accessibilityType,
   alerts,
   alertView = 'list',
-  onCloseStats = () => {},
 }) {
   const [alertItems, setAlertItems] = useState(alerts)
   const [activeFilter, setActiveFilter] = useState('ALL')
@@ -83,7 +124,6 @@ export function AlertsTab({
     [activeFilter, alertItems],
   )
 
-  const alertStats = useMemo(() => buildAlertStats(alertItems), [alertItems])
 
   useEffect(() => {
     if (selectedAlertId === null && alertView !== 'stats') {
@@ -203,7 +243,7 @@ export function AlertsTab({
   }
 
   if (alertView === 'stats' && !selectedAlert) {
-    return <AlertStatsPanel stats={alertStats} onBack={onCloseStats} />
+    return <NotificationStatsPage stats={notificationStatsMock} />
   }
 
   return (
@@ -342,40 +382,335 @@ function InlineAlertFeedback({ message }) {
   )
 }
 
-function AlertStatsPanel({ stats, onBack }) {
-  return (
-    <section className="tab-stack alert-tab" aria-labelledby="alert-stats-title">
-      <section className="content-card alert-stats-panel">
-        <div className="alert-detail-hero device-add-hero">
-          <button
-            className="text-button back-button alert-detail-back"
-            type="button"
-            aria-label="목록으로 돌아가기"
-            onClick={onBack}
-          >
-            <span aria-hidden="true">←</span>
-          </button>
-          <strong className="card-title" id="alert-stats-title">
-            통계
-          </strong>
-        </div>
+function NotificationStatsPage({ stats }) {
+  const [activePeriod, setActivePeriod] = useState('7d')
 
-        <div className="alert-stats-grid">
-          {stats.summaryCards.map((item) => (
-            <article className="alert-stats-card" key={item.label}>
+  return (
+    <section className="tab-stack alert-tab notification-stats-page" aria-label="알림 통계 리포트">
+      <PeriodFilter periods={stats.periods} activePeriod={activePeriod} onChange={setActivePeriod} />
+
+      <section className="notification-summary-grid" aria-label="알림 통계 요약">
+        {stats.summary.map((item) => (
+          <StatsSummaryCard item={item} key={item.id} />
+        ))}
+      </section>
+
+      <TimeAlertChart data={stats.timeAlerts} />
+      <DeviceUsageRanking data={stats.deviceUsage} />
+      <AlertRatioChart data={stats.ratios} />
+      <DeviceAlertTable data={stats.deviceAlerts} />
+      <AiInsightCard insight={stats.insight} />
+    </section>
+  )
+}
+
+function PeriodFilter({ periods, activePeriod, onChange }) {
+  return (
+    <div className="notification-period-filter" aria-label="통계 기간 선택">
+      {periods.map((period) => (
+        <button
+          className={activePeriod === period.id ? 'notification-period-button active' : 'notification-period-button'}
+          type="button"
+          key={period.id}
+          aria-pressed={activePeriod === period.id}
+          onClick={() => onChange(period.id)}
+        >
+          {period.label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+function StatsSummaryCard({ item }) {
+  const numericValue = Number(item.value)
+  const shouldCountUp = Number.isFinite(numericValue)
+
+  return (
+    <article className={item.accent ? 'stats-summary-card accent' : 'stats-summary-card'}>
+      <span className="stats-summary-icon" aria-hidden="true">
+        <StatsIcon name={item.icon} />
+      </span>
+      <div>
+        <p>{item.label}</p>
+        <strong>{shouldCountUp ? <CountUpNumber value={numericValue} /> : item.value}</strong>
+      </div>
+    </article>
+  )
+}
+
+function CountUpNumber({ value }) {
+  const [displayValue, setDisplayValue] = useState(() =>
+    typeof window !== 'undefined' &&
+    window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+      ? value
+      : 0,
+  )
+
+  useEffect(() => {
+    if (
+      typeof window === 'undefined' ||
+      window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+    ) {
+      return undefined
+    }
+
+    let animationFrame = 0
+    const duration = 650
+    const startTime = window.performance.now()
+
+    function updateFrame(now) {
+      const progress = Math.min((now - startTime) / duration, 1)
+      const easedProgress = 1 - (1 - progress) ** 3
+      setDisplayValue(Math.round(value * easedProgress))
+
+      if (progress < 1) {
+        animationFrame = window.requestAnimationFrame(updateFrame)
+      }
+    }
+
+    animationFrame = window.requestAnimationFrame(updateFrame)
+
+    return () => {
+      window.cancelAnimationFrame(animationFrame)
+    }
+  }, [value])
+
+  return displayValue
+}
+
+function TimeAlertChart({ data }) {
+  const maxValue = Math.max(...data.map((item) => item.value))
+
+  return (
+    <StatsSection title="시간대별 알림 발생 수">
+      <div className="time-alert-chart" aria-label="시간대별 알림 막대 차트">
+        {data.map((item) => (
+          <div className="time-alert-bar-item" key={item.label}>
+            <span className="time-alert-value">{item.value}</span>
+            <span
+              className="time-alert-bar"
+              style={{ height: Math.max((item.value / maxValue) * 100, 14) + '%' }}
+              aria-label={item.label + ' ' + item.value + '건'}
+            />
+            <span className="time-alert-label">{item.label}</span>
+          </div>
+        ))}
+      </div>
+    </StatsSection>
+  )
+}
+
+function DeviceUsageRanking({ data }) {
+  const maxValue = Math.max(...data.map((item) => item.value))
+
+  return (
+    <StatsSection title="자주 사용하는 가전">
+      <div className="device-usage-list">
+        {data.map((item) => (
+          <div className="device-usage-row" key={item.device}>
+            <span className="device-usage-icon" aria-hidden="true">
+              <StatsIcon name={item.icon} />
+            </span>
+            <span className="device-usage-name">{item.device}</span>
+            <span className="device-usage-track" aria-hidden="true">
+              <span style={{ width: (item.value / maxValue) * 100 + '%' }} />
+            </span>
+            <strong>{item.value}</strong>
+          </div>
+        ))}
+      </div>
+    </StatsSection>
+  )
+}
+
+function AlertRatioChart({ data }) {
+  const ratioSegments = data.reduce((segments, item) => {
+    const offset = segments.reduce((sum, segment) => sum + segment.value, 0)
+    return [...segments, { ...item, offset }]
+  }, [])
+
+  return (
+    <StatsSection title="위험/주의 알림 비율">
+      <div className="alert-ratio-layout">
+        <div className="alert-ratio-donut" aria-label="위험 18%, 주의 32%, 일반 50%" role="img">
+          <svg viewBox="0 0 120 120" focusable="false">
+            <circle className="alert-ratio-donut-track" cx="60" cy="60" r="46" />
+            {ratioSegments.map((item) => (
+              <circle
+                className="alert-ratio-donut-segment"
+                cx="60"
+                cy="60"
+                r="46"
+                key={item.label}
+                pathLength="100"
+                stroke={item.color}
+                strokeDasharray={item.value + ' ' + (100 - item.value)}
+                strokeDashoffset={-item.offset}
+              />
+            ))}
+          </svg>
+          <span>126</span>
+        </div>
+        <div className="alert-ratio-list">
+          {data.map((item) => (
+            <div className="alert-ratio-item" key={item.label}>
+              <span style={{ backgroundColor: item.color }} aria-hidden="true" />
               <p>{item.label}</p>
-              <strong>{item.value}</strong>
-              <span>{item.description}</span>
-            </article>
+              <strong>{item.value}%</strong>
+            </div>
           ))}
         </div>
+      </div>
+    </StatsSection>
+  )
+}
 
-        <div className="alert-stats-note">
-          <p className="card-label">요약</p>
-          <p>{stats.summaryMessage}</p>
+function DeviceAlertTable({ data }) {
+  return (
+    <StatsSection title="가전별 알림 통계">
+      <div className="device-alert-table" role="table" aria-label="가전별 알림 통계 표">
+        <div className="device-alert-row header" role="row">
+          <span role="columnheader">가전</span>
+          <span role="columnheader">총</span>
+          <span role="columnheader">위험</span>
+          <span role="columnheader">주의</span>
+          <span role="columnheader">일반</span>
         </div>
-      </section>
+        {data.map((item) => (
+          <div className="device-alert-row" role="row" key={item.device}>
+            <span className="device-alert-name" role="cell">
+              <span aria-hidden="true">
+                <StatsIcon name={item.icon} />
+              </span>
+              {item.device}
+            </span>
+            <strong role="cell">{item.total}</strong>
+            <strong className="danger" role="cell">
+              {item.danger}
+            </strong>
+            <strong className="caution" role="cell">
+              {item.caution}
+            </strong>
+            <span role="cell">{item.normal}</span>
+          </div>
+        ))}
+      </div>
+    </StatsSection>
+  )
+}
+
+function AiInsightCard({ insight }) {
+  return (
+    <section className="ai-insight-card" aria-labelledby="ai-insight-title">
+      <span className="ai-insight-icon" aria-hidden="true">
+        <StatsIcon name="spark" />
+      </span>
+      <div>
+        <div className="ai-insight-heading">
+          <strong id="ai-insight-title">AI 인사이트</strong>
+          <span>분석 기반 제안</span>
+        </div>
+        <p>{insight}</p>
+      </div>
     </section>
+  )
+}
+
+function StatsSection({ title, children }) {
+  const titleId = 'stats-' + title.replaceAll(' ', '-')
+
+  return (
+    <section className="stats-report-card" aria-labelledby={titleId}>
+      <div className="stats-report-header">
+        <h2 id={titleId}>{title}</h2>
+        <span aria-hidden="true">i</span>
+      </div>
+      {children}
+    </section>
+  )
+}
+
+function StatsIcon({ name }) {
+  const icons = {
+    air: (
+      <>
+        <circle cx="7" cy="7" r="1.2" />
+        <circle cx="14" cy="5" r="1.2" />
+        <circle cx="17" cy="12" r="1.2" />
+        <circle cx="9" cy="15" r="1.2" />
+        <circle cx="15" cy="18" r="1.2" />
+      </>
+    ),
+    bars: (
+      <>
+        <path d="M5 19V10" />
+        <path d="M12 19V5" />
+        <path d="M19 19v-7" />
+      </>
+    ),
+    bell: (
+      <>
+        <path d="M6 9a6 6 0 0 1 12 0c0 6 2 6 2 8H4c0-2 2-2 2-8" />
+        <path d="M10 20a2 2 0 0 0 4 0" />
+      </>
+    ),
+    clock: (
+      <>
+        <circle cx="12" cy="12" r="8" />
+        <path d="M12 7v5l4 3" />
+      </>
+    ),
+    door: (
+      <>
+        <path d="M7 4h10v16H7z" />
+        <path d="M14 12h1" />
+      </>
+    ),
+    fridge: (
+      <>
+        <path d="M7 3h10v18H7z" />
+        <path d="M7 10h10" />
+        <path d="M10 6v2" />
+        <path d="M10 13v3" />
+      </>
+    ),
+    shield: (
+      <>
+        <path d="M12 3 5 6v6c0 4 3 7 7 9 4-2 7-5 7-9V6z" />
+        <path d="M12 8v5" />
+        <path d="M12 16h.01" />
+      </>
+    ),
+    spark: (
+      <>
+        <path d="M12 3c1 4 3 6 7 7-4 1-6 3-7 7-1-4-3-6-7-7 4-1 6-3 7-7z" />
+        <path d="M5 15c.5 2 1.5 3 3.5 3.5" />
+        <path d="M18 4c.4 1.8 1.4 2.8 3 3.2" />
+      </>
+    ),
+    tv: (
+      <>
+        <path d="M5 7h14v9H5z" />
+        <path d="M9 20h6" />
+        <path d="M12 16v4" />
+      </>
+    ),
+    washer: (
+      <>
+        <path d="M6 4h12v16H6z" />
+        <path d="M6 8h12" />
+        <circle cx="12" cy="14" r="4" />
+        <path d="M9 6h.01" />
+        <path d="M12 6h.01" />
+      </>
+    ),
+  }
+
+  return (
+    <svg viewBox="0 0 24 24" focusable="false">
+      {icons[name] || icons.bars}
+    </svg>
   )
 }
 
@@ -493,47 +828,6 @@ function WarningRecommendationCard({ recommendation }) {
       </dl>
     </section>
   )
-}
-
-function buildAlertStats(alerts) {
-  const unreadCount = alerts.filter((alert) => alert.status === 'UNREAD').length
-  const dangerCount = alerts.filter((alert) => isUrgentAlert(alert)).length
-  const guardianCount = alerts.filter((alert) => alert.requiresGuardianNotify).length
-  const lifeCount = alerts.filter((alert) => alert.type === 'LIFE').length
-
-  return {
-    summaryCards: [
-      {
-        label: '전체 알림',
-        value: `${alerts.length}건`,
-        description: '최근 수신한 알림',
-      },
-      {
-        label: '미확인',
-        value: `${unreadCount}건`,
-        description: '아직 확인 전',
-      },
-      {
-        label: '위험 알림',
-        value: `${dangerCount}건`,
-        description: '긴급 대응 필요',
-      },
-      {
-        label: '보호자 전달',
-        value: `${guardianCount}건`,
-        description: '보호자 알림 대상',
-      },
-      {
-        label: '생활 알림',
-        value: `${lifeCount}건`,
-        description: '일상 안내 중심',
-      },
-    ],
-    summaryMessage:
-      unreadCount > 0
-        ? `현재 미확인 알림 ${unreadCount}건이 있어 먼저 확인이 필요합니다.`
-        : '현재 미확인 알림은 없고, 최근 알림 흐름은 차분하게 유지되고 있습니다.',
-  }
 }
 
 function filterAlert(alert, activeFilter) {
