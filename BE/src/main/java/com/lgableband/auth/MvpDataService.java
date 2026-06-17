@@ -316,7 +316,7 @@ public class MvpDataService {
 			String guardianName = hasGuardian ? this.mockDataStore.guardians(user.userId()).get(0).name() : null;
 			return new HomeData(
 				new HomeUser(user.userId(), this.mockDataStore.accountById(user.accountId()).name(), user.accessibilityType().name()),
-				new HomeSafetyStatus(SafetyStatusLevel.SAFE, "현재 위험 알림이 없습니다.", OffsetDateTime.now()),
+				new HomeSafetyStatus(SafetyStatusLevel.SAFE, "Able Band가 실시간 안전 상태를 확인 중입니다.", OffsetDateTime.now()),
 				alerts,
 				new HomeDeviceSummary(devices.size(), connected, warning, uwb),
 				new HomeEmergency(hasGuardian, guardianName),
@@ -338,7 +338,7 @@ public class MvpDataService {
 
 		return new HomeData(
 			new HomeUser(user.userId(), user.name(), user.accessibilityType().name()),
-			new HomeSafetyStatus(SafetyStatusLevel.SAFE, "현재 위험 알림이 없습니다.", OffsetDateTime.now()),
+			new HomeSafetyStatus(SafetyStatusLevel.SAFE, "Able Band가 실시간 안전 상태를 확인 중입니다.", OffsetDateTime.now()),
 			alerts,
 			new HomeDeviceSummary(total, connected, warning, uwb),
 			new HomeEmergency(hasGuardian, guardianName),

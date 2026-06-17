@@ -107,7 +107,7 @@ export function AlertsTab({
             : alert,
         ),
       )
-      setFeedbackMessage('알림을 확인 처리했습니다.')
+      setFeedbackMessage('알림을 확인 완료로 처리했습니다.')
     } catch (error) {
       setFeedbackMessage(error.message || '알림 확인 처리에 실패했습니다.')
     }
@@ -333,9 +333,6 @@ function AlertDetail({ alert, feedbackMessage, onBack, onConfirm, onReplay, warn
             {alert.title}
           </strong>
         </div>
-        <span className={`alert-status-chip alert-status-${alert.status.toLowerCase()}`}>
-          {statusLabels[alert.status] || alert.status}
-        </span>
       </div>
 
       <p className="alert-detail-summary">{alert.message}</p>
@@ -437,7 +434,7 @@ function buildAlertStats(alerts) {
       {
         label: '전체 알림',
         value: `${alerts.length}건`,
-        description: '최근 수신된 알림',
+        description: '최근 수신한 알림',
       },
       {
         label: '미확인',
@@ -463,7 +460,7 @@ function buildAlertStats(alerts) {
     summaryMessage:
       unreadCount > 0
         ? `현재 미확인 알림 ${unreadCount}건이 있어 먼저 확인이 필요합니다.`
-        : '현재 미확인 알림은 없고, 최근 알림 흐름을 한눈에 확인할 수 있습니다.',
+        : '현재 미확인 알림은 없고, 최근 알림 흐름은 차분하게 유지되고 있습니다.',
   }
 }
 
@@ -493,7 +490,19 @@ function isUrgentAlert(alert) {
 }
 
 function formatAlertTime(isoString) {
-  return isoString.slice(11, 16)
+  const date = new Date(isoString)
+
+  if (Number.isNaN(date.getTime())) {
+    return isoString
+  }
+
+  return new Intl.DateTimeFormat('ko-KR', {
+    month: 'numeric',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  }).format(date)
 }
 
 function createAlertGuide(alert) {

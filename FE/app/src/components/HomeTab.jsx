@@ -16,8 +16,6 @@ export function HomeTab({
 }) {
   const recentAlerts = summary.recentAlerts.slice(0, 1)
   const alertMetrics = createAlertMetrics(summary.recentAlerts)
-  const guardianName = summary.emergency.primaryGuardianName || '보호자'
-
   return (
     <>
       <section className={`status-card home-safety-card status-${summary.safetyStatus.level.toLowerCase()}`}>
@@ -44,7 +42,7 @@ export function HomeTab({
       <section className="emergency-card">
         <div>
           <p className="card-label">긴급 지원 요청</p>
-          <strong className="card-title">{guardianName}에게 바로 알림</strong>
+          <strong className="card-title">보호자에게 바로 알림</strong>
           <p className="emergency-card-copy">버튼을 누르면 보호자에게 상황을 즉시 알립니다.</p>
         </div>
         <button
@@ -71,7 +69,7 @@ export function HomeTab({
               연결된 기기 {summary.deviceSummary.connectedCount}/{summary.deviceSummary.totalCount}개
             </strong>
           </div>
-          <button className="device-inline-add-button" type="button" onClick={onOpenDevices}>
+          <button className="summary-action-button" type="button" onClick={onOpenDevices}>
             기기 확인
           </button>
         </div>
@@ -87,7 +85,7 @@ export function HomeTab({
             <p className="card-label">실시간 알림 요약</p>
             <strong className="card-title">최근 알림</strong>
           </div>
-          <button className="device-inline-add-button" type="button" onClick={onOpenAlerts}>
+          <button className="summary-action-button" type="button" onClick={onOpenAlerts}>
             전체 보기
           </button>
         </div>

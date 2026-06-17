@@ -347,15 +347,9 @@ function MenuTab({
 
   return (
     <section className="tab-stack" aria-labelledby="menu-title">
-      <div className="content-card hero-card">
-        <p className="card-label">빠른 설정</p>
-        <h2 id="menu-title">자주 바꾸는 설정만 모았어요.</h2>
-        <p>{userName}님의 접근성, 보호자, 생활 신호 기능을 확인합니다.</p>
-      </div>
-
       <section className="content-card">
-        <div className="section-title-row">
-          <h2>접근성 설정</h2>
+        <div className="section-title-row" id="menu-title">
+          <strong className="card-title">접근성 설정</strong>
           <span>{accessibility.textSize}</span>
         </div>
         <div className="settings-grid">
@@ -370,7 +364,7 @@ function MenuTab({
         <div className="home-member-header">
           <div>
             <p className="card-label">보호자 연결</p>
-            <h2 id="home-member-title">홈 멤버</h2>
+            <strong className="card-title" id="home-member-title">홈 멤버</strong>
             <p>{guardianMembers.length}명</p>
           </div>
           <button
@@ -379,7 +373,7 @@ function MenuTab({
             aria-label="홈 멤버 관리"
             onClick={onOpenGuardianConnection}
           >
-            ›
+            관리
           </button>
         </div>
 
@@ -428,14 +422,14 @@ function MenuTab({
         </span>
         <span>
           <p className="card-label">웨어러블 연동</p>
-          <h2>밴드 QR을 카메라로 스캔해요.</h2>
+          <strong className="card-title">밴드 QR을 카메라로 스캔해요.</strong>
           <p>웨어러블 화면의 QR 코드를 비추면 바로 연결을 시작합니다.</p>
         </span>
       </button>
 
       <button className="soft-card settings-link-card" type="button" onClick={onOpenLivingSignals}>
         <p className="card-label">생활 신호 설정</p>
-        <h2>등록된 생활 알림음을 관리해요.</h2>
+        <strong className="card-title">등록된 생활 알림음을 관리해요.</strong>
         <p>
           현재 {livingSignals.summary.registeredSoundCount}개 신호, 샘플{' '}
           {livingSignals.summary.enrolledClipCount}개가 등록되어 있어요.
@@ -592,7 +586,7 @@ function WearablePairingScannerScreen({ onBack }) {
 
       <section className="content-card wearable-scanner-card">
         <p className="card-label">웨어러블 연동</p>
-        <h2 id="wearable-scanner-title">밴드 QR을 스캔해주세요.</h2>
+        <strong className="card-title" id="wearable-scanner-title">밴드 QR을 스캔해주세요.</strong>
         <p>
           웨어러블의 첫 화면 또는 연동 화면에 표시된 QR 코드를 카메라로 비춰주세요.
         </p>
@@ -775,13 +769,20 @@ function GuardianConnectionScreen({
 
   return (
     <section className="tab-stack guardian-connection-screen" aria-labelledby="guardian-connection-title">
-      <button className="text-link-button" type="button" onClick={onBack}>
-        메뉴로 돌아가기
-      </button>
-
       <form className="content-card guardian-form-card" onSubmit={handleSubmit}>
-        <p className="card-label">보호자 연결</p>
-        <h2 id="guardian-connection-title">긴급 알림을 받을 보호자를 등록해요.</h2>
+        <div className="guardian-form-hero">
+          <button
+            className="text-button back-button alert-detail-back"
+            type="button"
+            aria-label="목록으로 돌아가기"
+            onClick={onBack}
+          >
+            <span aria-hidden="true">←</span>
+          </button>
+          <strong className="card-title" id="guardian-connection-title">
+            알림 받을 보호자를 등록해 주세요.
+          </strong>
+        </div>
 
         <label className="field">
           <span>보호자 이메일</span>
@@ -835,7 +836,7 @@ function GuardianConnectionScreen({
 
       <section className="content-card connected-guardian-card" aria-labelledby="connected-guardian-title">
         <div className="section-title-row">
-          <h2 id="connected-guardian-title">연결된 보호자</h2>
+          <strong className="card-title" id="connected-guardian-title">연결된 보호자</strong>
           <span>{guardians.length}명</span>
         </div>
 

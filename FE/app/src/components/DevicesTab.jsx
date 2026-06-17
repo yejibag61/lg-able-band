@@ -16,7 +16,7 @@ const deviceCatalog = [
     type: 'WASHER',
     typeLabel: '세탁기',
     room: '세탁실',
-    detail: '세탁 완료와 문 열림, 오류 안내를 앱에서 바로 확인할 수 있습니다.',
+    detail: '선택한 가전의 기본 정보를 확인합니다.',
     primarySignal: '세탁 완료 알림',
     locationSupported: true,
     remoteEnabled: true,
@@ -404,7 +404,7 @@ export function DevicesTab({ devices = [], maxDeviceCount, uwb }) {
         <div className="section-title-row">
           <div>
             <p className="card-label">연결된 가전</p>
-            <h2 id="connected-devices-title">내 가전 목록</h2>
+            <strong className="card-title" id="connected-devices-title">내 가전 목록</strong>
           </div>
           <button
             className={isDevicePickerOpen ? 'device-inline-add-button active' : 'device-inline-add-button'}
@@ -489,8 +489,12 @@ export function DevicesTab({ devices = [], maxDeviceCount, uwb }) {
         >
           <div className="device-manager-header">
             <div>
-              <p className="card-label">{selectedDevice.room}</p>
-              <strong className="card-title">{selectedDevice.name} 관리</strong>
+              <div className="device-manager-topline">
+                <p className="card-label">{selectedDevice.room}</p>
+              </div>
+              <div className="device-manager-title-row">
+                <strong className="card-title">{selectedDevice.name} 관리</strong>
+              </div>
             </div>
             <button
               className="device-manager-refresh-button"
@@ -601,6 +605,7 @@ function getGuideTarget(devices, selectedDevice, uwb) {
 
   return devices[0] || null
 }
+
 
 function formatLastEvent(value) {
   if (!value) {
