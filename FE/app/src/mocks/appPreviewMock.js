@@ -100,6 +100,7 @@ export const mockAppPreview = {
     {
       deviceId: 1,
       name: '세탁기',
+      vendorDeviceId: 'thinq-washer-001',
       type: 'WASHER',
       typeLabel: '세탁기',
       room: '세탁실',
@@ -114,76 +115,6 @@ export const mockAppPreview = {
       locationSupported: true,
       lastEventLabel: '14:20 세탁 완료',
       management: ['세탁 완료 알림', '문 열림/오류 안내', 'UWB 위치 안내'],
-    },
-    {
-      deviceId: 2,
-      name: 'TV',
-      type: 'TV',
-      typeLabel: 'TV',
-      room: '거실',
-      connectionStatus: 'CONNECTED',
-      status: '연결됨',
-      detail: '전원 상태, 볼륨, 채널 변경 안내를 확인합니다.',
-      primarySignal: '전원/볼륨 상태 안내',
-      locationSupported: false,
-      lastEventLabel: '13:48 전원 꺼짐',
-      management: ['전원 상태 안내', '볼륨/채널 안내', '리모컨 찾기'],
-    },
-    {
-      deviceId: 3,
-      name: '안전 전기레인지',
-      type: 'RANGE',
-      typeLabel: '전기레인지',
-      room: '주방',
-      connectionStatus: 'WARNING',
-      status: '주의 필요',
-      detail: '잔열과 과열 위험 신호를 우선 안내합니다.',
-      primarySignal: '잔열·과열 경고',
-      locationSupported: false,
-      lastEventLabel: '14:42 과열 주의',
-      management: ['전원 켜짐 안내', '조리 완료 알림', '잔열·과열 경고'],
-    },
-    {
-      deviceId: 4,
-      name: '도어센서',
-      type: 'DOOR_SENSOR',
-      typeLabel: '도어센서',
-      room: '현관',
-      connectionStatus: 'CONNECTED',
-      status: '연결됨',
-      detail: '문 열림과 장시간 열림 상태를 즉시 알립니다.',
-      primarySignal: '문 열림 알림',
-      locationSupported: false,
-      lastEventLabel: '12:10 현관 닫힘',
-      management: ['문 열림 알림', '장시간 열림 경고', '외출 전 확인'],
-    },
-    {
-      deviceId: 5,
-      name: 'LG 공기질 센서',
-      type: 'AIR_SENSOR',
-      typeLabel: '공기질 센서',
-      room: '거실',
-      connectionStatus: 'CONNECTED',
-      status: '연결됨',
-      detail: '공기질, 온습도, 미세먼지 상태를 생활 알림으로 전달합니다.',
-      primarySignal: '공기질 상태 안내',
-      locationSupported: true,
-      lastEventLabel: '14:05 공기질 좋음',
-      management: ['이산화탄소 안내', '온도/습도 안내', '미세먼지 안내'],
-    },
-    {
-      deviceId: 6,
-      name: '냉장고',
-      type: 'REFRIGERATOR',
-      typeLabel: '냉장고',
-      room: '주방',
-      connectionStatus: 'WARNING',
-      status: '주의 필요',
-      detail: '문 열림, 온도 이상, 식재료 찾기 알림을 관리합니다.',
-      primarySignal: '문 열림 알림',
-      locationSupported: false,
-      lastEventLabel: '13:30 문 열림 주의',
-      management: ['문 열림 알림', '온도 이상 안내', '식재료 찾기'],
     },
   ],
   accessibility: {
@@ -243,4 +174,13 @@ export const mockAppPreview = {
       '기준값 이상이면 등록된 생활 신호 이름으로 안내합니다.',
     ],
   },
+}
+
+export function resetMockDevices() {
+  if (typeof window === 'undefined' || !window.localStorage) {
+    return
+  }
+
+  window.localStorage.removeItem('connectedDevices')
+  window.localStorage.removeItem('availableDevices')
 }

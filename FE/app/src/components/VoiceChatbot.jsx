@@ -10,13 +10,39 @@ import {
   stopChatbotWakeService,
   subscribeChatbotWake,
 } from '../services/chatbotWakeService'
-import { playGreetingAudio, playTurnCueTone } from '../services/turnCueAudioService'
+import {
+  playGreetingAudio,
+  playTurnCueTone,
+  stopTurnCueAudio,
+  unlockTurnCueAudio,
+} from '../services/turnCueAudioService'
+import { handleStructuredVoiceCommand } from '../services/voiceIntentEngine'
 import { requestVoiceChat } from '../services/voiceChatbotService'
 import { normalizeSpeechText, shouldCloseChatbot, shouldOpenChatbot } from '../utils/chatbotWake'
 
 export { shouldOpenChatbot } from '../utils/chatbotWake'
 
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
+export const CHATBOT_INTERRUPT_EVENT = 'lg-able-band:interrupt-chatbot'
+
+const CHATBOT_VOICE_STATE = {
+  CLOSED: 'CLOSED',
+  OPENING: 'OPENING',
+  SPEAKING: 'SPEAKING',
+  BEEPING: 'BEEPING',
+  LISTENING: 'LISTENING',
+  THINKING: 'THINKING',
+  INTERRUPTED: 'INTERRUPTED',
+  CLOSING: 'CLOSING',
+  ERROR: 'ERROR',
+}
+
+const UNCLEAR_SPEECH_GUIDE =
+  '말씀하신 내용을 이해하지 못했어요. 미확인 알림, 위험 알림, 최근 알림, 세탁기 상태처럼 물어봐 주세요.'
+const RECOGNITION_RETRY_GUIDE = '말씀을 정확히 인식하지 못했습니다. 다시 말씀해주세요.'
+const RECOGNITION_REPEAT_FAILURE_GUIDE =
+  '계속 인식이 어렵습니다. 화면의 입력창에 직접 입력하거나 다시 시도할 수 있습니다.'
+const CLOSE_CHATBOT_GUIDE = '챗봇을 종료할게요.'
 
 const locationGuideSteps = [
   {
@@ -114,6 +140,9 @@ export function VoiceChatbot({
   const [showResetConfirm, setShowResetConfirm] = useState(false)
   const [selectedQuestionCategoryId, setSelectedQuestionCategoryId] = useState(initialQuestionCategoryId)
   const [turnCueEnabled, setTurnCueEnabled] = useState(true)
+  const [voiceState, setVoiceState] = useState(
+    initialOpen ? CHATBOT_VOICE_STATE.OPENING : CHATBOT_VOICE_STATE.CLOSED,
+  )
   const recognitionRef = useRef(null)
   const wakeRecognitionRef = useRef(null)
   const latestTranscriptRef = useRef('')
@@ -133,7 +162,14 @@ export function VoiceChatbot({
   const greetingTimeoutRef = useRef(null)
   const speechEndTimeoutRef = useRef(null)
   const speechStartTimeoutRef = useRef(null)
+  const speechStartDelayTimeoutRef = useRef(null)
+  const speechRetryTimeoutRef = useRef(null)
+  const turnCueTimeoutRef = useRef(null)
+  const spokenBotMessageIdsRef = useRef(new Set())
   const appFlowRef = useRef(null)
+  const voiceStateRef = useRef(initialOpen ? CHATBOT_VOICE_STATE.OPENING : CHATBOT_VOICE_STATE.CLOSED)
+  const audioStopVersionRef = useRef(0)
+  const recognitionFailureCountRef = useRef(0)
 
   const supportsSpeechRecognition = Boolean(SpeechRecognition)
   const chatbotContext = useMemo(() => createChatbotContext(summary, preview), [preview, summary])
@@ -159,9 +195,13 @@ export function VoiceChatbot({
       window.clearTimeout(recognitionStartTimeoutRef.current)
       window.clearTimeout(speechEndTimeoutRef.current)
       window.clearTimeout(speechStartTimeoutRef.current)
+      window.clearTimeout(speechStartDelayTimeoutRef.current)
+      window.clearTimeout(speechRetryTimeoutRef.current)
+      window.clearTimeout(turnCueTimeoutRef.current)
       wakeRecognitionRef.current?.stop()
       recognitionRef.current?.stop()
       window.speechSynthesis?.cancel()
+      stopTurnCueAudio()
     }
   }, [embedded])
 
@@ -200,11 +240,60 @@ export function VoiceChatbot({
     }
   }, [messages, isListening, status])
 
+  useEffect(() => {
+    function handleExternalInterrupt() {
+      if (!isOpenRef.current) {
+        stopChatbotAudioAndTimers()
+        stopActiveRecognition()
+        return
+      }
+
+      runChatbotButtonAction(closeChatbot)
+    }
+
+    window.addEventListener(CHATBOT_INTERRUPT_EVENT, handleExternalInterrupt)
+    return () => {
+      window.removeEventListener(CHATBOT_INTERRUPT_EVENT, handleExternalInterrupt)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (assistantMode !== 'talk' || !conversationActiveRef.current || manualStopRef.current) {
+      return
+    }
+
+    const nextMessageToSpeak = [...messages]
+      .reverse()
+      .find((message) => (
+        message.role === 'bot'
+        && !message.pending
+        && message.text
+        && !spokenBotMessageIdsRef.current.has(message.id)
+      ))
+
+    if (!nextMessageToSpeak) {
+      return
+    }
+
+    spokenBotMessageIdsRef.current.add(nextMessageToSpeak.id)
+    setStatus('응답 중...')
+    speakAndCueUserTurn(getBotMessageVoiceText(nextMessageToSpeak, chatbotContext), () => {
+      setStatus('응답 완료')
+    })
+  }, [assistantMode, chatbotContext, messages])
+
+  function setChatbotVoiceState(nextState) {
+    voiceStateRef.current = nextState
+    setVoiceState(nextState)
+  }
+
   function openAssistant() {
     isOpenRef.current = true
     stopWakeListening()
+    unlockTurnCueAudio()
     conversationActiveRef.current = false
     manualStopRef.current = false
+    setChatbotVoiceState(CHATBOT_VOICE_STATE.CLOSED)
     setAssistantMode(embedded ? 'talk' : 'select')
     setIsOpen(true)
     setError('')
@@ -214,15 +303,18 @@ export function VoiceChatbot({
   function openChatbot(options = {}) {
     isOpenRef.current = true
     stopWakeListening()
+    unlockTurnCueAudio()
     conversationActiveRef.current = true
     manualStopRef.current = false
+    recognitionFailureCountRef.current = 0
+    setChatbotVoiceState(CHATBOT_VOICE_STATE.OPENING)
     setAssistantMode('talk')
     setSelectedQuestionCategoryId(null)
     setIsOpen(true)
     setError('')
     setStatus('안내 중...')
     window.clearTimeout(greetingTimeoutRef.current)
-    const greetingDelayMs = options.fromWake ? 850 : 250
+    const greetingDelayMs = options.fromWake ? 650 : 0
     greetingTimeoutRef.current = window.setTimeout(() => {
       if (!conversationActiveRef.current || manualStopRef.current) {
         return
@@ -232,18 +324,66 @@ export function VoiceChatbot({
     }, greetingDelayMs)
   }
 
-  function closeChatbot() {
-    isOpenRef.current = false
-    conversationActiveRef.current = false
-    manualStopRef.current = true
-    recognitionStartingRef.current = false
-    recognitionListeningRef.current = false
+  function stopChatbotAudioAndTimers() {
+    audioStopVersionRef.current += 1
     window.clearTimeout(recognitionStartTimeoutRef.current)
     window.clearTimeout(greetingTimeoutRef.current)
     window.clearTimeout(speechEndTimeoutRef.current)
     window.clearTimeout(speechStartTimeoutRef.current)
-    window.speechSynthesis?.cancel()
-    recognitionRef.current?.stop()
+    window.clearTimeout(speechStartDelayTimeoutRef.current)
+    window.clearTimeout(speechRetryTimeoutRef.current)
+    window.clearTimeout(turnCueTimeoutRef.current)
+    stopTurnCueAudio()
+    try {
+      window.speechSynthesis?.cancel?.()
+    } catch {
+      // Speech synthesis can be unavailable while the browser changes audio focus.
+    }
+  }
+
+  function stopActiveRecognition() {
+    try {
+      recognitionRef.current?.abort?.()
+    } catch {
+      // The recognizer may already be stopped between turns.
+    }
+
+    try {
+      recognitionRef.current?.stop?.()
+    } catch {
+      // The recognizer may already be stopped between turns.
+    }
+  }
+
+  function runChatbotButtonAction(action, options = {}) {
+    const { stopRecognition = true } = options
+
+    setChatbotVoiceState(CHATBOT_VOICE_STATE.INTERRUPTED)
+    if (requestInFlightRef.current) {
+      chatResetVersionRef.current += 1
+      requestInFlightRef.current = false
+      setIsRequesting(false)
+    }
+    stopChatbotAudioAndTimers()
+    if (stopRecognition) {
+      recognitionStartingRef.current = false
+      recognitionListeningRef.current = false
+      stopActiveRecognition()
+      setIsListening(false)
+    }
+
+    action?.()
+  }
+
+  function closeChatbot() {
+    isOpenRef.current = false
+    conversationActiveRef.current = false
+    manualStopRef.current = true
+    setChatbotVoiceState(CHATBOT_VOICE_STATE.CLOSED)
+    recognitionStartingRef.current = false
+    recognitionListeningRef.current = false
+    stopChatbotAudioAndTimers()
+    stopActiveRecognition()
     setIsListening(false)
     setStatus('대화 종료')
     setAssistantMode('select')
@@ -262,17 +402,20 @@ export function VoiceChatbot({
   }
 
   function returnToFeatureSelect() {
+    chatResetVersionRef.current += 1
     conversationActiveRef.current = false
     manualStopRef.current = true
+    setChatbotVoiceState(CHATBOT_VOICE_STATE.CLOSED)
     recognitionStartingRef.current = false
     recognitionListeningRef.current = false
-    window.clearTimeout(recognitionStartTimeoutRef.current)
-    window.clearTimeout(greetingTimeoutRef.current)
-    window.clearTimeout(speechEndTimeoutRef.current)
-    window.clearTimeout(speechStartTimeoutRef.current)
-    window.speechSynthesis?.cancel()
-    recognitionRef.current?.stop()
+    requestInFlightRef.current = false
+    latestTranscriptRef.current = ''
+    sentTranscriptRef.current = ''
+    appFlowRef.current = null
+    stopChatbotAudioAndTimers()
+    stopActiveRecognition()
     setIsListening(false)
+    setIsRequesting(false)
     setStatus('대기 중')
     setAssistantMode('select')
     setShowResetConfirm(false)
@@ -280,9 +423,11 @@ export function VoiceChatbot({
   }
 
   function resetChat() {
+    const shouldRestartConversation = assistantMode === 'talk' && isOpenRef.current
     chatResetVersionRef.current += 1
     conversationActiveRef.current = false
     manualStopRef.current = true
+    setChatbotVoiceState(CHATBOT_VOICE_STATE.CLOSED)
     recognitionStartingRef.current = false
     recognitionListeningRef.current = false
     requestInFlightRef.current = false
@@ -290,12 +435,9 @@ export function VoiceChatbot({
     sentTranscriptRef.current = ''
     lastInfoAgentRef.current = null
     appFlowRef.current = null
-    window.clearTimeout(recognitionStartTimeoutRef.current)
-    window.clearTimeout(greetingTimeoutRef.current)
-    window.clearTimeout(speechEndTimeoutRef.current)
-    window.clearTimeout(speechStartTimeoutRef.current)
-    window.speechSynthesis?.cancel()
-    recognitionRef.current?.stop()
+    spokenBotMessageIdsRef.current.clear()
+    stopChatbotAudioAndTimers()
+    stopActiveRecognition()
 
     setMessages([])
     setInputText('')
@@ -307,6 +449,20 @@ export function VoiceChatbot({
     setStatus('대기 중')
     setShowResetConfirm(false)
     setSelectedQuestionCategoryId(null)
+
+    if (shouldRestartConversation) {
+      conversationActiveRef.current = true
+      manualStopRef.current = false
+      recognitionFailureCountRef.current = 0
+      setChatbotVoiceState(CHATBOT_VOICE_STATE.OPENING)
+      setStatus('안내 중...')
+      window.clearTimeout(greetingTimeoutRef.current)
+      greetingTimeoutRef.current = window.setTimeout(() => {
+        if (conversationActiveRef.current && !manualStopRef.current) {
+          speakGreetingAndCueUserTurn()
+        }
+      }, 0)
+    }
   }
 
   function ensureWakeRecognition() {
@@ -401,6 +557,7 @@ export function VoiceChatbot({
       latestTranscriptRef.current = ''
       sentTranscriptRef.current = ''
       manualStopRef.current = false
+      setChatbotVoiceState(CHATBOT_VOICE_STATE.LISTENING)
       setIsListening(true)
       setStatus('듣는 중...')
       setError('')
@@ -416,7 +573,15 @@ export function VoiceChatbot({
 
       const lastResult = event.results[event.results.length - 1]
       if (lastResult.isFinal) {
+        recognitionFailureCountRef.current = 0
+        recognitionListeningRef.current = false
+        setIsListening(false)
         setStatus('음성 인식 완료')
+        try {
+          recognition.stop?.()
+        } catch {
+          // Recognition may already be stopping after the final transcript.
+        }
         sendRecognizedText(transcript)
       }
     }
@@ -439,7 +604,13 @@ export function VoiceChatbot({
         return
       }
 
-      setStatus(event.error === 'no-speech' ? '음성을 기다리고 있어요' : '음성 인식 오류')
+      if (event.error === 'no-speech') {
+        handleRecognitionFailure(RECOGNITION_RETRY_GUIDE)
+        return
+      }
+
+      setChatbotVoiceState(CHATBOT_VOICE_STATE.ERROR)
+      setStatus('음성 인식 오류')
     }
 
     recognition.onend = () => {
@@ -458,6 +629,11 @@ export function VoiceChatbot({
         return
       }
 
+      if (voiceStateRef.current === CHATBOT_VOICE_STATE.LISTENING) {
+        handleRecognitionFailure(RECOGNITION_RETRY_GUIDE)
+        return
+      }
+
       setStatus('음성 입력 대기')
     }
 
@@ -470,6 +646,10 @@ export function VoiceChatbot({
       !conversationActiveRef.current
       || recognitionStartingRef.current
       || recognitionListeningRef.current
+      || voiceStateRef.current === CHATBOT_VOICE_STATE.SPEAKING
+      || voiceStateRef.current === CHATBOT_VOICE_STATE.BEEPING
+      || voiceStateRef.current === CHATBOT_VOICE_STATE.THINKING
+      || voiceStateRef.current === CHATBOT_VOICE_STATE.CLOSING
     ) {
       return
     }
@@ -483,6 +663,7 @@ export function VoiceChatbot({
 
     const wakeWasListening = stopWakeListening()
     recognitionStartingRef.current = true
+    setChatbotVoiceState(CHATBOT_VOICE_STATE.LISTENING)
     setStatus('마이크 연결 중...')
     setError('')
 
@@ -526,11 +707,38 @@ export function VoiceChatbot({
     window.clearTimeout(recognitionStartTimeoutRef.current)
     recognitionRef.current?.stop()
     setIsListening(false)
+    if (voiceStateRef.current === CHATBOT_VOICE_STATE.LISTENING) {
+      setChatbotVoiceState(CHATBOT_VOICE_STATE.INTERRUPTED)
+    }
     setStatus('일시 정지')
   }
 
   async function handleAppVoiceCommand(text, displayText, continueConversation) {
     const flow = appFlowRef.current
+    if (!flow || flow.currentIntent) {
+      const structuredResult = await handleStructuredVoiceCommand({
+        currentTask: flow?.currentIntent ? flow : null,
+        text,
+        context: {
+          preview,
+          summary,
+          session,
+          deviceCatalog: deviceVoiceCatalog,
+        },
+      })
+
+      if (structuredResult.handled) {
+        appFlowRef.current = structuredResult.nextTask || null
+        respondWithLocalAssistant(
+          displayText,
+          structuredResult.responseText,
+          continueConversation,
+          createStructuredResponseData(structuredResult, text),
+        )
+        return true
+      }
+    }
+
     if (flow) {
       return continueAppFlow(flow, text, displayText, continueConversation)
     }
@@ -949,22 +1157,25 @@ export function VoiceChatbot({
     return true
   }
 
-  function respondWithLocalAssistant(userText, assistantText, continueConversation) {
+  function respondWithLocalAssistant(userText, assistantText, continueConversation, extraData = {}) {
     const visibleUserText = userText.trim()
     const shouldKeepTalking = continueConversation || conversationActiveRef.current
+    const botMessage = createChatMessage('bot', assistantText, {
+      data: {
+        answerText: assistantText,
+        voiceText: assistantText,
+        intent: 'APP_VOICE_FLOW',
+        action: 'LOCAL_APP_ACTION',
+        ...extraData,
+      },
+    })
     setInputText('')
     setError('')
+    spokenBotMessageIdsRef.current.add(botMessage.id)
     setMessages((previousMessages) => [
       ...previousMessages,
       ...(visibleUserText ? [createChatMessage('user', visibleUserText)] : []),
-      createChatMessage('bot', assistantText, {
-        data: {
-          answerText: assistantText,
-          voiceText: assistantText,
-          intent: 'APP_VOICE_FLOW',
-          action: 'LOCAL_APP_ACTION',
-        },
-      }),
+      botMessage,
     ])
     setStatus('응답 중...')
     cueAssistantTurn()
@@ -972,12 +1183,32 @@ export function VoiceChatbot({
       speakAndCueUserTurn(assistantText, () => {
         setStatus('응답 완료')
       })
+    } else {
+      setChatbotVoiceState(CHATBOT_VOICE_STATE.SPEAKING)
+      speak(assistantText, () => {
+        setStatus('응답 완료')
+      })
+    }
+  }
+
+  function speakBotMessageNow(message, keepConversation) {
+    if (!message?.id || spokenBotMessageIdsRef.current.has(message.id)) {
       return
     }
 
-    speak(assistantText, () => {
-      setStatus('응답 완료')
-    })
+    spokenBotMessageIdsRef.current.add(message.id)
+    const voiceText = getBotMessageVoiceText(message, chatbotContext)
+    setStatus('응답 중...')
+    if (keepConversation) {
+      speakAndCueUserTurn(voiceText, () => {
+        setStatus('응답 완료')
+      })
+    } else {
+      setChatbotVoiceState(CHATBOT_VOICE_STATE.SPEAKING)
+      speak(voiceText, () => {
+        setStatus('응답 완료')
+      })
+    }
   }
 
   async function sendMessage(
@@ -1001,11 +1232,11 @@ export function VoiceChatbot({
 
     if (shouldCloseChatbot(trimmedText)) {
       setInputText(trimmedText)
+      setChatbotVoiceState(CHATBOT_VOICE_STATE.CLOSING)
       setStatus('대화 종료 중...')
-      speak('음성 챗봇을 종료할게요.', () => {
-        playTurnCue('user', { force: true }).finally(() => {
-          closeChatbot()
-        })
+      pauseRecognitionForAssistantSpeech()
+      speak(CLOSE_CHATBOT_GUIDE, () => {
+        closeChatbot()
       })
       return
     }
@@ -1020,6 +1251,7 @@ export function VoiceChatbot({
     const requestResetVersion = chatResetVersionRef.current
     requestInFlightRef.current = true
     setIsRequesting(true)
+    setChatbotVoiceState(CHATBOT_VOICE_STATE.THINKING)
     setStatus('챗봇 응답 요청 중...')
     setError('')
     setInputText('')
@@ -1079,34 +1311,22 @@ export function VoiceChatbot({
         }
         setFollowupPromptResponse(enrichedData)
       }
-      const spokenResponseText = getSpokenAssistantText(
-        enrichedData,
-        enrichedData.voiceText || enrichedData.answerText || '응답을 받았습니다.',
-        chatbotContext,
-      )
+      const botMessageForSpeech = {
+        ...pendingMessage,
+        pending: false,
+        text: enrichedData.answerText || '응답을 받았습니다.',
+        data: enrichedData,
+        hideInfoCard: isFollowup,
+      }
       setResponse(enrichedData)
       setMessages((previousMessages) => previousMessages.map((message) => (
         message.id === pendingMessage.id
-          ? {
-              ...message,
-              pending: false,
-              text: enrichedData.answerText || '응답을 받았습니다.',
-              data: enrichedData,
-              hideInfoCard: isFollowup,
-            }
+          ? botMessageForSpeech
           : message
       )))
       setStatus('응답 중...')
       cueAssistantTurn()
-      if (continueConversation || conversationActiveRef.current) {
-        speakAndCueUserTurn(spokenResponseText, () => {
-          setStatus('응답 완료')
-        })
-      } else {
-        speak(spokenResponseText, () => {
-          setStatus('응답 완료')
-        })
-      }
+      speakBotMessageNow(botMessageForSpeech, continueConversation || conversationActiveRef.current)
     } catch (requestError) {
       await waitForMinimumDuration(requestStartedAt, 350)
       if (requestResetVersion !== chatResetVersionRef.current) {
@@ -1114,22 +1334,20 @@ export function VoiceChatbot({
       }
 
       const errorText = requestError.message || '음성 챗봇 연결에 실패했습니다.'
+      const botErrorMessage = {
+        ...pendingMessage,
+        pending: false,
+        error: true,
+        text: '연결에 실패했어요. 잠시 후 다시 시도해 주세요.',
+      }
       setError(errorText)
       setMessages((previousMessages) => previousMessages.map((message) => (
         message.id === pendingMessage.id
-          ? {
-              ...message,
-              pending: false,
-              error: true,
-              text: '연결에 실패했어요. 잠시 후 다시 시도해 주세요.',
-            }
+          ? botErrorMessage
           : message
       )))
       setStatus('연결 실패')
-
-      if (continueConversation || conversationActiveRef.current) {
-        speakAndCueUserTurn('연결에 실패했어요. 잠시 후 다시 시도해 주세요.')
-      }
+      speakBotMessageNow(botErrorMessage, continueConversation || conversationActiveRef.current)
     } finally {
       if (requestResetVersion === chatResetVersionRef.current) {
         requestInFlightRef.current = false
@@ -1145,7 +1363,28 @@ export function VoiceChatbot({
     }
 
     sentTranscriptRef.current = trimmedText
+    if (!isMeaningfulVoiceRequest(trimmedText)) {
+      handleRecognitionFailure(UNCLEAR_SPEECH_GUIDE)
+      return
+    }
+
     sendMessage(trimmedText)
+  }
+
+  function handleRecognitionFailure(message) {
+    if (!conversationActiveRef.current || manualStopRef.current) {
+      return
+    }
+
+    recognitionFailureCountRef.current += 1
+    const guidanceText = recognitionFailureCountRef.current >= 2
+      ? RECOGNITION_REPEAT_FAILURE_GUIDE
+      : message
+    setError('')
+    setInputText('')
+    speakAndCueUserTurn(guidanceText, () => {
+      setStatus('응답 완료')
+    })
   }
 
   function cueAssistantTurn() {
@@ -1154,6 +1393,7 @@ export function VoiceChatbot({
 
   function speakAndCueUserTurn(text, afterSpeech, options = {}) {
     pauseRecognitionForAssistantSpeech()
+    setChatbotVoiceState(CHATBOT_VOICE_STATE.SPEAKING)
     speak(text, () => {
       afterSpeech?.()
       cueUserTurnAndListen()
@@ -1161,8 +1401,24 @@ export function VoiceChatbot({
   }
 
   function speakGreetingAndCueUserTurn() {
-    speakAndCueUserTurn('무엇을 도와드릴까요', null, {
-      fallbackAudio: playGreetingAudio,
+    pauseRecognitionForAssistantSpeech()
+    setChatbotVoiceState(CHATBOT_VOICE_STATE.SPEAKING)
+    const greetingVersion = audioStopVersionRef.current
+    playGreetingAudio().then((played) => {
+      if (
+        greetingVersion !== audioStopVersionRef.current
+        || !conversationActiveRef.current
+        || manualStopRef.current
+      ) {
+        return
+      }
+
+      if (played) {
+        cueUserTurnAndListen()
+        return
+      }
+
+      speakAndCueUserTurn('무엇을 도와드릴까요')
     })
   }
 
@@ -1193,10 +1449,19 @@ export function VoiceChatbot({
       return
     }
 
+    setChatbotVoiceState(CHATBOT_VOICE_STATE.BEEPING)
     setStatus('말씀해 주세요')
-    window.setTimeout(() => {
+    window.clearTimeout(turnCueTimeoutRef.current)
+    const cueVersion = audioStopVersionRef.current
+    turnCueTimeoutRef.current = window.setTimeout(() => {
       playTurnCue('user', { force: true }).finally(() => {
-        if (conversationActiveRef.current && !manualStopRef.current) {
+        if (
+          cueVersion === audioStopVersionRef.current
+          && conversationActiveRef.current
+          && !manualStopRef.current
+          && voiceStateRef.current === CHATBOT_VOICE_STATE.BEEPING
+        ) {
+          setChatbotVoiceState(CHATBOT_VOICE_STATE.LISTENING)
           startListening()
         }
       })
@@ -1214,7 +1479,12 @@ export function VoiceChatbot({
   function speak(text, onEnd, options = {}) {
     if (!text || !('speechSynthesis' in window)) {
       if (options.fallbackAudio) {
-        options.fallbackAudio().finally(() => onEnd?.())
+        const fallbackVersion = audioStopVersionRef.current
+        options.fallbackAudio().finally(() => {
+          if (fallbackVersion === audioStopVersionRef.current) {
+            onEnd?.()
+          }
+        })
         return
       }
 
@@ -1224,6 +1494,8 @@ export function VoiceChatbot({
 
     window.clearTimeout(speechEndTimeoutRef.current)
     window.clearTimeout(speechStartTimeoutRef.current)
+    window.clearTimeout(speechStartDelayTimeoutRef.current)
+    window.clearTimeout(speechRetryTimeoutRef.current)
     try {
       window.speechSynthesis.cancel?.()
       window.speechSynthesis.resume?.()
@@ -1231,67 +1503,66 @@ export function VoiceChatbot({
       // Speech synthesis can be unavailable for a moment while mobile browsers swap audio sessions.
     }
 
-    window.setTimeout(() => {
+    const speechVersion = audioStopVersionRef.current
+    speechStartDelayTimeoutRef.current = window.setTimeout(() => {
+      if (speechVersion !== audioStopVersionRef.current) {
+        return
+      }
+
       window.speechSynthesis.resume?.()
-      speakWithRetry(text, onEnd, 0, options)
+      speakWithRetry(text, onEnd, 0, options, speechVersion)
     }, 120)
   }
 
-  function speakWithRetry(text, onEnd, retryCount, options = {}) {
+  function speakWithRetry(text, onEnd, retryCount, options = {}, speechVersion = audioStopVersionRef.current) {
     const utterance = createKoreanUtterance(text)
-    let speechStarted = false
     const handleEnd = callOnce(() => {
       window.clearTimeout(speechEndTimeoutRef.current)
       window.clearTimeout(speechStartTimeoutRef.current)
-      onEnd?.()
+      window.clearTimeout(speechStartDelayTimeoutRef.current)
+      window.clearTimeout(speechRetryTimeoutRef.current)
+      if (speechVersion !== audioStopVersionRef.current) {
+        return
+      }
+
+      if (speechVersion === audioStopVersionRef.current) {
+        onEnd?.()
+      }
     })
     const handleError = callOnce(() => {
       window.clearTimeout(speechEndTimeoutRef.current)
       window.clearTimeout(speechStartTimeoutRef.current)
+      window.clearTimeout(speechStartDelayTimeoutRef.current)
+      window.clearTimeout(speechRetryTimeoutRef.current)
       if (retryCount < 2) {
-        window.setTimeout(() => {
+        speechRetryTimeoutRef.current = window.setTimeout(() => {
+          if (speechVersion !== audioStopVersionRef.current) {
+            return
+          }
+
           window.speechSynthesis?.resume?.()
-          speakWithRetry(text, onEnd, retryCount + 1, options)
+          speakWithRetry(text, onEnd, retryCount + 1, options, speechVersion)
         }, 250)
         return
       }
 
       if (options.fallbackAudio) {
-        options.fallbackAudio().finally(() => onEnd?.())
+        options.fallbackAudio().finally(() => {
+          if (speechVersion === audioStopVersionRef.current) {
+            onEnd?.()
+          }
+        })
         return
       }
 
       onEnd?.()
     })
 
-    utterance.onstart = () => {
-      speechStarted = true
-      window.clearTimeout(speechStartTimeoutRef.current)
-    }
     utterance.onend = handleEnd
     utterance.onerror = handleError
     window.speechSynthesis.speak(utterance)
     window.speechSynthesis.resume?.()
     const fallbackMs = Math.min(Math.max(text.length * 350, 4500), 30000)
-    speechStartTimeoutRef.current = window.setTimeout(() => {
-      if (speechStarted) {
-        return
-      }
-
-      try {
-        window.speechSynthesis.cancel?.()
-        window.speechSynthesis.resume?.()
-      } catch {
-        // Continue with retry or fallback.
-      }
-
-      if (retryCount < 2) {
-        speakWithRetry(text, onEnd, retryCount + 1, options)
-        return
-      }
-
-      handleError()
-    }, 1200)
     speechEndTimeoutRef.current = window.setTimeout(handleEnd, fallbackMs)
   }
 
@@ -1302,7 +1573,7 @@ export function VoiceChatbot({
           className="voice-chatbot-fab"
           type="button"
           aria-label="음성 챗봇 열기"
-          onClick={openAssistant}
+          onClick={() => runChatbotButtonAction(openChatbot)}
         >
           AI
         </button>
@@ -1325,14 +1596,14 @@ export function VoiceChatbot({
                 </button>
               </div>
               <ChatbotFeatureSelect
-                onOpenSpeak={() => setAssistantMode('speak')}
-                onOpenTalk={openChatbot}
+                onOpenSpeak={() => runChatbotButtonAction(() => setAssistantMode('speak'))}
+                onOpenTalk={() => runChatbotButtonAction(openChatbot)}
               />
             </>
           ) : null}
 
           {assistantMode === 'speak' ? (
-            <SpeakForMeScreen onBack={returnToFeatureSelect} />
+            <SpeakForMeScreen onBack={() => runChatbotButtonAction(returnToFeatureSelect)} />
           ) : null}
 
           {assistantMode === 'talk' ? (
@@ -1342,7 +1613,7 @@ export function VoiceChatbot({
               type="button"
               className="voice-close-button voice-talk-back"
               aria-label="챗봇 선택으로 돌아가기"
-              onClick={returnToFeatureSelect}
+              onClick={() => runChatbotButtonAction(returnToFeatureSelect)}
             >
               ‹
             </button>
@@ -1353,7 +1624,7 @@ export function VoiceChatbot({
               type="button"
               className="voice-reset-button"
               aria-label="대화 초기화"
-              onClick={() => setShowResetConfirm(true)}
+              onClick={() => runChatbotButtonAction(() => setShowResetConfirm(true))}
             >
               ↻
             </button>
@@ -1361,7 +1632,7 @@ export function VoiceChatbot({
 
           <div className="voice-chatbot-status-row" role="status" aria-live="polite">
             <span className={`voice-status-dot ${isListening || isRequesting ? 'is-active' : ''}`} />
-            <span>{compactStatusLabel(status, isRequesting, isListening)}</span>
+            <span>{compactStatusLabel(status, isRequesting, isListening, voiceState)}</span>
           </div>
           {error ? <p className="voice-chatbot-error">{error}</p> : null}
 
@@ -1390,7 +1661,7 @@ export function VoiceChatbot({
                       <button
                         type="button"
                         className="text-link-button"
-                        onClick={() => setSelectedQuestionCategoryId(null)}
+                        onClick={() => runChatbotButtonAction(() => setSelectedQuestionCategoryId(null))}
                       >
                         다른 주제 선택
                       </button>
@@ -1404,7 +1675,7 @@ export function VoiceChatbot({
                           type="button"
                           key={prompt}
                           disabled={isRequesting}
-                          onClick={() => sendMessage(prompt, true)}
+                          onClick={() => runChatbotButtonAction(() => sendMessage(prompt, true))}
                         >
                           {prompt}
                         </button>
@@ -1420,7 +1691,7 @@ export function VoiceChatbot({
                         key={category.id}
                         aria-label={`${category.title} 선택`}
                         disabled={isRequesting}
-                        onClick={() => setSelectedQuestionCategoryId(category.id)}
+                        onClick={() => runChatbotButtonAction(() => setSelectedQuestionCategoryId(category.id))}
                       >
                         <span className="voice-start-card-icon voice-category-image-wrap" aria-hidden="true">
                           {category.iconSrc ? (
@@ -1475,11 +1746,12 @@ export function VoiceChatbot({
                       {message.role === 'bot' && !message.hideInfoCard && shouldRenderInfoCard(message.data) ? (
                         <InfoAgentCard
                           response={message.data}
-                          onReplay={() => replayAndCueUserTurn(getSpokenAssistantText(
+                          onStopAudio={() => runChatbotButtonAction()}
+                          onReplay={() => runChatbotButtonAction(() => replayAndCueUserTurn(getSpokenAssistantText(
                             message.data,
                             message.data.voiceText || message.data.answerText || message.text,
                             chatbotContext,
-                          ))}
+                          )))}
                         />
                       ) : null}
 
@@ -1487,11 +1759,11 @@ export function VoiceChatbot({
                         <>
                           <ChatAlertCards data={message.data} context={chatbotContext} />
                           <MessageReplayAction
-                            onReplay={() => replayAndCueUserTurn(getSpokenAssistantText(
+                            onReplay={() => runChatbotButtonAction(() => replayAndCueUserTurn(getSpokenAssistantText(
                               message.data,
                               message.data?.voiceText || message.text,
                               chatbotContext,
-                            ))}
+                            )))}
                           />
                         </>
                       ) : null}
@@ -1512,7 +1784,7 @@ export function VoiceChatbot({
                   type="button"
                   className="voice-followup-close"
                   aria-label="정보 후속 질문 닫기"
-                  onClick={() => setFollowupPromptResponse(null)}
+                  onClick={() => runChatbotButtonAction(() => setFollowupPromptResponse(null))}
                 >
                   닫기
                 </button>
@@ -1527,7 +1799,7 @@ export function VoiceChatbot({
                       type="button"
                       key={prompt}
                       disabled={isRequesting}
-                      onClick={() => sendMessage(requestText, true, prompt)}
+                      onClick={() => runChatbotButtonAction(() => sendMessage(requestText, true, prompt))}
                     >
                       {prompt}
                     </button>
@@ -1548,7 +1820,7 @@ export function VoiceChatbot({
                 onKeyDown={(event) => {
                   if (event.key === 'Enter' && !event.shiftKey) {
                     event.preventDefault()
-                    sendMessage(inputText, true)
+                    runChatbotButtonAction(() => sendMessage(inputText, true))
                   }
                 }}
               />
@@ -1559,7 +1831,7 @@ export function VoiceChatbot({
               type="button"
               aria-label={isListening ? '음성 인식 중지' : '음성 입력 시작'}
               disabled={!supportsSpeechRecognition || isRequesting}
-              onClick={() => {
+              onClick={() => runChatbotButtonAction(() => {
                 conversationActiveRef.current = true
                 manualStopRef.current = false
                 if (isListening) {
@@ -1567,7 +1839,7 @@ export function VoiceChatbot({
                 } else {
                   startListening()
                 }
-              }}
+              }, { stopRecognition: false })}
             >
               <span aria-hidden="true">🎙</span>
             </button>
@@ -1577,7 +1849,7 @@ export function VoiceChatbot({
               type="button"
               aria-label="텍스트로 보내기"
               disabled={isRequesting}
-              onClick={() => sendMessage(inputText, true)}
+              onClick={() => runChatbotButtonAction(() => sendMessage(inputText, true))}
             >
               {isRequesting ? '…' : '↗'}
             </button>
@@ -1597,14 +1869,14 @@ export function VoiceChatbot({
                   <button
                     type="button"
                     className="voice-reset-cancel"
-                    onClick={() => setShowResetConfirm(false)}
+                    onClick={() => runChatbotButtonAction(() => setShowResetConfirm(false))}
                   >
                     취소
                   </button>
                   <button
                     type="button"
                     className="voice-reset-confirm"
-                    onClick={resetChat}
+                    onClick={() => runChatbotButtonAction(resetChat)}
                   >
                     초기화
                   </button>
@@ -1620,7 +1892,7 @@ export function VoiceChatbot({
   )
 }
 
-function InfoAgentCard({ response, onReplay }) {
+function InfoAgentCard({ response, onReplay, onStopAudio }) {
   const priority = response.classification?.priority
   const category = response.classification?.category
   const showUrgentActions = category === '재난/안전' || priority === 'URGENT'
@@ -1692,6 +1964,7 @@ function InfoAgentCard({ response, onReplay }) {
             className="primary-button compact-button"
             aria-label="보호자에게 이 정보 공유하기"
             onClick={() => {
+              onStopAudio?.()
               // TODO: Connect the guardian sharing API when it is available.
             }}
           >
@@ -1740,6 +2013,31 @@ function ChatAlertCards({ data, context }) {
         ))}
       </div>
     </section>
+  )
+}
+
+function createStructuredResponseData(structuredResult, requestText) {
+  const resultData = structuredResult.result?.data || {}
+  const hasAlerts = Array.isArray(resultData.alerts)
+  return {
+    responseType: 'STRUCTURED_VOICE_ACTION',
+    requestText,
+    intent: hasAlerts ? 'READ_ALERTS' : 'STRUCTURED_VOICE_ACTION',
+    action: hasAlerts ? 'READ_ALERTS' : 'EXECUTE_APP_ACTION',
+    alerts: resultData.alerts,
+    voiceActionResult: structuredResult.result,
+  }
+}
+
+function getBotMessageVoiceText(message, context) {
+  if (!message?.data) {
+    return message?.text || ''
+  }
+
+  return getSpokenAssistantText(
+    message.data,
+    message.data.voiceText || message.data.answerText || message.text,
+    context,
   )
 }
 
@@ -2113,7 +2411,14 @@ function formatChatAlertTime(value) {
   return `${date.getFullYear()}.${String(date.getMonth() + 1).padStart(2, '0')}.${String(date.getDate()).padStart(2, '0')}`
 }
 
-function compactStatusLabel(status, isRequesting, isListening) {
+function compactStatusLabel(status, isRequesting, isListening, voiceState) {
+  if (voiceState === CHATBOT_VOICE_STATE.SPEAKING) return '답변 중'
+  if (voiceState === CHATBOT_VOICE_STATE.BEEPING) return '대기 중'
+  if (voiceState === CHATBOT_VOICE_STATE.LISTENING) return '듣는 중'
+  if (voiceState === CHATBOT_VOICE_STATE.THINKING) return '생각 중'
+  if (voiceState === CHATBOT_VOICE_STATE.CLOSING) return '종료 중'
+  if (voiceState === CHATBOT_VOICE_STATE.OPENING) return '답변 중'
+  if (voiceState === CHATBOT_VOICE_STATE.ERROR) return '오류'
   if (isListening) return '듣는 중'
   if (isRequesting) return '답변 정리 중'
   if (status.includes('응답 중')) return '말하는 중'
@@ -2130,6 +2435,33 @@ function shouldRenderInfoCard(data) {
   if (data.responseType === 'FOLLOWUP_ANSWER') return false
   if (data.intent === 'INFO_AGENT_FOLLOWUP') return false
   return true
+}
+
+function isMeaningfulVoiceRequest(text) {
+  const normalized = normalizeSpeechText(text)
+  if (shouldCloseChatbot(normalized) || shouldOpenChatbot(normalized)) {
+    return true
+  }
+
+  const compact = normalized.replace(/\s+/g, '')
+  if (compact.length < 3) {
+    return false
+  }
+
+  const unclearPatterns = [
+    /^아?그럴$/,
+    /^아그렇$/,
+    /^아$/,
+    /^어$/,
+    /^음$/,
+    /^응$/,
+    /^네$/,
+    /^그래$/,
+    /^그냥$/,
+    /^몰라$/,
+  ]
+
+  return !unclearPatterns.some((pattern) => pattern.test(compact))
 }
 
 async function waitForMinimumDuration(startedAt, minimumDuration) {

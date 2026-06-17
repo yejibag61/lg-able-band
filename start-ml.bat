@@ -2,10 +2,13 @@
 setlocal
 cd /d "%~dp0"
 
+set "INFO_AGENT_PYTHON=python"
+if exist "%USERPROFILE%\anaconda3\python.exe" set "INFO_AGENT_PYTHON=%USERPROFILE%\anaconda3\python.exe"
+
 call :start_if_unhealthy 8000 /health LGABLEBAND_CONTEXT_AI "cd /d ""%~dp0ML\context"" && python server.py"
 call :start_if_unhealthy 8001 /health LGABLEBAND_WARNING_AI "cd /d ""%~dp0ML\warning"" && python server.py"
 call :start_if_unhealthy 8002 /health LGABLEBAND_SOUND_CHATBOT "cd /d ""%~dp0ML\sound_chatbot"" && python server.py"
-call :start_if_unhealthy 8004 /health LGABLEBAND_INFO_AGENT "cd /d ""%~dp0ML\info_agent"" && python info_agent_server.py"
+call :start_if_unhealthy 8004 /health LGABLEBAND_INFO_AGENT "cd /d ""%~dp0"" && ""%INFO_AGENT_PYTHON%"" -m ML.info_agent.info_agent_server"
 call :start_if_unhealthy 8003 /health LGABLEBAND_EMERGENCY_AI "cd /d ""%~dp0ML\emergency"" && python server.py"
 exit /b
 

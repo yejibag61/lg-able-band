@@ -52,7 +52,7 @@ public class DeviceService {
 					device.locationSupported(),
 					device.lastEventAt(),
 					null,
-					null,
+					mockVendorDeviceId(device.type()),
 					false
 				))
 				.toList();
@@ -394,6 +394,19 @@ public class DeviceService {
 		return value
 			.replace("\\", "\\\\")
 			.replace("\"", "\\\"");
+	}
+
+	private String mockVendorDeviceId(DeviceType type) {
+		return switch (type) {
+			case WASHER -> "thinq-washer-001";
+			case TV -> "thinq-tv-001";
+			case RANGE -> "thinq-range-001";
+			case DOOR_SENSOR -> "door-sensor-001";
+			case AIR_SENSOR -> "thinq-air-001";
+			case REFRIGERATOR -> "thinq-fridge-001";
+			case WEARABLE -> "able-band-demo-001";
+			case UWB_TAG -> "uwb-tag-demo-001";
+		};
 	}
 
 	private JdbcTemplate jdbcTemplate() {

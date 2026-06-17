@@ -68,7 +68,7 @@ const deviceCatalog = [
     primarySignal: '문 열림 알림',
     locationSupported: false,
     remoteEnabled: false,
-    defaultVendorDeviceId: 'thinq-door-001',
+    defaultVendorDeviceId: 'door-sensor-001',
     management: ['문 열림 알림', '열림 상태 경고', 'UWB 위치 안내'],
   },
   {
@@ -99,7 +99,7 @@ const deviceCatalog = [
   },
 ]
 
-export function DevicesTab({ devices = [], maxDeviceCount, uwb }) {
+export function DevicesTab({ devices = [], uwb }) {
   const catalogByType = useMemo(
     () => Object.fromEntries(deviceCatalog.map((item) => [item.type, item])),
     [],
@@ -125,19 +125,10 @@ export function DevicesTab({ devices = [], maxDeviceCount, uwb }) {
   const selectedDevice =
     connectedDevices.find((device) => device.deviceId === selectedDeviceId) || null
 
-  const registeredDeviceTypes = useMemo(
-    () => new Set(connectedDevices.map((device) => device.type)),
-    [connectedDevices],
-  )
-
   const uwbTarget = getGuideTarget(connectedDevices, selectedDevice, uwb)
   const isGuidingCurrentTarget = Boolean(
     uwbTarget && bleGuide.isActive && bleGuide.targetName === uwbTarget.name,
   )
-  const isGuidingSelectedDevice = Boolean(
-    selectedDevice && bleGuide.isActive && bleGuide.targetName === selectedDevice.name,
-  )
-
   useEffect(() => {
     if (!connectionMessage) {
       return undefined
@@ -190,7 +181,7 @@ export function DevicesTab({ devices = [], maxDeviceCount, uwb }) {
   }
 
   function openCreatePage(template) {
-    if (registeredDeviceTypes.has(template.type)) {
+    if (isDeviceConnected(connectedDevices, template)) {
       setConnectionMessage(`${template.name}는 이미 연결된 가전입니다.`)
       setIsDevicePickerOpen(false)
       return
@@ -238,12 +229,24 @@ export function DevicesTab({ devices = [], maxDeviceCount, uwb }) {
       return
     }
 
+    const normalizedDraft = {
+      ...draft,
+      vendorDeviceId: draft.vendorDeviceId.trim(),
+    }
+    if (isDeviceConnected(connectedDevices, normalizedDraft)) {
+      setSubmitState({
+        saving: false,
+        error: '이미 연결된 기기입니다.',
+      })
+      return
+    }
+
     setSubmitState({ saving: true, error: '' })
 
     try {
       const savedDevice = await createDevice({
         vendor: draft.vendor,
-        vendorDeviceId: draft.vendorDeviceId.trim(),
+        vendorDeviceId: normalizedDraft.vendorDeviceId,
         name: draft.name.trim(),
         type: draft.type,
         locationSupported: draft.locationSupported,
@@ -270,6 +273,7 @@ export function DevicesTab({ devices = [], maxDeviceCount, uwb }) {
 
   if (screenMode === 'create') {
     const template = catalogByType[draft.type]
+    const isAlreadyConnected = isDeviceConnected(connectedDevices, draft)
 
     return (
       <section className="tab-stack device-tab" aria-labelledby="device-add-title">
@@ -355,10 +359,16 @@ export function DevicesTab({ devices = [], maxDeviceCount, uwb }) {
             </p>
           ) : null}
 
+          {isAlreadyConnected ? (
+            <p className="form-error" role="alert">
+              이미 연결된 기기입니다.
+            </p>
+          ) : null}
+
           <button
             className="primary-button full-button"
             type="button"
-            disabled={submitState.saving}
+            disabled={submitState.saving || isAlreadyConnected}
             onClick={handleCreateDevice}
           >
             {submitState.saving ? '가전 연결 중...' : '가전 연결 완료'}
@@ -445,7 +455,7 @@ export function DevicesTab({ devices = [], maxDeviceCount, uwb }) {
             aria-label="추가 가능한 가전 목록"
           >
             {deviceCatalog.map((device) => {
-              const isRegistered = registeredDeviceTypes.has(device.type)
+              const isRegistered = isDeviceConnected(connectedDevices, device)
 
               return (
                 <button
@@ -585,6 +595,22 @@ function createEmptyDraft() {
     locationSupported: false,
     remoteEnabled: false,
   }
+}
+
+function getDeviceVendorId(device) {
+  return (device?.vendorDeviceId || device?.defaultVendorDeviceId || '').trim()
+}
+
+function isDeviceConnected(connectedDevices, selectedDevice) {
+  const selectedVendorDeviceId = getDeviceVendorId(selectedDevice)
+
+  if (!selectedVendorDeviceId) {
+    return false
+  }
+
+  return connectedDevices.some(
+    (device) => getDeviceVendorId(device) === selectedVendorDeviceId,
+  )
 }
 
 function enrichDevice(device, catalogByType) {

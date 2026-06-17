@@ -13,6 +13,8 @@ import {
   storeAccessibilitySettings,
 } from './utils/accessibilitySettings'
 
+let speechSynthesisPrimed = false
+
 function createInitialSignupForm() {
   return {
     role: 'USER',
@@ -82,6 +84,29 @@ function App() {
   useLayoutEffect(() => {
     if (session?.role === 'USER') {
       startChatbotWakeService()
+    }
+  }, [session])
+
+  useLayoutEffect(() => {
+    if (session?.role !== 'USER') {
+      return undefined
+    }
+
+    function unlockMobileAudio() {
+      unlockTurnCueAudio()
+      primeSpeechSynthesisForMobile({ speakSilent: true })
+    }
+
+    window.addEventListener('pointerdown', unlockMobileAudio, { passive: true, capture: true })
+    window.addEventListener('touchstart', unlockMobileAudio, { passive: true, capture: true })
+    window.addEventListener('click', unlockMobileAudio, { passive: true, capture: true })
+    window.addEventListener('keydown', unlockMobileAudio, { passive: true, capture: true })
+
+    return () => {
+      window.removeEventListener('pointerdown', unlockMobileAudio, { capture: true })
+      window.removeEventListener('touchstart', unlockMobileAudio, { capture: true })
+      window.removeEventListener('click', unlockMobileAudio, { capture: true })
+      window.removeEventListener('keydown', unlockMobileAudio, { capture: true })
     }
   }, [session])
 
@@ -217,7 +242,7 @@ function App() {
   )
 }
 
-function primeSpeechSynthesisForMobile() {
+function primeSpeechSynthesisForMobile(options = {}) {
   if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
     return
   }
@@ -225,6 +250,22 @@ function primeSpeechSynthesisForMobile() {
   try {
     window.speechSynthesis.resume?.()
     window.speechSynthesis.getVoices?.()
+
+    if (options.speakSilent && !speechSynthesisPrimed && 'SpeechSynthesisUtterance' in window) {
+      speechSynthesisPrimed = true
+      const utterance = new SpeechSynthesisUtterance(' ')
+      utterance.lang = 'ko-KR'
+      utterance.volume = 0.01
+      utterance.rate = 1
+      utterance.pitch = 1
+      utterance.onend = () => {
+        window.speechSynthesis.resume?.()
+      }
+      utterance.onerror = () => {
+        window.speechSynthesis.resume?.()
+      }
+      window.speechSynthesis.speak(utterance)
+    }
   } catch {
     // Some mobile browsers reject warm-up speech; regular chatbot speech still retries later.
   }

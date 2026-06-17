@@ -309,7 +309,7 @@ describe('VoiceChatbot info agent response', () => {
     await user.click(screen.getByRole('button', { name: '텍스트로 보내기' }))
 
     await waitFor(() => {
-      expect(window.speechSynthesis.speak.mock.calls.at(-1)?.[0]?.text).toBe('음성 챗봇을 종료할게요.')
+      expect(window.speechSynthesis.speak.mock.calls.at(-1)?.[0]?.text).toBe('챗봇을 종료할게요.')
     })
     const closeUtterance = window.speechSynthesis.speak.mock.calls.at(-1)?.[0]
     closeUtterance?.onend?.()
@@ -514,7 +514,7 @@ describe('VoiceChatbot info agent response', () => {
     await user.type(screen.getByLabelText('인식된 문장'), '최근 알림 읽어줘')
     await user.click(screen.getByRole('button', { name: '텍스트로 보내기' }))
     await screen.findByText('최근 알림은 한 건입니다.')
-    await screen.findByText('말하는 중')
+    await screen.findByText('답변 중')
 
     await user.type(screen.getByLabelText('인식된 문장'), '세탁기 몇 분 남았어?')
     await user.click(screen.getByRole('button', { name: '텍스트로 보내기' }))
@@ -586,7 +586,10 @@ describe('VoiceChatbot info agent response', () => {
 
 async function openTalkMode(user) {
   await user.click(screen.getByRole('button', { name: '음성 챗봇 열기' }))
-  await user.click(screen.getByRole('button', { name: '챗봇과 대화하기 화면으로 이동' }))
+  const talkButton = screen.queryByRole('button', { name: '챗봇과 대화하기 화면으로 이동' })
+  if (talkButton) {
+    await user.click(talkButton)
+  }
 }
 
 function mockVoiceChatResponse(data) {

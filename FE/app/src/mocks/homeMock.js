@@ -32,10 +32,10 @@ export const mockHomeSummary = {
     },
   ],
   deviceSummary: {
-    totalCount: 6,
-    connectedCount: 4,
-    warningCount: 2,
-    uwbSupportedCount: 2,
+    totalCount: 1,
+    connectedCount: 1,
+    warningCount: 0,
+    uwbSupportedCount: 1,
   },
   emergency: {
     enabled: true,

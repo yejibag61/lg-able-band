@@ -29,7 +29,7 @@ public class MockDataStore {
 	private final AtomicLong userSequence = new AtomicLong(2);
 	private final AtomicLong guardianProfileSequence = new AtomicLong(1);
 	private final AtomicLong guardianSequence = new AtomicLong(1);
-	private final AtomicLong deviceSequence = new AtomicLong(12);
+	private final AtomicLong deviceSequence = new AtomicLong(10);
 	private final AtomicLong emergencySequence = new AtomicLong(300);
 	private final AtomicLong alertSequence = new AtomicLong(200);
 	private final AtomicLong eventSequence = new AtomicLong(600);
@@ -75,9 +75,7 @@ public class MockDataStore {
 			new Guardian(1, "김보호", "010-0000-0000", true, true, ConnectionStatus.CONNECTED)
 		)));
 		this.devicesByUserId.put(1L, new ArrayList<>(List.of(
-			new Device(10, "세탁기", DeviceType.WASHER, ConnectionStatus.CONNECTED, true, OffsetDateTime.now().minusMinutes(10)),
-			new Device(11, "공기질 센서", DeviceType.AIR_SENSOR, ConnectionStatus.WARNING, false, OffsetDateTime.now().minusMinutes(30)),
-			new Device(12, "웨어러블 밴드", DeviceType.WEARABLE, ConnectionStatus.CONNECTED, true, OffsetDateTime.now().minusMinutes(2))
+			new Device(10, "세탁기", DeviceType.WASHER, ConnectionStatus.CONNECTED, true, OffsetDateTime.now().minusMinutes(10))
 		)));
 		this.alertsByUserId.put(1L, new ArrayList<>(List.of(
 			new Alert(101, AlertType.LIFE, Severity.LOW, "세탁 완료", "세탁이 완료되었습니다. 건조기로 옮겨주세요.", "세탁기", OffsetDateTime.now().minusMinutes(20), AlertStatus.UNREAD, "세탁기 완료 알림입니다."),

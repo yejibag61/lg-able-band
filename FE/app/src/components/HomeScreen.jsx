@@ -6,7 +6,7 @@ import { deleteGuardian, getGuardians, linkGuardianByEmail } from '../services/g
 import { AlertsTab } from './AlertsTab'
 import { DevicesTab } from './DevicesTab'
 import { HomeTab } from './HomeTab'
-import { VoiceChatbot } from './VoiceChatbot'
+import { CHATBOT_INTERRUPT_EVENT, VoiceChatbot } from './VoiceChatbot'
 
 function scrollAppContentToTop() {
   const appContent = document.querySelector('.app-content')
@@ -153,6 +153,7 @@ export function HomeScreen({ session, onLogout }) {
   }, [activeTab])
 
   function handleTabChange(nextTab) {
+    window.dispatchEvent(new Event(CHATBOT_INTERRUPT_EVENT))
     setActiveTab(nextTab)
     setEmergencyMessage('')
 

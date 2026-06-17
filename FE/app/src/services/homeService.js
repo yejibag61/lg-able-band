@@ -1,6 +1,6 @@
 import { apiRequest } from './apiClient'
 import { mockHomeSummary } from '../mocks/homeMock'
-import { mockAppPreview } from '../mocks/appPreviewMock'
+import { mockAppPreview, resetMockDevices } from '../mocks/appPreviewMock'
 import { getAlerts } from './alertService'
 import { getDevices } from './deviceService'
 
@@ -13,6 +13,10 @@ export async function getHomeSummary() {
 }
 
 export async function getAppPreview() {
+  if (import.meta.env.DEV) {
+    resetMockDevices()
+  }
+
   const preview = structuredClone(mockAppPreview)
 
   try {

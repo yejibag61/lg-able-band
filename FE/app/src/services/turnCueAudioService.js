@@ -1,9 +1,11 @@
 let audioContext = null
 let dingAudioElement = null
+let greetingAudioElement = null
 let dingAudioBuffer = null
 let dingAudioBufferPromise = null
 let greetingAudioBuffer = null
 let greetingAudioBufferPromise = null
+let activeAudioSources = new Set()
 
 const DING_DURATION_SECONDS = 0.82
 const DING_FREQUENCY_HZ = 1046.5
@@ -37,6 +39,7 @@ async function getAudioContext() {
 export async function unlockTurnCueAudio() {
   const context = await getAudioContext()
   const audioElement = getDingAudioElement()
+  const greetingAudioElement = getGreetingAudioElement()
 
   try {
     if (context) {
@@ -59,8 +62,9 @@ export async function unlockTurnCueAudio() {
     }
 
     audioElement?.load?.()
+    greetingAudioElement?.load?.()
 
-    return Boolean(context || audioElement)
+    return Boolean(context || audioElement || greetingAudioElement)
   } catch {
     return Boolean(context)
   }
@@ -70,13 +74,11 @@ export async function playGreetingAudio() {
   const context = await getAudioContext()
   const buffer = context ? await loadGreetingAudioBuffer(context) : null
   if (context && buffer) {
-    playDecodedBuffer(context, buffer, 1)
-    return new Promise((resolve) => {
-      window.setTimeout(() => resolve(true), buffer.duration * 1000 + 120)
-    })
+    await playDecodedBufferAndWait(context, buffer, 1)
+    return true
   }
 
-  return false
+  return playGreetingAudioElement()
 }
 
 export async function playTurnCueTone(kind) {
@@ -84,11 +86,9 @@ export async function playTurnCueTone(kind) {
     const context = await getAudioContext()
     const buffer = context ? await loadDingAudioBuffer(context) : null
     if (context && buffer) {
-      playDecodedDingBuffer(context, buffer, 1)
+      await playDecodedDingBuffer(context, buffer, 1)
       navigator.vibrate?.(80)
-      return new Promise((resolve) => {
-        window.setTimeout(() => resolve(true), buffer.duration * 1000 + 80)
-      })
+      return true
     }
 
     const playedAudioElement = await playDingAudioElement()
@@ -127,6 +127,7 @@ export async function playTurnCueTone(kind) {
       gain.gain.exponentialRampToValueAtTime(0.0001, toneEnd)
       oscillator.connect(gain)
       gain.connect(context.destination)
+      trackAudioSource(oscillator)
       oscillator.start(toneStart)
       oscillator.stop(toneEnd + 0.02)
     })
@@ -137,6 +138,28 @@ export async function playTurnCueTone(kind) {
   } catch {
     return false
   }
+}
+
+export function stopTurnCueAudio() {
+  activeAudioSources.forEach((source) => {
+    try {
+      source.stop?.(0)
+    } catch {
+      // Source may have already ended.
+    }
+  })
+  activeAudioSources.clear()
+
+  ;[dingAudioElement, greetingAudioElement].forEach((audioElement) => {
+    if (!audioElement) return
+
+    try {
+      audioElement.pause()
+      audioElement.currentTime = 0
+    } catch {
+      // Some mobile browsers throw while swapping audio sessions.
+    }
+  })
 }
 
 async function loadDingAudioBuffer(context) {
@@ -167,7 +190,7 @@ async function loadDingAudioBuffer(context) {
 }
 
 function playDecodedDingBuffer(context, buffer, volume) {
-  return playDecodedBuffer(context, buffer, volume)
+  return playDecodedBufferAndWait(context, buffer, volume)
 }
 
 function playDecodedBuffer(context, buffer, volume) {
@@ -179,8 +202,37 @@ function playDecodedBuffer(context, buffer, volume) {
   gain.gain.setValueAtTime(Math.max(0.0001, volume), now)
   source.connect(gain)
   gain.connect(context.destination)
+  trackAudioSource(source)
   source.start(now)
   return source
+}
+
+function playDecodedBufferAndWait(context, buffer, volume) {
+  const source = playDecodedBuffer(context, buffer, volume)
+
+  return new Promise((resolve) => {
+    let resolved = false
+    const finish = () => {
+      if (resolved) return
+      resolved = true
+      resolve(true)
+    }
+
+    source.onended = () => {
+      activeAudioSources.delete(source)
+      finish()
+    }
+    window.setTimeout(finish, buffer.duration * 1000 + 180)
+  })
+}
+
+function trackAudioSource(source) {
+  activeAudioSources.add(source)
+  const previousOnEnded = source.onended
+  source.onended = (event) => {
+    activeAudioSources.delete(source)
+    previousOnEnded?.(event)
+  }
 }
 
 async function loadGreetingAudioBuffer(context) {
@@ -229,6 +281,27 @@ async function playDingAudioElement() {
   }
 }
 
+async function playGreetingAudioElement() {
+  const audioElement = getGreetingAudioElement()
+  if (!audioElement) {
+    return false
+  }
+
+  try {
+    audioElement.pause()
+    audioElement.currentTime = 0
+    audioElement.volume = 1
+    await audioElement.play()
+    return new Promise((resolve) => {
+      const finish = () => resolve(true)
+      audioElement.onended = finish
+      window.setTimeout(finish, 2500)
+    })
+  } catch {
+    return false
+  }
+}
+
 function getDingAudioElement() {
   if (typeof window === 'undefined' || typeof Audio === 'undefined') {
     return null
@@ -241,4 +314,18 @@ function getDingAudioElement() {
   }
 
   return dingAudioElement
+}
+
+function getGreetingAudioElement() {
+  if (typeof window === 'undefined' || typeof Audio === 'undefined') {
+    return null
+  }
+
+  if (!greetingAudioElement) {
+    greetingAudioElement = new Audio(GREETING_AUDIO_SRC)
+    greetingAudioElement.preload = 'auto'
+    greetingAudioElement.playsInline = true
+  }
+
+  return greetingAudioElement
 }

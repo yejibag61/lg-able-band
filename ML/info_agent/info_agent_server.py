@@ -1,6 +1,8 @@
 """FastAPI server for the integrated LG Able Band information agent."""
 
 import os
+import sys
+from pathlib import Path
 from typing import Any, Optional
 
 import uvicorn
@@ -9,10 +11,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-try:
-    from .info_agent import run_info_agent
-except ImportError:
-    from info_agent import run_info_agent
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+    __package__ = "ML.info_agent"
+
+from .info_agent import run_info_agent
 
 
 HOST = "127.0.0.1"
