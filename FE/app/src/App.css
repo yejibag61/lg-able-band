@@ -7534,6 +7534,16 @@ h2 {
   letter-spacing: -0.02em !important;
 }
 
+.phone-screen .accessibility-summary-card .card-title,
+.phone-screen .home-member-card .card-title,
+.phone-screen .wearable-pairing-card .card-title,
+.phone-screen .settings-link-card .card-title {
+  font-size: 0.98rem !important;
+  font-weight: 520 !important;
+  line-height: 1.34 !important;
+  letter-spacing: -0.02em !important;
+}
+
 .phone-screen .home-safety-card .safety-status-title {
   font-size: 1.1rem !important;
 }
@@ -7749,7 +7759,7 @@ h2 {
 .phone-screen .device-manager-card .card-label,
 .phone-screen .device-register-card .card-label,
 .phone-screen .living-signal-header .card-label {
-  margin-bottom: 0 !important;
+  margin-bottom: 2px !important;
   color: #6b7280 !important;
   font-size: 0.74rem !important;
   font-weight: 430 !important;
@@ -7789,6 +7799,11 @@ h2 {
 
 .phone-screen .guardian-form-card > .field:first-of-type {
   margin-top: 6px;
+}
+
+.phone-screen .wearable-pairing-card > span:first-child > p:not(.card-label),
+.phone-screen .settings-link-card > p:not(.card-label) {
+  margin-top: 6px !important;
 }
 
 .phone-screen .alert-card .alert-card-message {
