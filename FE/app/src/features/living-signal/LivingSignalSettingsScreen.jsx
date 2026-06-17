@@ -366,6 +366,7 @@ export function LivingSignalSettingsScreen({
   if (screenMode === 'create' || screenMode === 'edit') {
     return (
       <section className="living-signal-screen" aria-labelledby="living-signal-editor-title">
+        <section className="content-card living-signal-editor-panel">
         <div className="living-signal-panel-hero device-add-hero">
           <button
             className="text-button back-button alert-detail-back"
@@ -504,6 +505,7 @@ export function LivingSignalSettingsScreen({
         <button className="living-signal-save" type="button" onClick={saveSound}>
           {screenMode === 'create' ? '추가 완료' : '수정 완료'}
         </button>
+        </section>
       </section>
     )
   }

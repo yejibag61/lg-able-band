@@ -352,7 +352,12 @@ function MenuTab({
   onLogout,
   userName,
 }) {
-  const [guardianInviteMessage, setGuardianInviteMessage] = useState('')
+  const [guardianInviteMessage, setGuardianInviteMessageState] = useState('')
+  function setGuardianInviteMessage(nextMessage) {
+    setGuardianInviteMessageState((currentMessage) =>
+      currentMessage === nextMessage ? '' : nextMessage,
+    )
+  }
   const guardianMembers = [
     {
       id: 'me',
