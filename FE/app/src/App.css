@@ -7582,7 +7582,10 @@ h2 {
 
 .phone-screen .home-member-card .member-status-message {
   margin-top: 8px !important;
-  padding: 11px 12px !important;
+  display: block !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+  padding: 12px 14px !important;
 }
 
 .phone-screen .home-member-card {
@@ -7652,6 +7655,47 @@ h2 {
 
 .phone-screen .living-signal-screen {
   gap: 16px;
+}
+
+.phone-screen .living-signal-editor-panel {
+  display: grid;
+  gap: 16px;
+  padding: 20px 16px;
+}
+
+.phone-screen .living-signal-editor-panel .living-signal-field > span,
+.phone-screen .living-signal-editor-panel .living-signal-sample-mode > span {
+  color: #6b7280 !important;
+  font-size: 0.74rem !important;
+  font-weight: 430 !important;
+  line-height: 1.4 !important;
+  letter-spacing: 0 !important;
+}
+
+.phone-screen .living-signal-editor-panel .living-signal-field,
+.phone-screen .living-signal-editor-panel .living-signal-mic-section,
+.phone-screen .living-signal-editor-panel .living-signal-warning,
+.phone-screen .living-signal-editor-panel .living-signal-save {
+  margin-inline: 4px;
+}
+
+.phone-screen .living-signal-editor-panel .living-signal-mic-section {
+  gap: 12px;
+  padding: 16px 18px;
+}
+
+.phone-screen .living-signal-editor-panel .living-signal-info,
+.phone-screen .living-signal-editor-panel .living-signal-sample-preview span,
+.phone-screen .living-signal-editor-panel .living-signal-section-row span,
+.phone-screen .living-signal-editor-panel .living-signal-warning,
+.phone-screen .living-signal-editor-panel .living-signal-recording-indicator {
+  font-size: 13.12px !important;
+  font-weight: 430 !important;
+  line-height: 1.56 !important;
+}
+
+.phone-screen .living-signal-editor-panel .living-signal-save {
+  margin-top: 2px;
 }
 
 .phone-screen .living-signal-list-section,
@@ -7777,7 +7821,7 @@ h2 {
 }
 
 .phone-screen .status-copy,
-.phone-screen .soft-card p:not(.card-label),
+.phone-screen .soft-card p:not(.card-label):not(.member-status-message),
 .phone-screen .alert-card p,
 .phone-screen .empty-state,
 .phone-screen .member-status-message,
@@ -7791,7 +7835,7 @@ h2 {
 .phone-screen .wearable-pairing-card p:not(.card-label),
 .phone-screen .wearable-scanner-card > p:not(.card-label):not(.member-status-message),
 .phone-screen .guardian-status-card p:not(.card-label) {
-  margin-top: 10px !important;
+  margin-top: 6px !important;
   padding: 0 !important;
   font-size: 13.12px !important;
   line-height: 1.56 !important;
