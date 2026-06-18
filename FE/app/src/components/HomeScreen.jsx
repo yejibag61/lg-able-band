@@ -282,6 +282,57 @@ export function HomeScreen({ session, onLogout }) {
     })
   }
 
+  function handleAlertDelete(alertId) {
+    setHomeState((currentState) => {
+      if (!currentState.summary || !currentState.preview) {
+        return currentState
+      }
+
+      return {
+        ...currentState,
+        summary: {
+          ...currentState.summary,
+          recentAlerts: currentState.summary.recentAlerts.filter((alert) => alert.alertId !== alertId),
+        },
+        preview: {
+          ...currentState.preview,
+          alerts: currentState.preview.alerts.filter((alert) => alert.alertId !== alertId),
+        },
+      }
+    })
+  }
+
+  function handleAlertRestore(alertToRestore) {
+    setHomeState((currentState) => {
+      if (!currentState.summary || !currentState.preview) {
+        return currentState
+      }
+
+      const nextSummaryAlerts = currentState.summary.recentAlerts.some(
+        (alert) => alert.alertId === alertToRestore.alertId,
+      )
+        ? currentState.summary.recentAlerts
+        : [alertToRestore, ...currentState.summary.recentAlerts]
+      const nextPreviewAlerts = currentState.preview.alerts.some(
+        (alert) => alert.alertId === alertToRestore.alertId,
+      )
+        ? currentState.preview.alerts
+        : [alertToRestore, ...currentState.preview.alerts]
+
+      return {
+        ...currentState,
+        summary: {
+          ...currentState.summary,
+          recentAlerts: nextSummaryAlerts,
+        },
+        preview: {
+          ...currentState.preview,
+          alerts: nextPreviewAlerts,
+        },
+      }
+    })
+  }
+
   function handleDevicesChange(nextDevices) {
     setHomeState((currentState) => {
       if (!currentState.preview) {
@@ -437,6 +488,8 @@ export function HomeScreen({ session, onLogout }) {
             accessibilityType={session.userProfile?.accessibilityType || 'VISUAL'}
             alerts={preview.alerts}
             alertView={alertsScreen}
+            onAlertDelete={handleAlertDelete}
+            onAlertRestore={handleAlertRestore}
             onAlertStatusChange={handleAlertStatusChange}
             onCloseStats={() => setAlertsScreen('list')}
           />

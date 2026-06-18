@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useMemo, useState } from 'react'
-import { confirmAlert, replayAlert } from '../services/alertService'
+import { confirmAlert, deleteAlert, replayAlert } from '../services/alertService'
 import { getWarningRecommendation } from '../services/warningService'
 import { isEmergencyRequestAlert } from '../utils/homeSummaryUtils'
 
@@ -107,6 +107,8 @@ export function AlertsTab({
   accessibilityType,
   alerts,
   alertView = 'list',
+  onAlertDelete = () => {},
+  onAlertRestore = () => {},
   onAlertStatusChange = () => {},
 }) {
   const [alertItems, setAlertItems] = useState(alerts)
@@ -236,11 +238,19 @@ export function AlertsTab({
     }
   }
 
-  function handleDeleteAlert(alertId) {
+  async function handleDeleteAlert(alertId) {
     const deletedIndex = filteredAlerts.findIndex((alert) => alert.alertId === alertId)
+    const originalIndex = alertItems.findIndex((alert) => alert.alertId === alertId)
+    const deletedAlert = alertItems[originalIndex]
     const nextVisibleAlertId = filteredAlerts[deletedIndex + 1]?.alertId ?? null
 
+    if (!deletedAlert) {
+      return
+    }
+
+    setInlineFeedback(null)
     setAlertItems((currentAlerts) => currentAlerts.filter((alert) => alert.alertId !== alertId))
+    onAlertDelete(alertId)
     if (selectedAlertId === alertId) {
       setSelectedAlertId(null)
     }
@@ -248,8 +258,30 @@ export function AlertsTab({
     setInlineFeedback({
       appendToEnd: nextVisibleAlertId === null,
       insertBeforeAlertId: nextVisibleAlertId,
-      message: '알림을 목록에서 삭제했습니다.',
+      message: '알림을 삭제하는 중입니다.',
     })
+
+    try {
+      await deleteAlert(alertId)
+      setInlineFeedback({
+        appendToEnd: nextVisibleAlertId === null,
+        insertBeforeAlertId: nextVisibleAlertId,
+        message: '알림을 목록에서 삭제했습니다.',
+      })
+    } catch (error) {
+      setAlertItems((currentAlerts) => {
+        if (currentAlerts.some((alert) => alert.alertId === alertId)) {
+          return currentAlerts
+        }
+
+        const nextAlerts = [...currentAlerts]
+        nextAlerts.splice(Math.max(originalIndex, 0), 0, deletedAlert)
+        return nextAlerts
+      })
+      onAlertRestore(deletedAlert)
+      setInlineFeedback(null)
+      setFeedbackMessage(error.message || '알림 삭제에 실패했습니다.')
+    }
   }
 
   if (alertView === 'stats' && !selectedAlert) {

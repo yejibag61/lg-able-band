@@ -66,11 +66,13 @@ const previewAlerts = [
 
 let currentHomeSummary
 let currentPreviewAlerts
+let deleteResponseDelay
 
 describe('HomeScreen alert summary sync', () => {
   beforeEach(() => {
     currentHomeSummary = structuredClone(homeSummary)
     currentPreviewAlerts = structuredClone(previewAlerts)
+    deleteResponseDelay = null
     window.localStorage.setItem('lg-able-band.accessToken', 'api-user-token')
     window.scrollTo = vi.fn()
     window.HTMLElement.prototype.scrollTo = vi.fn()
@@ -103,6 +105,49 @@ describe('HomeScreen alert summary sync', () => {
     expect(homeContent.queryByText('전기레인지 과열 주의')).toBeNull()
     expect(homeContent.getByText('최근 알림이 없습니다.')).toBeTruthy()
     expect(screen.getByText('최근 알림 0건')).toBeTruthy()
+  })
+
+  it('keeps deleted alerts removed after returning to the alerts tab', async () => {
+    const user = userEvent.setup()
+    render(<HomeScreen session={session} onLogout={() => {}} />)
+
+    await screen.findByRole('heading', { name: '소희 홈' })
+    await user.click(screen.getByRole('button', { name: '알림' }))
+    await user.click(screen.getByRole('button', { name: '전기레인지 과열 주의 삭제' }))
+
+    await waitFor(() => {
+      expect(screen.getByRole('status').textContent).toContain('알림을 목록에서 삭제했습니다.')
+    })
+
+    expect(findFetchCall('/api/alerts/201', 'DELETE')).toBeTruthy()
+
+    await user.click(screen.getByRole('button', { name: '홈' }))
+    await user.click(screen.getByRole('button', { name: '알림' }))
+
+    expect(screen.queryByText('전기레인지 과열 주의')).toBeNull()
+    expect(screen.getByText('조건에 맞는 알림이 없습니다.')).toBeTruthy()
+  })
+
+  it('removes deleted alerts from the visible list before the delete API finishes', async () => {
+    const user = userEvent.setup()
+    let resolveDelete
+    deleteResponseDelay = new Promise((resolve) => {
+      resolveDelete = resolve
+    })
+    render(<HomeScreen session={session} onLogout={() => {}} />)
+
+    await screen.findByRole('heading', { name: '소희 홈' })
+    await user.click(screen.getByRole('button', { name: '알림' }))
+    await user.click(screen.getByRole('button', { name: '전기레인지 과열 주의 삭제' }))
+
+    expect(screen.queryByText('전기레인지 과열 주의')).toBeNull()
+    expect(findFetchCall('/api/alerts/201', 'DELETE')).toBeTruthy()
+
+    resolveDelete()
+
+    await waitFor(() => {
+      expect(screen.getByRole('status').textContent).toContain('알림을 목록에서 삭제했습니다.')
+    })
   })
 
   it('uses the same alert records as the alerts tab for the home real-time summary', async () => {
@@ -207,7 +252,26 @@ async function mockFetch(input, init = {}) {
     return jsonResponse({ ...currentPreviewAlerts[0], status: 'CONFIRMED' })
   }
 
+  if (url === `${API_BASE_URL}/api/alerts/201` && method === 'DELETE') {
+    if (deleteResponseDelay) {
+      await deleteResponseDelay
+    }
+
+    currentPreviewAlerts = currentPreviewAlerts.filter((alert) => alert.alertId !== 201)
+    currentHomeSummary = {
+      ...currentHomeSummary,
+      recentAlerts: currentHomeSummary.recentAlerts.filter((alert) => alert.alertId !== 201),
+    }
+    return new Response(null, { status: 204 })
+  }
+
   return jsonResponse({ message: 'not found' }, { status: 404 })
+}
+
+function findFetchCall(path, method = 'GET') {
+  return globalThis.fetch.mock.calls.find(([url, init = {}]) => {
+    return url === `${API_BASE_URL}${path}` && (init.method || 'GET').toUpperCase() === method
+  })
 }
 
 function jsonResponse(body, { status = 200 } = {}) {
