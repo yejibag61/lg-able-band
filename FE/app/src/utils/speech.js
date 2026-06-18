@@ -18,8 +18,9 @@ export function speakText(text, options = {}) {
   const utterance = new SpeechSynthesisUtterance(trimmedText)
   utterance.lang = options.lang || 'ko-KR'
   utterance.volume = options.volume ?? 1
-  utterance.rate = options.rate ?? 0.92
+  utterance.rate = options.rate ?? 1.04
   utterance.pitch = options.pitch ?? 1
+  utterance.voice = options.voice ?? findKoreanVoice()
 
   if (typeof options.onEnd === 'function') {
     utterance.onend = options.onEnd
@@ -31,6 +32,15 @@ export function speakText(text, options = {}) {
 
   window.speechSynthesis.speak(utterance)
   return { ok: true, message: '' }
+}
+
+export function findKoreanVoice() {
+  const voices = window.speechSynthesis?.getVoices?.() || []
+  return (
+    voices.find((voice) => voice.lang?.toLowerCase() === 'ko-kr') ||
+    voices.find((voice) => voice.lang?.toLowerCase().startsWith('ko')) ||
+    null
+  )
 }
 
 export function stopSpeaking() {

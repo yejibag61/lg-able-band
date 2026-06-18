@@ -37,6 +37,8 @@ const CHATBOT_VOICE_STATE = {
   ERROR: 'ERROR',
 }
 
+const POST_CUE_LISTEN_DELAY_MS = 180
+
 const UNCLEAR_SPEECH_GUIDE =
   '말씀하신 내용을 이해하지 못했어요. 미확인 알림, 위험 알림, 최근 알림, 세탁기 상태처럼 물어봐 주세요.'
 const RECOGNITION_RETRY_GUIDE = '말씀을 정확히 인식하지 못했습니다. 다시 말씀해주세요.'
@@ -1455,17 +1457,20 @@ export function VoiceChatbot({
     const cueVersion = audioStopVersionRef.current
     turnCueTimeoutRef.current = window.setTimeout(() => {
       playTurnCue('user', { force: true }).finally(() => {
-        if (
-          cueVersion === audioStopVersionRef.current
-          && conversationActiveRef.current
-          && !manualStopRef.current
-          && voiceStateRef.current === CHATBOT_VOICE_STATE.BEEPING
-        ) {
-          setChatbotVoiceState(CHATBOT_VOICE_STATE.LISTENING)
-          startListening()
-        }
+        window.clearTimeout(turnCueTimeoutRef.current)
+        turnCueTimeoutRef.current = window.setTimeout(() => {
+          if (
+            cueVersion === audioStopVersionRef.current
+            && conversationActiveRef.current
+            && !manualStopRef.current
+            && voiceStateRef.current === CHATBOT_VOICE_STATE.BEEPING
+          ) {
+            setChatbotVoiceState(CHATBOT_VOICE_STATE.LISTENING)
+            startListening()
+          }
+        }, POST_CUE_LISTEN_DELAY_MS)
       })
-    }, 220)
+    }, 0)
   }
 
   async function playTurnCue(kind, options = {}) {
@@ -2108,7 +2113,7 @@ function createChatMessage(role, text, extra = {}) {
 function createKoreanUtterance(text) {
   const utterance = new SpeechSynthesisUtterance(text)
   utterance.lang = 'ko-KR'
-  utterance.rate = 0.95
+  utterance.rate = 1.04
   utterance.pitch = 1
   utterance.volume = 1
 

@@ -909,11 +909,12 @@ function speakAlert(text) {
   const utterance = new window.SpeechSynthesisUtterance(text)
   utterance.lang = 'ko-KR'
   utterance.volume = 1
-  utterance.rate = 0.9
+  utterance.rate = 1.04
   utterance.pitch = 1
 
   const voices = synthesis.getVoices()
-  const koreanVoice = voices.find((voice) => voice.lang?.toLowerCase().startsWith('ko'))
+  const koreanVoice = voices.find((voice) => voice.lang?.toLowerCase() === 'ko-kr') ||
+    voices.find((voice) => voice.lang?.toLowerCase().startsWith('ko'))
   if (koreanVoice) {
     utterance.voice = koreanVoice
   }

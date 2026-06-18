@@ -7,9 +7,10 @@ let greetingAudioBuffer = null
 let greetingAudioBufferPromise = null
 let activeAudioSources = new Set()
 
-const DING_DURATION_SECONDS = 0.82
-const DING_FREQUENCY_HZ = 1046.5
-const TURN_CUE_AUDIO_SRC = '/turn-cue-ding.wav'
+const DING_DURATION_SECONDS = 0.18
+const DING_FREQUENCY_HZ = 880
+const TURN_CUE_AUDIO_SRC = '/turn-cue-ding.mp3'
+const TURN_CUE_MAX_MS = 420
 const GREETING_AUDIO_SRC = '/chatbot-greeting.wav'
 
 async function getAudioContext() {
@@ -108,10 +109,7 @@ export async function playTurnCueTone(kind) {
     const isUserTurn = kind === 'user'
     const duration = isUserTurn ? DING_DURATION_SECONDS : 0.12
     const tones = isUserTurn
-      ? [
-          { frequency: DING_FREQUENCY_HZ, start: 0, duration: 0.72, volume: 0.9 },
-          { frequency: DING_FREQUENCY_HZ * 1.5, start: 0.015, duration: 0.18, volume: 0.22 },
-        ]
+      ? [{ frequency: DING_FREQUENCY_HZ, start: 0, duration: DING_DURATION_SECONDS, volume: 0.28 }]
       : [{ frequency: 520, start: 0, duration: 0.1, volume: 0.1 }]
 
     tones.forEach((tone) => {
@@ -273,12 +271,33 @@ async function playDingAudioElement() {
     audioElement.currentTime = 0
     audioElement.volume = 1
     await audioElement.play()
-    return new Promise((resolve) => {
-      window.setTimeout(() => resolve(true), DING_DURATION_SECONDS * 1000 + 80)
-    })
+    return waitForAudioElement(audioElement, TURN_CUE_MAX_MS)
   } catch {
     return false
   }
+}
+
+function waitForAudioElement(audioElement, maxMs) {
+  return new Promise((resolve) => {
+    let resolved = false
+    const finish = () => {
+      if (resolved) return
+      resolved = true
+      resolve(true)
+    }
+
+    audioElement.addEventListener('ended', finish, { once: true })
+    audioElement.addEventListener('error', finish, { once: true })
+    window.setTimeout(() => {
+      try {
+        audioElement.pause()
+        audioElement.currentTime = 0
+      } catch {
+        // Audio can already be stopped.
+      }
+      finish()
+    }, maxMs)
+  })
 }
 
 async function playGreetingAudioElement() {

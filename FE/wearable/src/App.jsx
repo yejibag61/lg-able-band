@@ -65,7 +65,7 @@ function App() {
   const [isChatbotSpeaking, setIsChatbotSpeaking] = useState(false)
   const [syncedTime, setSyncedTime] = useState(() => new Date())
   const [selectedGuideTarget, setSelectedGuideTarget] = useState(null)
-  const [livingSignalState, setLivingSignalState] = useState({
+  const [, setLivingSignalState] = useState({
     isListening: false,
     threshold: 0.8,
     sounds: [],
@@ -656,6 +656,8 @@ function App() {
       setIsBusy(false)
     }
   }
+
+  void handleUnpair
 
   return (
     <main className="app-root">
