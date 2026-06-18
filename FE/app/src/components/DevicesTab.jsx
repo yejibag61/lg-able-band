@@ -193,6 +193,7 @@ export function DevicesTab({ devices = [], uwb }) {
       vendorDeviceId: template.defaultVendorDeviceId,
       name: template.name,
       type: template.type,
+      room: '',
       locationSupported: template.locationSupported,
       remoteEnabled: template.remoteEnabled,
     })
@@ -232,7 +233,9 @@ export function DevicesTab({ devices = [], uwb }) {
 
     const normalizedDraft = {
       ...draft,
+      name: draft.name.trim(),
       vendorDeviceId: draft.vendorDeviceId.trim(),
+      room: draft.room.trim(),
     }
     if (isDeviceConnected(connectedDevices, normalizedDraft)) {
       setSubmitState({
@@ -245,16 +248,28 @@ export function DevicesTab({ devices = [], uwb }) {
     setSubmitState({ saving: true, error: '' })
 
     try {
-      const savedDevice = await createDevice({
+      const devicePayload = {
         vendor: draft.vendor,
         vendorDeviceId: normalizedDraft.vendorDeviceId,
-        name: draft.name.trim(),
+        name: normalizedDraft.name,
         type: draft.type,
         locationSupported: draft.locationSupported,
         remoteEnabled: draft.remoteEnabled,
-      })
+      }
 
-      const nextDevice = enrichDevice(savedDevice, catalogByType)
+      if (normalizedDraft.room) {
+        devicePayload.room = normalizedDraft.room
+      }
+
+      const savedDevice = await createDevice(devicePayload)
+
+      const nextDevice = enrichDevice(
+        {
+          ...savedDevice,
+          room: savedDevice.room || savedDevice.locationName || normalizedDraft.room,
+        },
+        catalogByType,
+      )
       setConnectedDevices((current) => [
         nextDevice,
         ...current.filter((item) => item.deviceId !== nextDevice.deviceId),
@@ -338,6 +353,16 @@ export function DevicesTab({ devices = [], uwb }) {
               value={draft.vendorDeviceId}
               onChange={(event) => updateDraft('vendorDeviceId', event.target.value)}
               placeholder="예: thinq-washer-001"
+            />
+          </label>
+
+          <label className="field">
+            <span>가전 위치</span>
+            <input
+              type="text"
+              value={draft.room}
+              onChange={(event) => updateDraft('room', event.target.value)}
+              placeholder={`예: ${template?.room || '거실'}`}
             />
           </label>
 
@@ -615,6 +640,7 @@ function createEmptyDraft() {
     vendorDeviceId: '',
     name: '',
     type: 'WASHER',
+    room: '',
     locationSupported: false,
     remoteEnabled: false,
   }
@@ -652,7 +678,7 @@ function enrichDevice(device, catalogByType) {
     ...template,
     ...device,
     vendorDeviceId: getDeviceVendorId({ ...template, ...device }),
-    room: device.room || template.room,
+    room: device.room || device.locationName || template.room,
     typeLabel: device.typeLabel || template.typeLabel,
     detail: device.detail || template.detail,
     primarySignal: device.primarySignal || template.primarySignal,

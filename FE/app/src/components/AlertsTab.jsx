@@ -174,7 +174,9 @@ export function AlertsTab({
       return
     }
 
-    setWarningRecommendation(await getWarningRecommendation(alert, accessibilityType))
+    if (shouldShowDeliveryRecommendation(alert)) {
+      setWarningRecommendation(await getWarningRecommendation(alert, accessibilityType))
+    }
   }
 
   async function handleConfirmAlert(alertId) {
@@ -860,6 +862,10 @@ function isUrgentAlert(alert) {
     alert.severity === 'HIGH' ||
     alert.severity === 'CRITICAL'
   )
+}
+
+function shouldShowDeliveryRecommendation(alert) {
+  return isUrgentAlert(alert)
 }
 
 function formatAlertTime(isoString) {
