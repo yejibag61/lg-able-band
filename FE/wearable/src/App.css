@@ -2446,8 +2446,11 @@ h1 {
 }
 
 .wearable-chat-screen {
+  inset: 0;
+  z-index: 20;
   padding: 8px 0 0;
-  background: transparent;
+  background: linear-gradient(180deg, #ffffff 0%, #f7f8fa 100%);
+  isolation: isolate;
 }
 
 .wearable-chat-content {

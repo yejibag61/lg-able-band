@@ -76,14 +76,29 @@ const WAKE_WORDS = [
   '챗봇꺼줘',
   '챗봇크줘',
   '챗봇크자',
+  '챗봇켜주세요',
+  '챗봇켜주라',
+  '챗봇켜줄래',
+  '챗봇열어주세요',
+  '챗봇시작해줘',
+  '챗봇호출',
   '챗지피티켜줘',
   '챗지피티열어줘',
   '지피티켜줘',
   '지피티열어줘',
+  '챕봇켜줘',
+  '챕봇켜죠',
+  '챕봇켜주',
+  '찻봇켜줘',
+  '찻봇켜죠',
+  '찻봇켜주',
   '채봇켜줘',
   '채봇켜죠',
   '채봇켜주',
   '채팅켜줘',
+  '채팅켜주세요',
+  '채팅시작',
+  '채팅열어줘',
   '채팅봇켜줘',
   '채팅봇켜',
   '쳇봇켜줘',
@@ -112,9 +127,14 @@ const WAKE_WORDS = [
   '에이아이켜줘',
   '에이아이열어줘',
   '에이아이시작',
+  '에이아이켜주세요',
+  '에이아이모드시작',
+  '에이아이모드켜줘',
   'ai켜줘',
   'ai열어줘',
   'ai시작',
+  'ai켜주세요',
+  'ai모드시작',
   'ai챗봇',
   'ai챗켜줘',
   'ai모드켜줘',
@@ -256,6 +276,7 @@ export function VoiceChatbot({
   const activeVoiceUwbSessionRef = useRef(null)
   const uwbPollingTimerRef = useRef(null)
   const lastUwbGuideZoneRef = useRef('')
+  const microphoneReadyRef = useRef(false)
 
   const answers = useMemo(
     () => createAnswers({ alert, alertQueue, isPaired, mode, statusMessage, uwbSession }),
@@ -337,6 +358,7 @@ export function VoiceChatbot({
     latestTranscriptRef.current = ''
     userSpeechHandledRef.current = false
     idlePromptGivenRef.current = false
+    microphoneReadyRef.current = false
     clearConversationTimers()
     setConversationState(fromWake ? CONVERSATION_STATE.WAKE_DETECTED : CONVERSATION_STATE.IDLE)
     setChatbotAudioLock(true)
@@ -366,6 +388,7 @@ export function VoiceChatbot({
     latestTranscriptRef.current = ''
     userSpeechHandledRef.current = false
     idlePromptGivenRef.current = false
+    microphoneReadyRef.current = false
     clearConversationTimers()
     stopUwbPolling()
     stopRecognition()
@@ -423,7 +446,7 @@ export function VoiceChatbot({
     speakText(createWelfareAnswer(welfareType).lines.join(' '))
   }
 
-  function startVoiceTurn() {
+  async function startVoiceTurn() {
     const SpeechRecognition = getSpeechRecognitionConstructor()
     if (!SpeechRecognition) {
       const message = '이 브라우저는 마이크 인식을 지원하지 않아요.'
@@ -434,6 +457,19 @@ export function VoiceChatbot({
 
     clearConversationTimers()
     stopRecognition()
+
+    if (!microphoneReadyRef.current) {
+      const microphoneError = await checkMicrophoneAvailability()
+      if (microphoneError) {
+        console.warn('마이크 준비 실패:', microphoneError)
+        setIsListening(false)
+        setCurrentChatScreen('listening')
+        setVoiceStatus(microphoneError)
+        scheduleMicrophoneRetry()
+        return
+      }
+      microphoneReadyRef.current = true
+    }
 
     const sessionId = recognitionSessionIdRef.current + 1
     recognitionSessionIdRef.current = sessionId
@@ -464,10 +500,12 @@ export function VoiceChatbot({
         return
       }
       markRecognitionActivity()
-      const nextTranscript = Array.from(event.results)
-        .map((result) => getRecognitionAlternatives(result)[0] || '')
-        .join('')
-        .trim()
+      const nextTranscript = cleanupRecognizedSpeech(
+        Array.from(event.results)
+          .map((result) => getRecognitionAlternatives(result)[0] || '')
+          .join(' ')
+          .trim(),
+      )
       const heardCandidates = Array.from(event.results)
         .flatMap((result) => getRecognitionAlternatives(result))
         .filter(Boolean)
@@ -501,9 +539,6 @@ export function VoiceChatbot({
         return
       }
       markRecognitionActivity()
-      if (!latestTranscriptRef.current) {
-        setVoiceStatus('소리를 듣고 있어요.')
-      }
     }
 
     recognition.onspeechstart = () => {
@@ -546,6 +581,7 @@ export function VoiceChatbot({
 
       setCurrentChatScreen('start')
       setVoiceStatus('마이크 권한을 확인해주세요.')
+      microphoneReadyRef.current = false
       runAiTurn('마이크 권한을 확인해주세요.')
     }
 
@@ -571,8 +607,9 @@ export function VoiceChatbot({
 
     try {
       recognition.start()
-    } catch {
-      setVoiceStatus('잠시 후 다시 말해주세요.')
+    } catch (error) {
+      console.warn('STT 시작 실패:', error)
+      setVoiceStatus('마이크를 다시 여는 중이에요.')
       window.setTimeout(() => {
         if (isOpenRef.current && !userSpeechHandledRef.current) {
           startVoiceTurn()
@@ -702,7 +739,7 @@ export function VoiceChatbot({
       case VOICE_INTENT.READ_ALERTS:
         return normalizeSpeechText(spokenText).includes('긴급') ? handleReadUrgentAlert() : handleReadAlerts()
       case VOICE_INTENT.READ_APPLIANCE_STATUS:
-        return handleReadApplianceStatus()
+        return handleReadApplianceStatus(spokenText)
       case VOICE_INTENT.FIND_WASHER:
         return handleFindDevice('세탁기')
       case VOICE_INTENT.FIND_FRIDGE:
@@ -816,8 +853,23 @@ export function VoiceChatbot({
     return { text }
   }
 
-  async function handleReadApplianceStatus() {
+  async function handleReadApplianceStatus(spokenText = '') {
     const appliances = await loadWearableAppliances()
+    const requestedDeviceName = getRequestedApplianceName(spokenText)
+    if (requestedDeviceName) {
+      const appliance = appliances.find((item) => item.name?.includes(requestedDeviceName))
+      if (!appliance) {
+        return {
+          text: `${requestedDeviceName} 상태를 확인했어요. 현재 연결된 ${requestedDeviceName} 정보를 찾지 못했어요.`,
+        }
+      }
+
+      const statusText = formatApplianceStatus(appliance)
+      return {
+        text: `${requestedDeviceName} 상태를 확인했어요. ${appliance.name || requestedDeviceName}은 ${statusText}. 위치 안내가 필요하면 ${requestedDeviceName} 찾아줘라고 말해주세요.`,
+      }
+    }
+
     const connectedNames = appliances.map((item) => item.name).filter(Boolean)
     return {
       text: `현재 연결된 가전은 ${connectedNames.length}개예요. ${joinKoreanList(connectedNames)}가 연결되어 있어요. 위치 안내가 필요하면 세탁기 찾아줘 또는 냉장고 찾아줘라고 말해주세요.`,
@@ -1046,6 +1098,7 @@ export function VoiceChatbot({
     recognition.lang = 'ko-KR'
     recognition.interimResults = true
     recognition.continuous = true
+    recognition.maxAlternatives = 5
     wakeTranscriptRef.current = ''
     wakeRecognitionRef.current = recognition
 
@@ -1060,10 +1113,10 @@ export function VoiceChatbot({
       const heardCandidates = Array.from(event.results)
         .flatMap((result) => getRecognitionAlternatives(result))
         .filter(Boolean)
-      const heard = heardCandidates.join(' ')
+      const heard = cleanupRecognizedSpeech(heardCandidates.join(' '))
 
       wakeTranscriptRef.current = `${wakeTranscriptRef.current} ${heard}`.slice(-160)
-      console.log('STT 인식 결과:', heard)
+      console.log('STT 인식 결과:', heard, heardCandidates)
 
       if (shouldOpenChatbot(`${heard} ${wakeTranscriptRef.current}`)) {
         wakeMatchedRef.current = true
@@ -1204,6 +1257,14 @@ export function VoiceChatbot({
         }
       }, USER_RESTART_DELAY_MS)
     }, RECOGNITION_STUCK_RESTART_MS)
+  }
+
+  function scheduleMicrophoneRetry() {
+    window.setTimeout(() => {
+      if (isOpenRef.current && !userSpeechHandledRef.current && !latestTranscriptRef.current) {
+        startVoiceTurn()
+      }
+    }, 1800)
   }
 
   function scheduleUserSpeechEnd(text) {
@@ -1940,6 +2001,34 @@ function isMeaningfulTranscript(text) {
   return normalizeSpeechText(text).length >= MIN_USER_TRANSCRIPT_CHARS
 }
 
+function cleanupRecognizedSpeech(text) {
+  const trimmedText = String(text || '').replace(/\s+/g, ' ').trim()
+  if (!trimmedText) {
+    return ''
+  }
+
+  const compactText = trimmedText.replace(/\s/g, '')
+  for (let size = 2; size <= Math.floor(compactText.length / 2); size += 1) {
+    if (compactText.length % size === 0) {
+      const unit = compactText.slice(0, size)
+      const repeated = unit.repeat(compactText.length / size)
+      if (repeated === compactText) {
+        return unit
+      }
+    }
+  }
+
+  const words = trimmedText.split(' ')
+  const dedupedWords = []
+  for (const word of words) {
+    if (word && word !== dedupedWords[dedupedWords.length - 1]) {
+      dedupedWords.push(word)
+    }
+  }
+
+  return dedupedWords.join(' ')
+}
+
 function getRecognitionAlternatives(result) {
   if (!result?.length) {
     return []
@@ -1952,6 +2041,39 @@ function getSpeechRecognitionConstructor() {
   return globalThis.SpeechRecognition || globalThis.webkitSpeechRecognition
 }
 
+async function checkMicrophoneAvailability() {
+  if (!isMicrophoneSecureContext()) {
+    return '마이크는 localhost 또는 HTTPS 주소에서만 사용할 수 있어요.'
+  }
+
+  try {
+    const permissionStatus = await globalThis.navigator?.permissions?.query?.({ name: 'microphone' })
+    if (permissionStatus?.state === 'denied') {
+      return '마이크 권한을 허용해주세요.'
+    }
+  } catch {
+    // Some mobile browsers do not expose microphone permissions here.
+  }
+
+  if (!globalThis.navigator?.mediaDevices?.getUserMedia && !getSpeechRecognitionConstructor()) {
+    return '이 브라우저에서 마이크 인식을 사용할 수 없어요.'
+  }
+
+  return ''
+}
+
+function isMicrophoneSecureContext() {
+  const location = globalThis.location
+  const hostname = location?.hostname || ''
+  return (
+    globalThis.isSecureContext ||
+    hostname === 'localhost' ||
+    hostname === '127.0.0.1' ||
+    hostname === '[::1]' ||
+    hostname === '::1'
+  )
+}
+
 function shouldOpenChatbot(text) {
   const normalizedText = normalizeSpeechText(text)
   const compactText = normalizeWakeText(text)
@@ -1959,13 +2081,26 @@ function shouldOpenChatbot(text) {
     return true
   }
 
+  if (hasWakeSubject(compactText) && hasWakeAction(compactText)) {
+    return true
+  }
+
   return (
-    /(챗|쳇|채|첵|책|체크|챡|착|챠|차|채팅|챗지피티|지피티|gpt).{0,6}(봇|본|봄|벗|봇트|보|복|포|bot|보트|지피티)?.{0,8}(켜|커|크|켜줘|켜죠|켜주|켜저|켜져|열|열어|열어줘|시작|실행|불러)/i.test(normalizedText) ||
-    /(챗|쳇|채|첵|책|체크|챡|착|챠|차|챗지피티|지피티).{0,8}(켜|커|크|켜줘|켜죠|켜주|켜저|켜져|열|열어|열어줘|시작|실행|불러)/i.test(normalizedText) ||
-    /(에이아이|에이|ai|able|에이블).{0,10}(챗|쳇|채|봇|모드|켜|커|크|열|시작|실행|불러)/i.test(normalizedText) ||
+    /(챗|쳇|채|첵|책|체크|챡|착|챠|차|챕|찻|채팅|챗지피티|지피티|gpt).{0,8}(봇|본|봄|벗|봇트|보|복|포|bot|보트|지피티)?.{0,10}(켜|커|크|켜줘|켜죠|켜주|켜저|켜져|켜주세요|열|열어|열어줘|열어주세요|시작|시작해|실행|불러|호출)/i.test(normalizedText) ||
+    /(챗|쳇|채|첵|책|체크|챡|착|챠|차|챕|찻|챗지피티|지피티).{0,10}(켜|커|크|켜줘|켜죠|켜주|켜저|켜져|켜주세요|열|열어|열어줘|열어주세요|시작|시작해|실행|불러|호출)/i.test(normalizedText) ||
+    /(에이아이|에이|ai|able|에이블).{0,12}(챗|쳇|채|봇|모드|켜|커|크|열|시작|시작해|실행|불러|호출)/i.test(normalizedText) ||
     /(cat|chat|check|cheat|chet|chap|gpt|bot).{0,12}(on|open|start|run)/i.test(compactText) ||
     /chatbot(open|on|start)/i.test(compactText)
   )
+}
+
+function hasWakeSubject(text) {
+  return /(챗|쳇|채|첵|책|체크|챡|착|챠|차|챕|찻|채팅|챗지피티|지피티|gpt).{0,8}(봇|본|봄|벗|봇트|보|복|포|bot|보트)?/i.test(text) ||
+    /(에이아이|에이아이모드|에이|ai|able|에이블)/i.test(text)
+}
+
+function hasWakeAction(text) {
+  return /(켜|커|크|켜줘|켜죠|켜주|켜저|켜져|켜주세요|열|열어|열어줘|열어주세요|시작|시작해|실행|불러|호출|도와)/i.test(text)
 }
 
 function classifyVoiceIntent(text) {
@@ -2027,6 +2162,10 @@ function classifyVoiceIntent(text) {
     return VOICE_INTENT.GUARDIAN_CONNECT
   }
 
+  if (hasApplianceStatusRequest(normalizedText)) {
+    return VOICE_INTENT.READ_APPLIANCE_STATUS
+  }
+
   if (includesAny(normalizedText, ['세탁기', '세탁', '빨래']) && includesAny(normalizedText, ['찾', '위치', '어디', '안내'])) {
     return VOICE_INTENT.FIND_WASHER
   }
@@ -2035,7 +2174,7 @@ function classifyVoiceIntent(text) {
     return VOICE_INTENT.FIND_FRIDGE
   }
 
-  if (includesAny(normalizedText, ['가전상태', '가전', '기기상태', '상태알려', '상태읽어'])) {
+  if (includesAny(normalizedText, ['가전상태', '가전', '기기상태', '상태알려', '상태읽어', '상태확인', '연결상태'])) {
     return VOICE_INTENT.READ_APPLIANCE_STATUS
   }
 
@@ -2079,6 +2218,38 @@ function createIntentVoiceResponse(intent) {
 
 function includesAny(text, keywords) {
   return keywords.some((keyword) => text.includes(keyword))
+}
+
+function hasApplianceStatusRequest(text) {
+  return Boolean(
+    getRequestedApplianceName(text) &&
+      includesAny(text, ['상태', '확인', '알려', '읽어', '연결', '작동', '동작', '켜져', '꺼져']),
+  )
+}
+
+function getRequestedApplianceName(text) {
+  const normalizedText = normalizeSpeechText(text)
+  if (includesAny(normalizedText, ['세탁기', '세탁', '빨래'])) {
+    return '세탁기'
+  }
+  if (includesAny(normalizedText, ['냉장고', '냉장', '냉동고'])) {
+    return '냉장고'
+  }
+  return ''
+}
+
+function formatApplianceStatus(appliance) {
+  const status = String(appliance?.connectionStatus || appliance?.status || '').toUpperCase()
+  if (['CONNECTED', 'ONLINE', 'ACTIVE', 'OK'].includes(status)) {
+    return '연결되어 있어요'
+  }
+  if (['DISCONNECTED', 'OFFLINE', 'INACTIVE'].includes(status)) {
+    return '연결이 끊겨 있어요'
+  }
+  if (['WARNING', 'CAUTION', 'CHECK'].includes(status)) {
+    return '확인이 필요해요'
+  }
+  return appliance?.connectionStatus || appliance?.status || '상태 정보를 확인 중이에요'
 }
 
 function getUnreadAlerts(alerts) {

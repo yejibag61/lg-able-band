@@ -313,7 +313,14 @@ function App() {
   }, [alertStatuses, isPaired, mode, resetPairingSession])
 
   useEffect(() => {
-    if (!isPaired || isChatbotWakeListening || mode === 'uwb' || mode === 'emergency') {
+    if (
+      !isPaired ||
+      isChatbotWakeListening ||
+      isChatbotOpen ||
+      isChatbotSpeaking ||
+      mode === 'uwb' ||
+      mode === 'emergency'
+    ) {
       stopLivingSignalMonitoring()
       return undefined
     }
@@ -442,7 +449,7 @@ function App() {
       isMounted = false
       stopLivingSignalMonitoring()
     }
-  }, [isChatbotWakeListening, isPaired, mode, speakText, stopLivingSignalMonitoring])
+  }, [isChatbotOpen, isChatbotSpeaking, isChatbotWakeListening, isPaired, mode, speakText, stopLivingSignalMonitoring])
 
   useEffect(() => {
     if (!selectedAlert?.alertId) {
@@ -721,7 +728,7 @@ function App() {
             <dl className="standby-meta">
               <div>
                 <dt>마이크 감지</dt>
-                <dd>{isChatbotWakeListening ? '챗봇 대기 중' : livingSignalState.isListening ? '실행 중' : '준비 중'}</dd>
+                <dd>{isChatbotOpen ? '챗봇 사용 중' : isChatbotWakeListening ? '챗봇 대기 중' : livingSignalState.isListening ? '실행 중' : '준비 중'}</dd>
               </div>
               <div>
                 <dt>연동</dt>
