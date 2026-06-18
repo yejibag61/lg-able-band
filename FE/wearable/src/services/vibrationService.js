@@ -9,7 +9,12 @@ const vibrationPatterns = {
 
 export function triggerVibration(pattern = 'NONE') {
   const sequence = vibrationPatterns[pattern] || vibrationPatterns.NONE
-  if (!sequence.length || typeof navigator === 'undefined' || !navigator.vibrate) {
+  if (
+    !sequence.length ||
+    typeof navigator === 'undefined' ||
+    !navigator.vibrate ||
+    globalThis.__ABLE_BAND_VIBRATION_ENABLED__ !== true
+  ) {
     return false
   }
 

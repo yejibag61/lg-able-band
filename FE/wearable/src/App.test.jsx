@@ -161,7 +161,11 @@ describe('Wearable MVP', () => {
         status: 'success',
       }),
     )
-    const apiFetch = setupPairingApi({ statuses: ['WAITING'] })
+    const apiFetch = setupPairingApi({
+      statusesBySession: {
+        'pairing-api-001': ['PAIRED'],
+      },
+    })
 
     render(<App />)
 

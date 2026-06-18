@@ -476,7 +476,7 @@ function buildGuideMessage(distanceM, trend, targetName) {
   const rounded = distanceM.toFixed(1)
 
   if (distanceM <= 1.0) {
-    return `${targetName} 쪽 신호가 바로 근처에 있어요. 약 ${rounded}미터예요.`
+    return `${targetName} 앞에 도착했어요. 약 ${rounded}미터예요.`
   }
 
   if (trend === 'approaching') {
