@@ -450,6 +450,67 @@ button:disabled {
   font-weight: 900;
 }
 
+.status-refresh-control {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
+.status-refresh-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-height: 30px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 999px;
+  padding: 0 9px;
+  background: rgba(255, 255, 255, 0.82);
+  color: #334155;
+  font: inherit;
+  font-size: 0.7rem;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: 0;
+  white-space: nowrap;
+  box-shadow: none;
+}
+
+.status-refresh-button svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.status-refresh-button:disabled {
+  cursor: wait;
+  opacity: 0.72;
+}
+
+.status-refresh-button .is-spinning {
+  animation: status-refresh-spin 0.8s linear infinite;
+}
+
+.status-refresh-error {
+  margin: -2px 0 0;
+  color: #be123c;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+@keyframes status-refresh-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .status-copy {
   color: #314158;
   font-size: 0.9rem;
@@ -7573,6 +7634,19 @@ h2 {
 
 .phone-screen .home-safety-card {
   gap: 4px !important;
+}
+
+.phone-screen .home-safety-card .status-refresh-control {
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  max-width: 148px;
+}
+
+.phone-screen .home-safety-card .status-refresh-button {
+  min-height: 28px;
+  padding: 0 8px;
+  font-size: 0.68rem;
 }
 
 .phone-screen .home-safety-card .status-card-header > div > .card-label,

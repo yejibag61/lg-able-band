@@ -1,5 +1,5 @@
 import jsQR from 'jsqr'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { LivingSignalSettingsScreen } from '../features/living-signal'
 import { getAccessibilitySettings, updateAccessibilitySettings } from '../services/accessibilityService'
 import { getAppPreview, getHomeSummary } from '../services/homeService'
@@ -66,6 +66,10 @@ export function HomeScreen({ session, onLogout }) {
   })
   const [emergencyMessage, setEmergencyMessage] = useState('')
   const [emergencySubmitting, setEmergencySubmitting] = useState(false)
+  const [homeRefreshState, setHomeRefreshState] = useState({
+    refreshing: false,
+    error: '',
+  })
   const [homeState, setHomeState] = useState({
     loading: true,
     error: '',
@@ -73,31 +77,38 @@ export function HomeScreen({ session, onLogout }) {
     preview: null,
   })
 
+  const loadHomeView = useCallback(async () => {
+    const [summary, preview] = await Promise.all([getHomeSummary(), getAppPreview()])
+    const accessibilityType = sessionAccessibilityType || summary.user?.accessibilityType || 'VISUAL'
+    const accessibilitySettings = await getAccessibilitySettings({
+      accessibilityType,
+      identity: sessionEmail,
+    })
+
+    return {
+      summary,
+      preview: {
+        ...preview,
+        accessibility: createAccessibilityView(
+          preview.accessibility,
+          accessibilitySettings,
+          accessibilityType,
+        ),
+      },
+    }
+  }, [sessionAccessibilityType, sessionEmail])
+
   useEffect(() => {
     let isMounted = true
-
     async function loadHome() {
       try {
-        const [summary, preview] = await Promise.all([getHomeSummary(), getAppPreview()])
-        const accessibilityType = sessionAccessibilityType || summary.user?.accessibilityType || 'VISUAL'
-        const accessibilitySettings = await getAccessibilitySettings({
-          accessibilityType,
-          identity: sessionEmail,
-        })
+        const nextHomeView = await loadHomeView()
 
         if (isMounted) {
           setHomeState({
             loading: false,
             error: '',
-            summary,
-            preview: {
-              ...preview,
-              accessibility: createAccessibilityView(
-                preview.accessibility,
-                accessibilitySettings,
-                accessibilityType,
-              ),
-            },
+            ...nextHomeView,
           })
         }
       } catch {
@@ -117,7 +128,7 @@ export function HomeScreen({ session, onLogout }) {
     return () => {
       isMounted = false
     }
-  }, [sessionAccessibilityType, sessionEmail])
+  }, [loadHomeView])
 
   useEffect(() => {
     let isMounted = true
@@ -212,12 +223,30 @@ export function HomeScreen({ session, onLogout }) {
     try {
       const request = await createEmergencyRequest()
       setEmergencyMessage(request.statusMessage || '보호자에게 긴급 요청을 보냈습니다.')
-      const [summary, preview] = await Promise.all([getHomeSummary(), getAppPreview()])
-      setHomeState({ loading: false, error: '', summary, preview })
+      const nextHomeView = await loadHomeView()
+      setHomeState({ loading: false, error: '', ...nextHomeView })
     } catch (error) {
       setEmergencyMessage(error.message || '긴급 요청을 보내지 못했습니다.')
     } finally {
       setEmergencySubmitting(false)
+    }
+  }
+
+  async function handleHomeRefresh() {
+    if (homeRefreshState.refreshing) {
+      return
+    }
+
+    setHomeRefreshState({ refreshing: true, error: '' })
+    try {
+      const nextHomeView = await loadHomeView()
+      setHomeState({ loading: false, error: '', ...nextHomeView })
+      setHomeRefreshState({ refreshing: false, error: '' })
+    } catch (error) {
+      setHomeRefreshState({
+        refreshing: false,
+        error: error.message || '홈 정보를 새로고침하지 못했습니다.',
+      })
     }
   }
 
@@ -362,10 +391,13 @@ export function HomeScreen({ session, onLogout }) {
             emergencyMessage={emergencyMessage}
             emergencySubmitting={emergencySubmitting}
             alerts={preview.alerts}
+            refreshError={homeRefreshState.error}
+            refreshing={homeRefreshState.refreshing}
             statusDisplay={statusDisplay}
             summary={summary}
             onEmergencyRequest={handleEmergencyRequest}
             onOpenAlerts={() => handleTabChange('alerts')}
+            onRefreshHome={handleHomeRefresh}
           />
         ) : null}
         {activeTab === 'alerts' ? (

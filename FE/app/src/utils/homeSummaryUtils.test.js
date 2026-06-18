@@ -22,8 +22,13 @@ describe('home summary utilities', () => {
   })
 
   it('formats last checked time and hides unreliable values', () => {
-    expect(formatStatusUpdatedAt('2026-06-10T14:30:00+09:00')).toContain('업데이트')
-    expect(formatStatusUpdatedAt('2026-06-10T14:30:00+09:00')).not.toBe('방금 전')
+    const now = new Date('2026-06-10T15:30:00+09:00')
+
+    expect(formatStatusUpdatedAt('2026-06-10T15:29:30+09:00', now)).toBe('방금 업데이트')
+    expect(formatStatusUpdatedAt('2026-06-10T15:28:00+09:00', now)).toBe('2분 전 업데이트')
+    expect(formatStatusUpdatedAt('2026-06-10T15:19:00+09:00', now)).toBe('10분 전 업데이트')
+    expect(formatStatusUpdatedAt('2026-06-10T14:31:00+09:00', now)).toBe('50분 전 업데이트')
+    expect(formatStatusUpdatedAt('2026-06-10T12:20:00+09:00', now)).toBe('3시간 전 업데이트')
     expect(formatStatusUpdatedAt('')).toBe('')
     expect(formatStatusUpdatedAt('not-a-date')).toBe('')
   })

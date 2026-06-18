@@ -14,7 +14,7 @@ export function getSafetyStatusDisplay(level) {
   }
 }
 
-export function formatStatusUpdatedAt(value) {
+export function formatStatusUpdatedAt(value, now = new Date()) {
   if (!value) {
     return ''
   }
@@ -24,13 +24,25 @@ export function formatStatusUpdatedAt(value) {
     return ''
   }
 
-  return `${new Intl.DateTimeFormat('ko-KR', {
-    month: 'numeric',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true,
-  }).format(date)} 업데이트`
+  const currentDate = now instanceof Date ? now : new Date(now)
+  if (Number.isNaN(currentDate.getTime())) {
+    return ''
+  }
+
+  const elapsedMinutes = Math.floor((currentDate.getTime() - date.getTime()) / 60_000)
+  if (elapsedMinutes < 1) {
+    return '방금 업데이트'
+  }
+
+  if (elapsedMinutes < 10) {
+    return `${elapsedMinutes}분 전 업데이트`
+  }
+
+  if (elapsedMinutes < 60) {
+    return `${Math.floor(elapsedMinutes / 10) * 10}분 전 업데이트`
+  }
+
+  return `${Math.floor(elapsedMinutes / 60)}시간 전 업데이트`
 }
 
 export function getActionableRecentAlerts(alerts, limit = ACTIONABLE_ALERT_LIMIT) {

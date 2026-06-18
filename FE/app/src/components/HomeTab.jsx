@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import {
   createHomeAlertMetrics,
   formatStatusUpdatedAt,
@@ -16,17 +17,31 @@ export function HomeTab({
   emergencyMessage,
   emergencySubmitting,
   alerts,
+  refreshError,
+  refreshing,
   statusDisplay,
   summary,
   onEmergencyRequest,
   onOpenAlerts,
+  onRefreshHome,
 }) {
+  const [currentTime, setCurrentTime] = useState(() => new Date())
   const homeAlerts = alerts || summary.recentAlerts
   const recentAlerts = getActionableRecentAlerts(homeAlerts)
   const alertMetrics = createHomeAlertMetrics(homeAlerts)
-  const updatedAtLabel = formatStatusUpdatedAt(summary.safetyStatus.lastCheckedAt)
+  const updatedAtLabel = formatStatusUpdatedAt(summary.safetyStatus.lastCheckedAt, currentTime)
   const emergencyAvailability = getEmergencyAvailability(summary)
   const emergencyStatusMessage = emergencyMessage
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      setCurrentTime(new Date())
+    }, 60_000)
+
+    return () => {
+      window.clearInterval(intervalId)
+    }
+  }, [])
 
   function handleEmergencyClick() {
     onEmergencyRequest(emergencyAvailability)
@@ -45,9 +60,32 @@ export function HomeTab({
               </span>
             </strong>
           </div>
-          {updatedAtLabel ? <span className="status-badge">{updatedAtLabel}</span> : null}
+          <div className="status-refresh-control">
+            {updatedAtLabel ? <span className="status-badge">{updatedAtLabel}</span> : null}
+            <button
+              className="status-refresh-button"
+              type="button"
+              aria-label="홈 정보 새로고침"
+              aria-busy={refreshing}
+              disabled={refreshing}
+              onClick={onRefreshHome}
+            >
+              <svg className={refreshing ? 'is-spinning' : undefined} viewBox="0 0 24 24" focusable="false">
+                <path d="M20 11a8 8 0 0 0-14.7-4.4L4 8" />
+                <path d="M4 4v4h4" />
+                <path d="M4 13a8 8 0 0 0 14.7 4.4L20 16" />
+                <path d="M20 20v-4h-4" />
+              </svg>
+              <span>{refreshing ? '동기화 중' : '새로고침'}</span>
+            </button>
+          </div>
         </div>
         <p className="status-copy">{summary.safetyStatus.message}</p>
+        {refreshError ? (
+          <p className="status-refresh-error" role="alert">
+            {refreshError}
+          </p>
+        ) : null}
         <div className="home-metric-row" aria-label="오늘 알림 요약">
           <span className="home-metric-pill">최근 알림 {alertMetrics.total}건</span>
           <span className="home-metric-pill">미확인 {alertMetrics.unread}건</span>

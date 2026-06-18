@@ -145,6 +145,42 @@ describe('HomeScreen alert summary sync', () => {
     await userEvent.click(screen.getByRole('button', { name: '알림' }))
     expect(screen.getByText('알림 탭과 같은 최신 알림')).toBeTruthy()
   })
+
+  it('reloads the home summary and alert records from the status refresh control', async () => {
+    const user = userEvent.setup()
+    render(<HomeScreen session={session} onLogout={() => {}} />)
+
+    await screen.findByRole('heading', { name: '소희 홈' })
+    expect(screen.getByText('전기레인지 과열 주의')).toBeTruthy()
+
+    currentHomeSummary = {
+      ...homeSummary,
+      safetyStatus: {
+        ...homeSummary.safetyStatus,
+        lastCheckedAt: '2026-06-10T14:40:00+09:00',
+      },
+      recentAlerts: [],
+    }
+    currentPreviewAlerts = [
+      {
+        alertId: 401,
+        type: 'DANGER',
+        severity: 'HIGH',
+        title: '새로고침된 최신 알림',
+        message: '새로고침 후 홈에서도 보여야 합니다.',
+        deviceName: '새 센서',
+        occurredAt: '2026-06-10T14:40:00+09:00',
+        status: 'UNREAD',
+      },
+    ]
+
+    await user.click(screen.getByRole('button', { name: '홈 정보 새로고침' }))
+
+    await waitFor(() => {
+      expect(screen.getByText('새로고침된 최신 알림')).toBeTruthy()
+    })
+    expect(screen.queryByText('전기레인지 과열 주의')).toBeNull()
+  })
 })
 
 async function mockFetch(input, init = {}) {

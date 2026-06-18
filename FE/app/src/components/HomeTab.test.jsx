@@ -82,6 +82,24 @@ describe('HomeTab', () => {
     )
   })
 
+  it('refreshes the home data from the status control', async () => {
+    const user = userEvent.setup()
+    const handleRefreshHome = vi.fn()
+    renderHomeTab(baseSummary, { onRefreshHome: handleRefreshHome })
+
+    await user.click(screen.getByRole('button', { name: '홈 정보 새로고침' }))
+
+    expect(handleRefreshHome).toHaveBeenCalledTimes(1)
+  })
+
+  it('shows a disabled syncing control while the home data refreshes', () => {
+    renderHomeTab(baseSummary, { refreshing: true })
+
+    const refreshButton = screen.getByRole('button', { name: '홈 정보 새로고침' })
+    expect(refreshButton.disabled).toBe(true)
+    expect(screen.getByText('동기화 중')).toBeTruthy()
+  })
+
   it('sends the emergency request action when SOS is available', async () => {
     const user = userEvent.setup()
     const handleEmergencyRequest = vi.fn()
@@ -104,10 +122,12 @@ function renderHomeTab(summary = baseSummary, options = {}) {
     <HomeTab
       emergencyMessage={options.emergencyMessage || ''}
       emergencySubmitting={false}
+      refreshing={options.refreshing || false}
       statusDisplay={getSafetyStatusDisplay(summary.safetyStatus.level)}
       summary={summary}
       onEmergencyRequest={options.onEmergencyRequest || (() => {})}
       onOpenAlerts={() => {}}
+      onRefreshHome={options.onRefreshHome || (() => {})}
     />,
   )
 }
