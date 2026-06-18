@@ -1234,6 +1234,21 @@ button:disabled {
   font-weight: 900;
 }
 
+.device-location-editor {
+  display: grid;
+  gap: 10px;
+}
+
+.device-location-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.device-location-edit-button {
+  margin-top: 2px;
+}
+
 .device-action-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;

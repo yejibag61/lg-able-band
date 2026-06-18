@@ -124,6 +124,7 @@ export function DevicesTab({ devices = [], uwb }) {
     saving: false,
     error: '',
   })
+  const [editingLocationDeviceId, setEditingLocationDeviceId] = useState(null)
 
   const bleGuide = useBleProximityGuide()
 
@@ -132,6 +133,10 @@ export function DevicesTab({ devices = [], uwb }) {
   const locationDraft = selectedDevice
     ? locationDraftByDeviceId[selectedDevice.deviceId] ?? selectedDevice.room ?? ''
     : ''
+  const selectedLocationLabel = selectedDevice?.room || '위치 미설정'
+  const isLocationEditorOpen = Boolean(
+    selectedDevice && editingLocationDeviceId === selectedDevice.deviceId,
+  )
 
   const uwbTarget = getGuideTarget(connectedDevices, selectedDevice, uwb)
   const isGuidingCurrentTarget = Boolean(
@@ -167,6 +172,7 @@ export function DevicesTab({ devices = [], uwb }) {
     setSelectedDeviceId(deviceId)
     setConnectionMessage('')
     setLocationSaveState({ saving: false, error: '' })
+    setEditingLocationDeviceId(null)
   }
 
   function handleRefreshSelectedDevice() {
@@ -188,6 +194,24 @@ export function DevicesTab({ devices = [], uwb }) {
     }
 
     bleGuide.startGuide(targetDevice.name)
+  }
+
+  function handleStartLocationEdit() {
+    if (!selectedDevice) {
+      return
+    }
+
+    setLocationDraftByDeviceId((currentDrafts) => ({
+      ...currentDrafts,
+      [selectedDevice.deviceId]: selectedDevice.room || '',
+    }))
+    setLocationSaveState({ saving: false, error: '' })
+    setEditingLocationDeviceId(selectedDevice.deviceId)
+  }
+
+  function handleCancelLocationEdit() {
+    setEditingLocationDeviceId(null)
+    setLocationSaveState({ saving: false, error: '' })
   }
 
   function openCreatePage(template) {
@@ -338,6 +362,7 @@ export function DevicesTab({ devices = [], uwb }) {
       }))
       setLocationSaveState({ saving: false, error: '' })
       setConnectionMessage(`${nextDevice.name} 위치를 ${nextDevice.room}으로 저장했습니다.`)
+      setEditingLocationDeviceId(null)
     } catch (error) {
       setLocationSaveState({
         saving: false,
@@ -624,7 +649,7 @@ export function DevicesTab({ devices = [], uwb }) {
           <div className="device-manager-header">
             <div>
               <div className="device-manager-topline">
-                <p className="card-label">{selectedDevice.room}</p>
+                <p className="card-label">{selectedLocationLabel}</p>
               </div>
               <div className="device-manager-title-row">
                 <strong className="card-title">{selectedDevice.name} 관리</strong>
@@ -646,8 +671,8 @@ export function DevicesTab({ devices = [], uwb }) {
           </div>
           <dl className="device-detail-grid">
             <div>
-              <dt>기기 유형</dt>
-              <dd>{selectedDevice.typeLabel}</dd>
+              <dt>가전 위치</dt>
+              <dd>{selectedLocationLabel}</dd>
             </div>
             <div>
               <dt>최근 이벤트</dt>
@@ -662,34 +687,56 @@ export function DevicesTab({ devices = [], uwb }) {
               <dd>{selectedDevice.primarySignal}</dd>
             </div>
           </dl>
-          <label className="field">
-            <span>가전 위치 수정</span>
-            <input
-              type="text"
-              value={locationDraft}
-              onChange={(event) => {
-                setLocationDraftByDeviceId((currentDrafts) => ({
-                  ...currentDrafts,
-                  [selectedDevice.deviceId]: event.target.value,
-                }))
-                setLocationSaveState((current) => ({ ...current, error: '' }))
-              }}
-              placeholder="예: 거실"
-            />
-          </label>
-          {locationSaveState.error ? (
-            <p className="form-error" role="alert">
-              {locationSaveState.error}
-            </p>
-          ) : null}
-          <button
-            className="primary-button full-button"
-            type="button"
-            disabled={locationSaveState.saving}
-            onClick={handleSaveLocation}
-          >
-            {locationSaveState.saving ? '위치 저장 중...' : '위치 저장'}
-          </button>
+          {isLocationEditorOpen ? (
+            <div className="device-location-editor">
+              <label className="field">
+                <span>가전 위치 수정</span>
+                <input
+                  type="text"
+                  value={locationDraft}
+                  onChange={(event) => {
+                    setLocationDraftByDeviceId((currentDrafts) => ({
+                      ...currentDrafts,
+                      [selectedDevice.deviceId]: event.target.value,
+                    }))
+                    setLocationSaveState((current) => ({ ...current, error: '' }))
+                  }}
+                  placeholder="예: 거실"
+                />
+              </label>
+              {locationSaveState.error ? (
+                <p className="form-error" role="alert">
+                  {locationSaveState.error}
+                </p>
+              ) : null}
+              <div className="device-location-actions">
+                <button
+                  className="secondary-button full-button"
+                  type="button"
+                  disabled={locationSaveState.saving}
+                  onClick={handleCancelLocationEdit}
+                >
+                  취소
+                </button>
+                <button
+                  className="primary-button full-button"
+                  type="button"
+                  disabled={locationSaveState.saving}
+                  onClick={handleSaveLocation}
+                >
+                  {locationSaveState.saving ? '위치 저장 중...' : '위치 저장'}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              className="secondary-button full-button device-location-edit-button"
+              type="button"
+              onClick={handleStartLocationEdit}
+            >
+              가전 위치 수정
+            </button>
+          )}
           <div className="device-feature-list" aria-label={`${selectedDevice.name} 관리 기능`}>
             {selectedDevice.management.map((feature) => (
               <span key={feature}>{feature}</span>

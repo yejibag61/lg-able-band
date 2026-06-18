@@ -49,7 +49,7 @@ describe('DevicesTab', () => {
         room: '침실',
       }),
     )
-    expect(screen.getByText('침실')).toBeTruthy()
+    expect(screen.getAllByText('침실').length).toBeGreaterThanOrEqual(1)
   })
 
   it('updates the selected device location from the management card', async () => {
@@ -67,6 +67,12 @@ describe('DevicesTab', () => {
 
     render(<DevicesTab devices={devices} uwb={{}} />)
 
+    expect(screen.getByText('가전 위치')).toBeTruthy()
+    expect(screen.getAllByText('거실').length).toBeGreaterThanOrEqual(1)
+    expect(screen.queryByLabelText('가전 위치 수정')).toBeNull()
+
+    await user.click(screen.getByRole('button', { name: '가전 위치 수정' }))
+
     const locationInput = screen.getByLabelText('가전 위치 수정')
     await user.clear(locationInput)
     await user.type(locationInput, '안방')
@@ -76,7 +82,7 @@ describe('DevicesTab', () => {
       expect(findUpdateDeviceCall()).toBeTruthy()
     })
     expect(JSON.parse(findUpdateDeviceCall()[1].body)).toEqual({ room: '안방' })
-    expect(screen.getByText('안방')).toBeTruthy()
+    expect(screen.getAllByText('안방').length).toBeGreaterThanOrEqual(1)
     expect(screen.getByRole('status').textContent).toContain('TV 위치를 안방으로 저장했습니다.')
   })
 })
