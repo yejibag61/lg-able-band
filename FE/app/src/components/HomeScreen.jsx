@@ -2,7 +2,7 @@ import jsQR from 'jsqr'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { LivingSignalSettingsScreen } from '../features/living-signal'
 import { getAccessibilitySettings, updateAccessibilitySettings } from '../services/accessibilityService'
-import { getAppPreview, getHomeSummary } from '../services/homeService'
+import { applyContextAiSafetyStatus, getAppPreview, getHomeSummary } from '../services/homeService'
 import { createEmergencyRequest } from '../services/emergencyService'
 import {
   createGuardian,
@@ -86,6 +86,7 @@ export function HomeScreen({ session, onLogout }) {
 
   const loadHomeView = useCallback(async () => {
     const [summary, preview] = await Promise.all([getHomeSummary(), getAppPreview()])
+    const safetySummary = await applyContextAiSafetyStatus(summary, preview.alerts)
     const accessibilityType = sessionAccessibilityType || summary.user?.accessibilityType || 'VISUAL'
     const accessibilitySettings = await getAccessibilitySettings({
       accessibilityType,
@@ -93,7 +94,7 @@ export function HomeScreen({ session, onLogout }) {
     })
 
     return {
-      summary,
+      summary: safetySummary,
       preview: {
         ...preview,
         accessibility: createAccessibilityView(
