@@ -4,10 +4,10 @@ import { navigationStatusLabels, vibrationLabels } from './uwbLabels'
 export function UwbGuideScreen({ session, actionMessage = '', isBusy, onStandby, onStop }) {
   if (!session) {
     return (
-      <section className="state-screen" aria-label="UWB 안내 없음">
+      <section className="state-screen uwb-empty-screen" aria-label="UWB 안내 없음">
         <p className="eyebrow">UWB</p>
         <h1>위치 안내 없음</h1>
-        <p>웨어러블에서 위치 안내를 시작하면 손목 화면에 거리와 진동이 표시됩니다.</p>
+        <p>웨어러블에서 위치 안내를 시작하면 목표 가전과 거리, 진동 안내를 함께 보여드립니다.</p>
         {actionMessage ? (
           <p className="live-message" role="status">
             {actionMessage}
@@ -25,49 +25,46 @@ export function UwbGuideScreen({ session, actionMessage = '', isBusy, onStandby,
   const confidence = Math.round(session.confidence * 100)
   const canStop = session.navigationStatus === 'ACTIVE'
   const lowConfidence = session.navigationStatus === 'FAILED' || confidence < 40
-  const locationLabel = getRoomLabel(session)
+  const deviceName = session.targetDeviceName || '가전'
+
+  const statusTone =
+    session.navigationStatus === 'FAILED'
+      ? 'critical'
+      : session.navigationStatus === 'CANCELED'
+        ? 'default'
+        : 'guide'
 
   return (
-    <section className="uwb-screen" aria-labelledby="uwb-title">
-      <div className="screen-topline">
-        <StatusBadge tone={session.navigationStatus === 'CANCELED' ? 'default' : 'guide'}>
-          {statusLabel}
-        </StatusBadge>
-        {lowConfidence ? <span className="signal-warning">신호 낮음</span> : null}
-        <span>신뢰도 {confidence}%</span>
-      </div>
-
-      <div className="uwb-main">
-        <div>
-          <p className="eyebrow">UWB 위치 안내</p>
-          <h1 id="uwb-title">{session.targetDeviceName} 찾기</h1>
+    <section className="uwb-screen uwb-guide-screen" aria-label="내 가전 상세">
+      <div className="uwb-main uwb-guide-hero">
+        <div className="uwb-guide-heading">
+          <StatusBadge tone={statusTone}>
+            {statusLabel}
+          </StatusBadge>
+          <p className="uwb-guide-device-name">{deviceName}</p>
+          <p className="uwb-guide-support">{vibrationLabel} 진동으로 안내 중</p>
         </div>
-        <strong>{session.distanceM}m</strong>
-      </div>
 
-      <p className="guide-copy">{session.voiceGuide}</p>
-      {actionMessage ? (
-        <p className="live-message" role="status">
-          {actionMessage}
-        </p>
-      ) : null}
-
-      <dl className="compact-meta">
-        <div>
-          <dt>위치</dt>
-          <dd>{locationLabel}</dd>
+        <div className="uwb-guide-distance-block">
+          <div className="uwb-guide-distance" aria-label={`현재 거리 ${session.distanceM}미터`}>
+            <span>현재 거리</span>
+            <strong>
+              {session.distanceM}
+              <small>m</small>
+            </strong>
+            {lowConfidence ? (
+              <p className="uwb-guide-inline-warning">신호가 약해 정확도가 낮을 수 있어요.</p>
+            ) : null}
+          </div>
         </div>
-        <div>
-          <dt>상태</dt>
-          <dd>{statusLabel}</dd>
-        </div>
-      </dl>
 
-      <div className="vibration-feedback vibration-guide" aria-label="진동 피드백">
-        <span className="vibration-pulse" aria-hidden="true" />
-        <div>
-          <span>진동 패턴</span>
-          <strong>{vibrationLabel} 표시 중</strong>
+        <div className="uwb-guide-copy-group">
+          <p className="guide-copy uwb-guide-copy-inline">{session.voiceGuide}</p>
+          {actionMessage ? (
+            <p className="live-message uwb-guide-message" role="status">
+              {actionMessage}
+            </p>
+          ) : null}
         </div>
       </div>
 
@@ -77,30 +74,8 @@ export function UwbGuideScreen({ session, actionMessage = '', isBusy, onStandby,
         disabled={isBusy || !canStop}
         onClick={() => onStop(session.sessionId)}
       >
-        탐색 종료
+        위치 안내 종료
       </button>
     </section>
   )
-}
-
-function getRoomLabel(session) {
-  if (session.locationName || session.roomName || session.room) {
-    return session.locationName || session.roomName || session.room
-  }
-
-  const targetName = session.targetDeviceName || ''
-
-  if (targetName.includes('세탁')) {
-    return '세탁실'
-  }
-
-  if (targetName.includes('냉장고')) {
-    return '주방'
-  }
-
-  if (targetName.includes('공기질') || targetName.includes('TV')) {
-    return '거실'
-  }
-
-  return '집 안'
 }

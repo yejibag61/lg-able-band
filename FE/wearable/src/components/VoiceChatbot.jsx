@@ -2471,7 +2471,7 @@ function createUwbDistanceGuide(session) {
     return {
       zone: 'ARRIVED',
       vibrationPattern: 'STRONG',
-      message: '근처에 도착했어요.',
+      message: '목적지에 도착했어요.',
     }
   }
 

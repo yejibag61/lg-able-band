@@ -953,12 +953,14 @@ h1 {
 .device-select-card {
   position: relative;
   display: grid;
-  min-height: 118px;
-  align-content: space-between;
-  justify-items: start;
+  grid-template-rows: auto auto auto;
+  gap: 12px;
+  min-height: 122px;
+  align-content: start;
+  justify-items: stretch;
   border: 1px solid #dfe7ef;
-  border-radius: 8px;
-  padding: 12px;
+  border-radius: 14px;
+  padding: 14px;
   background: #ffffff;
   color: #172033;
   font: inherit;
@@ -972,14 +974,37 @@ h1 {
   box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.14);
 }
 
+.device-select-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+}
+
 .device-select-icon {
   display: grid;
-  width: 46px;
-  height: 46px;
+  flex: 0 0 auto;
+  width: 48px;
+  height: 48px;
   place-items: center;
-  border-radius: 14px;
-  font-size: 1.35rem;
+  border-radius: 16px;
+  font-size: 1.4rem;
   font-weight: 1000;
+}
+
+.device-select-icon.is-svg-icon {
+  padding: 7px;
+}
+
+.device-select-icon.is-svg-icon svg {
+  width: 100%;
+  height: 100%;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .icon-teal {
@@ -1003,13 +1028,13 @@ h1 {
 }
 
 .device-status-dot {
-  position: absolute;
-  top: 11px;
-  right: 11px;
+  flex: 0 0 auto;
   width: 13px;
   height: 13px;
-  border: 3px solid #eef7f0;
+  margin-top: 2px;
+  border: 2px solid #ffffff;
   border-radius: 999px;
+  box-shadow: 0 0 0 1px #dbe4ec;
 }
 
 .device-status-dot.status-connected {
@@ -1017,23 +1042,22 @@ h1 {
 }
 
 .device-status-dot.status-warning {
-  border-color: #fff7ed;
-  background: #f59e0b;
+  background: #ef4444;
+}
+
+.device-select-copy {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  min-width: 0;
 }
 
 .device-select-name {
-  align-self: end;
   color: #172033;
-  font-size: 0.9rem;
+  font-size: 0.96rem;
   font-weight: 1000;
-  line-height: 1.18;
-}
-
-.device-select-status {
-  margin-top: 2px;
-  color: #64748b;
-  font-size: 0.72rem;
-  font-weight: 900;
+  line-height: 1.26;
+  overflow-wrap: anywhere;
 }
 
 .uwb-main {
@@ -1848,9 +1872,9 @@ h1 {
 }
 
 .device-select-card {
-  min-height: 114px;
+  min-height: 118px;
   border-radius: 18px;
-  padding: 14px;
+  padding: 16px;
   box-shadow: none;
 }
 
@@ -1874,9 +1898,12 @@ h1 {
   border-color: #ffffff;
 }
 
-.device-status-dot.status-connected,
+.device-status-dot.status-connected {
+  background: #22c55e;
+}
+
 .device-status-dot.status-warning {
-  background: var(--wearable-primary);
+  background: #ef4444;
 }
 
 .guide-copy {
@@ -2427,14 +2454,38 @@ h1 {
 }
 
 .device-select-card {
-  min-height: 108px;
-  gap: 10px;
+  min-height: 114px;
+  gap: 12px;
   border-radius: 18px;
-  padding: 12px;
+  padding: 14px;
+  align-items: stretch;
+  text-align: left;
+}
+
+.device-select-card-top {
+  align-items: center;
+}
+
+.device-select-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  font-size: 1.24rem;
+}
+
+.device-select-icon.is-svg-icon {
+  padding: 6px;
+}
+
+.device-select-name {
+  font-size: 0.92rem;
+  line-height: 1.24;
 }
 
 .device-select-action {
   width: 100%;
+  min-height: 46px;
+  justify-self: stretch;
 }
 
 .uwb-main,
@@ -2818,13 +2869,12 @@ h1 {
 }
 
 .device-select-card {
-  align-items: center;
-  text-align: center;
+  align-items: stretch;
+  text-align: left;
 }
 
-.device-select-status,
 .device-select-action {
-  justify-self: center;
+  justify-self: stretch;
 }
 
 .uwb-main,
@@ -3367,6 +3417,44 @@ h1 {
   max-width: none;
 }
 
+.alert-screen,
+.alert-screen > *,
+.alert-screen .screen-topline,
+.alert-screen .alert-copy,
+.alert-screen .compact-meta,
+.alert-screen .compact-meta div,
+.alert-screen .vibration-feedback,
+.alert-screen .action-row,
+.alert-screen .alert-pager,
+.alert-screen .live-message {
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.alert-screen h1,
+.alert-screen p,
+.alert-screen span,
+.alert-screen dd,
+.alert-screen strong,
+.alert-screen button {
+  min-width: 0;
+}
+
+.alert-screen .screen-topline,
+.alert-screen .alert-copy,
+.alert-screen .compact-meta,
+.alert-screen .vibration-feedback,
+.alert-screen .action-row,
+.alert-screen .alert-pager {
+  width: 100%;
+}
+
+.alert-screen .compact-meta dd,
+.alert-screen .alert-copy p {
+  overflow-wrap: anywhere;
+}
+
 .primary-action,
 .secondary-action {
   min-height: 64px;
@@ -3412,6 +3500,20 @@ h1 {
 }
 
 @container wearable (max-width: 380px) {
+  .alert-screen {
+    flex: 1 1 auto;
+    min-height: 0;
+    justify-content: flex-start;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding-bottom: 14px;
+    scrollbar-width: none;
+  }
+
+  .alert-screen::-webkit-scrollbar {
+    display: none;
+  }
+
   .pairing-screen,
   .alert-screen,
   .uwb-screen,
@@ -3658,6 +3760,10 @@ h1 {
 }
 
 @container wearable (max-width: 360px) {
+  .alert-screen {
+    padding-bottom: 12px;
+  }
+
   .wearable-screen {
     padding: 12px 10px 14px;
   }
@@ -3802,6 +3908,10 @@ h1 {
 }
 
 @container wearable (max-width: 320px) {
+  .alert-screen {
+    padding-bottom: 10px;
+  }
+
   .wearable-screen {
     padding: 10px 8px 12px;
   }
@@ -3874,5 +3984,648 @@ h1 {
     padding: 14px 14px 16px;
     border-radius: 18px;
     font-size: 0.88rem;
+  }
+}
+
+@container wearable (max-width: 360px) {
+  .alert-screen {
+    align-content: start;
+    gap: 10px;
+    padding: 12px 8px 10px;
+  }
+
+  .alert-screen .screen-topline {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: center;
+    gap: 6px 8px;
+  }
+
+  .alert-screen .screen-topline .status-badge {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+
+  .alert-screen .alert-copy {
+    gap: 8px;
+  }
+
+  .alert-screen h1 {
+    font-size: 1.34rem;
+    line-height: 1.06;
+    letter-spacing: -0.03em;
+    overflow-wrap: anywhere;
+  }
+
+  .alert-screen .alert-copy p,
+  .alert-screen .live-message {
+    font-size: 0.86rem;
+    line-height: 1.38;
+  }
+
+  .alert-screen .compact-meta {
+    gap: 8px;
+  }
+
+  .alert-screen .compact-meta div,
+  .alert-screen .vibration-feedback,
+  .alert-screen .live-message {
+    border-radius: 13px;
+    padding: 10px 11px;
+  }
+
+  .alert-screen .compact-meta dt {
+    font-size: 0.7rem;
+  }
+
+  .alert-screen .compact-meta dd {
+    margin-top: 4px;
+    font-size: 0.84rem;
+    line-height: 1.3;
+  }
+
+  .alert-screen .vibration-feedback {
+    gap: 10px;
+  }
+
+  .alert-screen .vibration-pulse {
+    width: 34px;
+    height: 34px;
+  }
+
+  .alert-screen .vibration-feedback strong {
+    font-size: 0.94rem;
+  }
+
+  .alert-screen .action-row {
+    gap: 8px;
+  }
+
+  .alert-screen .primary-action {
+    min-height: 46px;
+    padding: 0 12px;
+    font-size: 0.9rem;
+  }
+
+  .alert-screen .alert-pager {
+    gap: 8px;
+  }
+
+  .alert-screen .pager-arrow {
+    min-height: 38px;
+    padding: 0 10px;
+    font-size: 1.3rem;
+  }
+
+  .alert-screen .pager-dot {
+    width: 8px;
+    height: 8px;
+  }
+
+  .alert-screen .pager-dot.active {
+    width: 11px;
+    height: 11px;
+  }
+}
+
+@container wearable (max-width: 320px) {
+  .alert-screen {
+    gap: 8px;
+    padding: 10px 6px 8px;
+  }
+
+  .alert-screen .screen-topline {
+    gap: 5px 6px;
+  }
+
+  .alert-screen h1 {
+    font-size: 1.2rem;
+  }
+
+  .alert-screen .alert-copy p,
+  .alert-screen .live-message,
+  .alert-screen .compact-meta dd {
+    font-size: 0.78rem;
+  }
+
+  .alert-screen .compact-meta div,
+  .alert-screen .vibration-feedback,
+  .alert-screen .live-message {
+    padding: 9px 10px;
+    border-radius: 12px;
+  }
+
+  .alert-screen .vibration-pulse {
+    width: 30px;
+    height: 30px;
+  }
+
+  .alert-screen .vibration-feedback strong {
+    font-size: 0.88rem;
+  }
+
+  .alert-screen .primary-action {
+    min-height: 42px;
+    font-size: 0.84rem;
+  }
+
+  .alert-screen .pager-arrow {
+    min-height: 34px;
+    padding: 0 8px;
+    font-size: 1.14rem;
+  }
+}
+
+.uwb-guide-screen {
+  flex: 1 1 auto;
+  width: 100%;
+  height: 100%;
+  justify-content: flex-start !important;
+  align-content: stretch;
+  min-height: 0;
+  gap: 10px;
+  padding: 12px 10px 14px;
+  background: var(--wearable-bg);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+
+.uwb-guide-screen::-webkit-scrollbar {
+  display: none;
+}
+
+.uwb-guide-screen .status-guide {
+  padding: 9px 16px;
+  border: 1px solid rgba(225, 29, 72, 0.12);
+  border-radius: 999px;
+  background: var(--wearable-primary-soft);
+  color: var(--wearable-primary-strong);
+  font-size: 0.92rem;
+  font-weight: 560;
+  letter-spacing: -0.01em;
+}
+
+.uwb-guide-hero {
+  position: relative;
+  overflow: hidden;
+  grid-template-columns: 1fr;
+  grid-template-rows: auto 1fr auto;
+  align-content: start;
+  justify-items: center;
+  gap: 14px;
+  flex: 1 1 auto;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  min-height: 0;
+  padding: 18px 16px 16px;
+  border-radius: 28px;
+  border: 1px solid var(--wearable-border);
+  background: var(--wearable-surface);
+  box-shadow: var(--wearable-shadow-md);
+}
+
+.uwb-guide-heading {
+  display: grid;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  justify-items: center;
+  text-align: center;
+}
+
+.uwb-guide-device-name {
+  margin: 0;
+  color: var(--wearable-text);
+  font-size: 1.48rem;
+  font-weight: 620;
+  line-height: 1.08;
+  letter-spacing: -0.04em;
+  overflow-wrap: anywhere;
+}
+
+.uwb-guide-support {
+  margin: 0;
+  max-width: 18rem;
+  color: var(--wearable-text-soft);
+  font-size: 0.94rem;
+  font-weight: 480;
+  line-height: 1.45;
+}
+
+.uwb-guide-distance-block {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  flex: 1 1 auto;
+  min-height: 0;
+  max-width: 100%;
+}
+
+.uwb-guide-distance {
+  display: grid;
+  gap: 10px;
+  width: min(100%, 292px);
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+  align-content: center;
+  justify-items: center;
+  min-height: 288px;
+  padding: 22px 18px 20px;
+  border: 1px solid rgba(225, 29, 72, 0.14);
+  border-radius: 34px;
+  background: var(--wearable-primary-soft);
+  box-shadow: inset 0 0 0 10px rgba(255, 255, 255, 0.72);
+  justify-items: center;
+  text-align: center;
+}
+
+.uwb-guide-distance span {
+  color: var(--wearable-primary-strong);
+  font-size: 0.98rem;
+  font-weight: 560;
+  letter-spacing: -0.01em;
+}
+
+.uwb-guide-distance strong {
+  display: inline-flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 7px;
+  font-size: clamp(4.9rem, 20vw, 6.4rem);
+  font-weight: 640;
+  line-height: 0.82;
+  letter-spacing: -0.05em;
+  color: var(--wearable-text);
+}
+
+.uwb-guide-distance small {
+  margin-bottom: 0.16em;
+  color: var(--wearable-text-soft);
+  font-size: 1.28rem;
+  font-weight: 560;
+}
+
+.uwb-guide-vibration-note {
+  margin: 0;
+  color: var(--wearable-text-soft);
+  font-size: 0.96rem;
+  font-weight: 520;
+  line-height: 1.4;
+  text-align: center;
+}
+
+.uwb-guide-inline-warning {
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--wearable-primary-strong);
+  font-size: 0.82rem;
+  font-weight: 540;
+  line-height: 1.3;
+}
+
+.uwb-guide-copy-inline {
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  box-sizing: border-box;
+  padding: 14px 14px 0;
+  color: var(--wearable-text);
+  font-size: 0.98rem;
+  font-weight: 500;
+  line-height: 1.52;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+.uwb-guide-copy-group {
+  display: grid;
+  gap: 8px;
+  width: 100%;
+}
+
+.uwb-guide-message {
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--wearable-border);
+  border-radius: 16px;
+  background: var(--wearable-surface-soft);
+  color: var(--wearable-text-soft);
+  font-size: 0.9rem;
+  font-weight: 500;
+  line-height: 1.45;
+  text-align: center;
+}
+
+.uwb-guide-screen .stop-action {
+  min-height: 56px;
+  border-color: var(--wearable-border-strong);
+  border-radius: 20px;
+  background: #ffffff;
+  color: var(--wearable-text);
+  font-size: 1.02rem;
+  font-weight: 560;
+  box-shadow: var(--wearable-shadow-sm);
+}
+
+.uwb-guide-screen .stop-action:disabled {
+  box-shadow: none;
+}
+
+@container wearable (max-width: 360px) {
+  .uwb-guide-screen {
+    gap: 10px;
+    padding: 12px 8px 14px;
+  }
+
+  .uwb-guide-hero {
+    gap: 12px;
+    padding: 16px 14px 14px;
+  }
+
+  .uwb-guide-device-name {
+    font-size: 1.34rem;
+  }
+
+  .uwb-guide-support {
+    font-size: 0.88rem;
+  }
+
+  .uwb-guide-distance {
+    width: 100%;
+    min-width: 0;
+    min-height: 236px;
+    padding: 20px 16px 18px;
+  }
+
+  .uwb-guide-distance-block {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .uwb-guide-distance strong {
+    font-size: clamp(4.2rem, 21vw, 5.2rem);
+  }
+
+  .uwb-guide-vibration-note,
+  .uwb-guide-inline-warning {
+    font-size: 0.88rem;
+  }
+
+  .uwb-guide-screen .stop-action {
+    min-height: 52px;
+    font-size: 0.96rem;
+  }
+}
+
+@container wearable (max-width: 320px) {
+  .uwb-guide-screen {
+    gap: 8px;
+    padding: 10px 6px 12px;
+  }
+
+  .uwb-guide-distance {
+    min-height: 208px;
+    padding: 18px 14px 16px;
+  }
+
+  .uwb-guide-device-name {
+    font-size: 1.18rem;
+  }
+
+  .uwb-guide-support {
+    font-size: 0.82rem;
+  }
+
+  .uwb-guide-distance-block {
+    gap: 6px;
+  }
+
+  .uwb-guide-distance span {
+    font-size: 0.88rem;
+  }
+
+  .uwb-guide-distance strong {
+    font-size: clamp(3.7rem, 20vw, 4.4rem);
+  }
+
+  .uwb-guide-copy-inline,
+  .uwb-guide-message {
+    font-size: 0.86rem;
+  }
+
+  .uwb-guide-screen .stop-action {
+    min-height: 48px;
+  }
+}
+
+.device-select-screen {
+  flex: 1 1 auto;
+  justify-content: flex-start !important;
+  align-content: start;
+  gap: 10px;
+  padding: 12px 10px 14px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+
+.device-select-screen::-webkit-scrollbar {
+  display: none;
+}
+
+.device-select-hero {
+  display: grid;
+  gap: 6px;
+  width: 100%;
+}
+
+.device-select-hero h1 {
+  width: 100%;
+  font-size: 2.12rem;
+  line-height: 1.02;
+  letter-spacing: -0.04em;
+  overflow-wrap: anywhere;
+}
+
+.device-select-intro {
+  color: #475569;
+  font-size: 1.04rem;
+  line-height: 1.42;
+}
+
+.device-select-grid {
+  grid-template-columns: 1fr;
+  gap: 10px;
+  width: 100%;
+  align-content: start;
+}
+
+.device-select-card {
+  min-height: 194px;
+  gap: 14px;
+  padding: 20px 18px;
+  border-radius: 22px;
+  border-color: #dbe4ec;
+  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.06);
+}
+
+.device-select-card-top {
+  align-items: center;
+}
+
+.device-select-icon {
+  width: 60px;
+  height: 60px;
+  border-radius: 18px;
+  font-size: 1.6rem;
+}
+
+.device-select-icon.is-svg-icon {
+  padding: 8px;
+}
+
+.device-select-copy {
+  gap: 10px;
+}
+
+.device-select-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+}
+
+.device-select-name {
+  font-size: 1.46rem;
+  line-height: 1.08;
+  letter-spacing: -0.03em;
+}
+
+.device-select-room {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: #f8fafc;
+  color: #475569;
+  font-size: 0.88rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.device-select-detail {
+  margin: 0;
+  color: #475569;
+  font-size: 1.04rem;
+  line-height: 1.42;
+  overflow-wrap: anywhere;
+}
+
+.device-select-action {
+  min-height: 62px;
+  font-size: 1.1rem;
+  font-weight: 800;
+}
+
+@container wearable (max-width: 360px) {
+  .device-select-screen {
+    gap: 10px;
+    padding: 12px 8px 14px;
+  }
+
+  .device-select-hero h1 {
+    font-size: 1.76rem;
+  }
+
+  .device-select-intro {
+    font-size: 0.94rem;
+    line-height: 1.4;
+  }
+
+  .device-select-grid {
+    gap: 10px;
+  }
+
+  .device-select-card {
+    min-height: 176px;
+    gap: 12px;
+    padding: 18px 16px;
+    border-radius: 18px;
+  }
+
+  .device-select-icon {
+    width: 52px;
+    height: 52px;
+    border-radius: 16px;
+    font-size: 1.4rem;
+  }
+
+  .device-select-title-row {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .device-select-name {
+    font-size: 1.28rem;
+  }
+
+  .device-select-room {
+    min-height: 28px;
+    padding: 0 10px;
+    font-size: 0.8rem;
+  }
+
+  .device-select-detail {
+    font-size: 0.94rem;
+  }
+
+  .device-select-action {
+    min-height: 54px;
+    font-size: 1rem;
+  }
+}
+
+@container wearable (max-width: 320px) {
+  .device-select-screen {
+    gap: 8px;
+    padding: 10px 6px 12px;
+  }
+
+  .device-select-hero h1 {
+    font-size: 1.56rem;
+  }
+
+  .device-select-card {
+    min-height: 160px;
+    gap: 10px;
+    padding: 16px 14px;
+  }
+
+  .device-select-icon {
+    width: 48px;
+    height: 48px;
+    font-size: 1.28rem;
+  }
+
+  .device-select-name {
+    font-size: 1.16rem;
+  }
+
+  .device-select-detail {
+    font-size: 0.86rem;
+  }
+
+  .device-select-action {
+    min-height: 50px;
+    font-size: 0.94rem;
   }
 }
