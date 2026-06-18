@@ -24,6 +24,8 @@ const RECOGNITION_STUCK_RESTART_MS = 3500
 const MIN_USER_TRANSCRIPT_CHARS = 2
 const UWB_POLL_INTERVAL_MS = 2500
 const WAKE_RESTART_DELAY_MS = 100
+const WAKE_BLOCKED_RESTART_DELAY_MS = 1500
+const WAKE_STUCK_RESTART_MS = 7000
 const USER_RESTART_DELAY_MS = 450
 const CONVERSATION_STATE = {
   IDLE: 'IDLE',
@@ -245,7 +247,7 @@ export function VoiceChatbot({
   statusMessage,
   uwbSession,
 }) {
-  const [isOpen, setIsOpen] = useState(embedded)
+  const [isOpen, setIsOpen] = useState(false)
   const [currentChatScreen, setCurrentChatScreen] = useState('start')
   const [selectedPhrase, setSelectedPhrase] = useState('')
   const [selectedQuestion, setSelectedQuestion] = useState('alert')
@@ -262,6 +264,7 @@ export function VoiceChatbot({
   const wakeRecognitionRef = useRef(null)
   const wakeRestartTimerRef = useRef(null)
   const wakeSilenceTimerRef = useRef(null)
+  const wakeStartGuardTimerRef = useRef(null)
   const userSilenceTimerRef = useRef(null)
   const waitingUserTimerRef = useRef(null)
   const recognitionWatchdogTimerRef = useRef(null)
@@ -414,12 +417,15 @@ export function VoiceChatbot({
       text: CHATBOT_INTRO,
       quickReplies: [],
     })
+  }
 
-    if (embedded) {
-      setIsOpen(true)
-      isOpenRef.current = true
+  function startVoiceFromInitialScreen() {
+    if (embedded && !isOpenRef.current) {
+      openChatbot({ fromWake: true, autoListen: true })
       return
     }
+
+    startVoiceTurn()
   }
 
   async function beginVoiceConversation() {
@@ -1081,7 +1087,7 @@ export function VoiceChatbot({
   function goBack() {
     stopChatbotSpeech()
 
-    if (currentChatScreen === 'start') {
+    if (currentChatScreen === 'start' || (embedded && !isOpen)) {
       closeChatbot()
       return
     }
@@ -1121,13 +1127,16 @@ export function VoiceChatbot({
     wakeRecognitionRef.current = recognition
 
     recognition.onstart = () => {
+      window.clearTimeout(wakeStartGuardTimerRef.current)
       onWakeListeningChange?.(true)
       setVoiceStatus('챗봇 켜줘 라고 말하면 바로 시작해요.')
       wakeMatchedRef.current = false
       wakeTranscriptRef.current = ''
+      scheduleWakeWatchdog()
     }
 
     recognition.onresult = (event) => {
+      scheduleWakeWatchdog()
       const heardCandidates = Array.from(event.results)
         .flatMap((result) => getRecognitionAlternatives(result))
         .filter(Boolean)
@@ -1149,22 +1158,40 @@ export function VoiceChatbot({
       }
     }
 
-    recognition.onerror = (event) => {
-      if (['not-allowed', 'service-not-allowed', 'audio-capture'].includes(event?.error)) {
-        onWakeListeningChange?.(false)
-        setVoiceStatus('마이크 권한을 허용하면 챗봇 켜줘로 시작할 수 있어요.')
+    recognition.onerror = async (event) => {
+      window.clearTimeout(wakeStartGuardTimerRef.current)
+      window.clearTimeout(wakeSilenceTimerRef.current)
+      if (event?.error === 'aborted') {
         wakeRecognitionRef.current = null
         return
-      } else {
-        onWakeListeningChange?.(true)
       }
+
+      console.warn('Wake STT 오류:', event?.error || event)
       wakeRecognitionRef.current = null
       wakeTranscriptRef.current = ''
       wakeMatchedRef.current = false
+
+      if (['not-allowed', 'service-not-allowed', 'audio-capture'].includes(event?.error)) {
+        const permissionDenied = await isMicrophonePermissionDenied()
+        if (permissionDenied) {
+          onWakeListeningChange?.(false)
+          setVoiceStatus('마이크 권한을 허용하면 챗봇 켜줘로 시작할 수 있어요.')
+          return
+        }
+
+        onWakeListeningChange?.(true)
+        setVoiceStatus('챗봇 대기 마이크를 다시 여는 중이에요.')
+        scheduleWakeRestart(WAKE_BLOCKED_RESTART_DELAY_MS)
+        return
+      }
+
+      onWakeListeningChange?.(true)
       scheduleWakeRestart()
     }
 
     recognition.onend = () => {
+      window.clearTimeout(wakeStartGuardTimerRef.current)
+      window.clearTimeout(wakeSilenceTimerRef.current)
       wakeRecognitionRef.current = null
       if (wakeMatchedRef.current) {
         finishWakeSpeech()
@@ -1179,25 +1206,73 @@ export function VoiceChatbot({
 
     try {
       onWakeListeningChange?.(true)
+      scheduleWakeStartGuard(recognition)
       recognition.start()
     } catch {
+      window.clearTimeout(wakeStartGuardTimerRef.current)
       onWakeListeningChange?.(false)
       wakeRecognitionRef.current = null
       scheduleWakeRestart()
     }
   }
 
-  function scheduleWakeRestart() {
+  function scheduleWakeRestart(delayMs = WAKE_RESTART_DELAY_MS) {
     window.clearTimeout(wakeRestartTimerRef.current)
     if (isOpenRef.current || globalThis.__ABLE_BAND_CHATBOT_AUDIO_LOCK__ === true) {
       return
     }
-    wakeRestartTimerRef.current = window.setTimeout(startWakeListening, WAKE_RESTART_DELAY_MS)
+    wakeRestartTimerRef.current = window.setTimeout(startWakeListening, delayMs)
+  }
+
+  function scheduleWakeWatchdog() {
+    window.clearTimeout(wakeSilenceTimerRef.current)
+    if (isOpenRef.current || !wakeRecognitionRef.current) {
+      return
+    }
+
+    wakeSilenceTimerRef.current = window.setTimeout(() => {
+      if (isOpenRef.current || !wakeRecognitionRef.current) {
+        return
+      }
+
+      console.warn('Wake STT 입력 이벤트가 없어 대기 마이크를 다시 시작합니다.')
+      try {
+        wakeRecognitionRef.current?.abort?.()
+      } catch {
+        // Recognition can already be stopped.
+      }
+      wakeRecognitionRef.current = null
+      wakeTranscriptRef.current = ''
+      wakeMatchedRef.current = false
+      scheduleWakeRestart(WAKE_BLOCKED_RESTART_DELAY_MS)
+    }, WAKE_STUCK_RESTART_MS)
+  }
+
+  function scheduleWakeStartGuard(recognition) {
+    window.clearTimeout(wakeStartGuardTimerRef.current)
+    wakeStartGuardTimerRef.current = window.setTimeout(() => {
+      if (isOpenRef.current || wakeRecognitionRef.current !== recognition) {
+        return
+      }
+
+      console.warn('Wake STT 시작 이벤트가 없어 대기 마이크를 다시 시작합니다.')
+      try {
+        recognition.abort?.()
+      } catch {
+        // Recognition can already be stopped.
+      }
+      wakeRecognitionRef.current = null
+      wakeTranscriptRef.current = ''
+      wakeMatchedRef.current = false
+      onWakeListeningChange?.(false)
+      scheduleWakeRestart(WAKE_BLOCKED_RESTART_DELAY_MS)
+    }, 2500)
   }
 
   function stopWakeListening() {
     window.clearTimeout(wakeRestartTimerRef.current)
     window.clearTimeout(wakeSilenceTimerRef.current)
+    window.clearTimeout(wakeStartGuardTimerRef.current)
     try {
       wakeRecognitionRef.current?.abort?.()
     } catch {
@@ -1360,7 +1435,7 @@ export function VoiceChatbot({
               isListening={isListening}
               onAsk={() => setCurrentChatScreen('ask')}
               onSpeak={() => setCurrentChatScreen('speak')}
-              onVoiceQuestion={startVoiceTurn}
+              onVoiceQuestion={startVoiceFromInitialScreen}
               supportsSpeechRecognition={supportsSpeechRecognition}
               voiceStatus={voiceStatus}
             />
@@ -2084,6 +2159,15 @@ async function checkMicrophoneAvailability() {
   }
 
   return ''
+}
+
+async function isMicrophonePermissionDenied() {
+  try {
+    const permissionStatus = await globalThis.navigator?.permissions?.query?.({ name: 'microphone' })
+    return permissionStatus?.state === 'denied'
+  } catch {
+    return false
+  }
 }
 
 function isMicrophoneSecureContext() {
