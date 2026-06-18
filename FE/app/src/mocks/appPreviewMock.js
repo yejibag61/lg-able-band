@@ -95,6 +95,25 @@ export const mockAppPreview = {
       recommendedAction: '진동 안내가 빨라지면 주변 장애물을 확인하세요.',
       requiresGuardianNotify: false,
     },
+    {
+      alertId: 206,
+      type: 'LIFE',
+      severity: 'LOW',
+      title: 'TV 리모컨 찾기',
+      message: 'TV 리모컨 찾기 안내를 시작할 수 있습니다.',
+      voiceGuide: 'TV 리모컨 찾기 안내입니다. 거실 TV 주변을 확인해 주세요.',
+      deviceName: 'TV',
+      device: {
+        deviceId: 2,
+        name: 'TV',
+        type: 'TV',
+      },
+      locationName: '거실',
+      occurredAt: '2026-06-10T12:48:00+09:00',
+      status: 'UNREAD',
+      recommendedAction: 'TV 근처에서 소리와 화면 안내를 확인하세요.',
+      requiresGuardianNotify: false,
+    },
   ],
   devices: [
     {
