@@ -53,7 +53,8 @@ public class DeviceService {
 					device.lastEventAt(),
 					null,
 					mockVendorDeviceId(device.type()),
-					false
+					false,
+					device.room()
 				))
 				.toList();
 		}
@@ -67,13 +68,14 @@ public class DeviceService {
 			       d.location_supported,
 			       d.vendor_device_id,
 			       d.remote_enabled,
+			       d.room,
 			       COALESCE(MAX(de.occurred_at), d.created_at) AS last_event_at
 			FROM device d
 			LEFT JOIN device_event de ON de.device_id = d.device_id
 			WHERE d.user_id = ?
 			  AND d.connection_status <> 'DISCONNECTED'
 			GROUP BY d.device_id, d.name, d.device_type, d.connection_status,
-			         d.location_supported, d.vendor_device_id, d.remote_enabled, d.created_at
+			         d.location_supported, d.vendor_device_id, d.remote_enabled, d.room, d.created_at
 			ORDER BY last_event_at DESC, d.device_id DESC
 			""",
 			(rs, rowNum) -> new DeviceSummary(
@@ -85,7 +87,8 @@ public class DeviceService {
 				toOffsetDateTime(rs.getObject("last_event_at", LocalDateTime.class)),
 				null,
 				rs.getString("vendor_device_id"),
-				rs.getBoolean("remote_enabled")
+				rs.getBoolean("remote_enabled"),
+				rs.getString("room")
 			),
 			user.userId()
 		);
@@ -100,7 +103,8 @@ public class DeviceService {
 				user.userId(),
 				request.name(),
 				request.type(),
-				request.locationSupported()
+				request.locationSupported(),
+				normalizeRoom(request.room())
 			);
 			return new DeviceSummary(
 				device.deviceId(),
@@ -111,7 +115,8 @@ public class DeviceService {
 				device.lastEventAt(),
 				request.vendor(),
 				request.vendorDeviceId(),
-				request.remoteEnabled()
+				request.remoteEnabled(),
+				device.room()
 			);
 		}
 
@@ -127,7 +132,8 @@ public class DeviceService {
 				OffsetDateTime.now(),
 				request.vendor(),
 				request.vendorDeviceId(),
-				request.remoteEnabled()
+				request.remoteEnabled(),
+				normalizeRoom(request.room())
 			);
 		} catch (DuplicateKeyException ex) {
 			return reconnectExistingDevice(jdbcTemplate, user.userId(), request);
@@ -147,7 +153,8 @@ public class DeviceService {
 				user.userId(),
 				request.name(),
 				request.type(),
-				request.locationSupported()
+				request.locationSupported(),
+				normalizeRoom(request.room())
 			);
 			return new DeviceSummary(
 				device.deviceId(),
@@ -158,7 +165,8 @@ public class DeviceService {
 				device.lastEventAt(),
 				request.vendor(),
 				request.vendorDeviceId(),
-				request.remoteEnabled()
+				request.remoteEnabled(),
+				device.room()
 			);
 		}
 
@@ -174,11 +182,62 @@ public class DeviceService {
 				OffsetDateTime.now(),
 				request.vendor(),
 				request.vendorDeviceId(),
-				request.remoteEnabled()
+				request.remoteEnabled(),
+				normalizeRoom(request.room())
 			);
 		} catch (DuplicateKeyException ex) {
 			return claimExistingWearableDevice(jdbcTemplate, user.userId(), request);
 		}
+	}
+
+	public DeviceSummary updateDevice(String authorization, long deviceId, DeviceUpdateRequest request) {
+		JdbcTemplate jdbcTemplate = jdbcTemplate();
+		MvpDataService.CurrentUser user = this.dataService.currentUser(authorization);
+		String room = normalizeRoom(request.room());
+		if (room == null) {
+			throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_DEVICE_ROOM", "가전 위치를 입력해 주세요.");
+		}
+
+		if (jdbcTemplate == null) {
+			MockDataStore.Device device = this.mockDataStore.updateDeviceRoom(user.userId(), deviceId, room);
+			if (device == null) {
+				throw new ApiException(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND", "기기를 찾을 수 없습니다.");
+			}
+			return new DeviceSummary(
+				device.deviceId(),
+				device.name(),
+				device.type(),
+				device.connectionStatus(),
+				device.locationSupported(),
+				device.lastEventAt(),
+				null,
+				mockVendorDeviceId(device.type()),
+				false,
+				device.room()
+			);
+		}
+
+		int updated = jdbcTemplate.update(
+			"""
+			UPDATE device
+			SET room = ?,
+			    updated_at = CURRENT_TIMESTAMP(6)
+			WHERE device_id = ?
+			  AND user_id = ?
+			  AND connection_status <> 'DISCONNECTED'
+			""",
+			room,
+			deviceId,
+			user.userId()
+		);
+		if (updated == 0) {
+			throw new ApiException(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND", "기기를 찾을 수 없습니다.");
+		}
+
+		return devices(authorization).stream()
+			.filter(device -> device.deviceId() == deviceId)
+			.findFirst()
+			.orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND", "기기를 찾을 수 없습니다."));
 	}
 
 	public void deleteDevice(String authorization, long deviceId) {
@@ -220,10 +279,11 @@ public class DeviceService {
 					device_type,
 					vendor_device_id,
 					name,
+					room,
 					connection_status,
 					location_supported,
 					remote_enabled
-				) VALUES (?, ?, ?, ?, ?, ?, ?)
+				) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 				""",
 				Statement.RETURN_GENERATED_KEYS
 			);
@@ -231,9 +291,10 @@ public class DeviceService {
 			ps.setString(2, request.type().name());
 			ps.setString(3, blankToNull(request.vendorDeviceId()));
 			ps.setString(4, request.name());
-			ps.setString(5, ConnectionStatus.CONNECTED.name());
-			ps.setBoolean(6, request.locationSupported());
-			ps.setBoolean(7, request.remoteEnabled());
+			ps.setString(5, normalizeRoom(request.room()));
+			ps.setString(6, ConnectionStatus.CONNECTED.name());
+			ps.setBoolean(7, request.locationSupported());
+			ps.setBoolean(8, request.remoteEnabled());
 			return ps;
 		}, keyHolder);
 		return keyHolder.getKey().longValue();
@@ -277,6 +338,7 @@ public class DeviceService {
 			SET user_id = ?,
 			    device_type = ?,
 			    name = ?,
+			    room = ?,
 			    connection_status = 'CONNECTED',
 			    location_supported = ?,
 			    remote_enabled = ?,
@@ -286,6 +348,7 @@ public class DeviceService {
 			userId,
 			request.type().name(),
 			request.name(),
+			normalizeRoom(request.room()),
 			request.locationSupported(),
 			request.remoteEnabled(),
 			existing.deviceId()
@@ -300,7 +363,8 @@ public class DeviceService {
 			OffsetDateTime.now(),
 			request.vendor(),
 			request.vendorDeviceId(),
-			request.remoteEnabled()
+			request.remoteEnabled(),
+			normalizeRoom(request.room())
 		);
 	}
 
@@ -333,6 +397,7 @@ public class DeviceService {
 			UPDATE device
 			SET device_type = ?,
 			    name = ?,
+			    room = ?,
 			    connection_status = 'CONNECTED',
 			    location_supported = ?,
 			    remote_enabled = ?,
@@ -341,6 +406,7 @@ public class DeviceService {
 			""",
 			request.type().name(),
 			request.name(),
+			normalizeRoom(request.room()),
 			request.locationSupported(),
 			request.remoteEnabled(),
 			existing.deviceId()
@@ -355,7 +421,8 @@ public class DeviceService {
 			OffsetDateTime.now(),
 			request.vendor(),
 			request.vendorDeviceId(),
-			request.remoteEnabled()
+			request.remoteEnabled(),
+			normalizeRoom(request.room())
 		);
 	}
 
@@ -390,6 +457,10 @@ public class DeviceService {
 		return value == null || value.isBlank() ? null : value;
 	}
 
+	private String normalizeRoom(String value) {
+		return value == null || value.isBlank() ? null : value.trim();
+	}
+
 	private String escapeJson(String value) {
 		return value
 			.replace("\\", "\\\\")
@@ -422,7 +493,8 @@ public class DeviceService {
 		OffsetDateTime lastEventAt,
 		String vendor,
 		String vendorDeviceId,
-		boolean remoteEnabled
+		boolean remoteEnabled,
+		String room
 	) {
 	}
 
@@ -431,9 +503,13 @@ public class DeviceService {
 		String vendorDeviceId,
 		String name,
 		DeviceType type,
+		String room,
 		boolean locationSupported,
 		boolean remoteEnabled
 	) {
+	}
+
+	public record DeviceUpdateRequest(String room) {
 	}
 
 	private record DeviceRow(long deviceId, long userId) {

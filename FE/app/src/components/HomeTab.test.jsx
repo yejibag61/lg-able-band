@@ -59,7 +59,8 @@ describe('HomeTab', () => {
     expect(screen.getByText('위험 1건')).toBeTruthy()
     expect(screen.getByText('전기레인지 과열 주의')).toBeTruthy()
     expect(screen.queryByText('세탁 완료')).toBeNull()
-    expect(screen.getByText('주의/오류 없음')).toBeTruthy()
+    expect(screen.queryByText('기기 연결 상태')).toBeNull()
+    expect(screen.queryByText('주의/오류 없음')).toBeNull()
   })
 
   it('keeps the SOS button clickable when a guardian must be registered first', async () => {
@@ -107,7 +108,6 @@ function renderHomeTab(summary = baseSummary, options = {}) {
       summary={summary}
       onEmergencyRequest={options.onEmergencyRequest || (() => {})}
       onOpenAlerts={() => {}}
-      onOpenDevices={() => {}}
     />,
   )
 }

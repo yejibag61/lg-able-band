@@ -8,6 +8,7 @@ import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -44,9 +45,23 @@ public class DeviceController {
 				request.vendorDeviceId(),
 				request.name(),
 				request.type(),
+				request.room(),
 				request.locationSupported(),
 				request.remoteEnabled()
 			)
+		);
+	}
+
+	@PatchMapping("/{deviceId}")
+	public DeviceService.DeviceSummary updateDevice(
+		@RequestHeader("Authorization") String authorization,
+		@PathVariable long deviceId,
+		@RequestBody DeviceUpdateRequest request
+	) {
+		return this.deviceService.updateDevice(
+			authorization,
+			deviceId,
+			new DeviceService.DeviceUpdateRequest(request.room())
 		);
 	}
 
@@ -67,8 +82,12 @@ public class DeviceController {
 		String vendorDeviceId,
 		@NotBlank String name,
 		@NotNull DeviceType type,
+		String room,
 		boolean locationSupported,
 		boolean remoteEnabled
 	) {
+	}
+
+	public record DeviceUpdateRequest(String room) {
 	}
 }

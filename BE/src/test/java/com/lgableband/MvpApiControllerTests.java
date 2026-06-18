@@ -272,6 +272,45 @@ class MvpApiControllerTests {
 	}
 
 	@Test
+	void deviceRoomCanBeUpdatedAndReloaded() throws Exception {
+		String userToken = loginToken("USER", "user@example.com");
+		String vendorDeviceId = "thinq-room-%d".formatted(System.nanoTime());
+		MvcResult created = this.mockMvc.perform(post("/api/devices")
+				.header("Authorization", "Bearer " + userToken)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "vendor": "LG",
+					  "vendorDeviceId": "%s",
+					  "name": "TV",
+					  "type": "TV",
+					  "room": "거실",
+					  "locationSupported": false,
+					  "remoteEnabled": true
+					}
+					""".formatted(vendorDeviceId)))
+			.andExpect(status().isCreated())
+			.andExpect(jsonPath("$.room").value("거실"))
+			.andReturn();
+		String deviceId = extractJsonNumber(created.getResponse().getContentAsString(), "deviceId");
+
+		this.mockMvc.perform(patch("/api/devices/" + deviceId)
+				.header("Authorization", "Bearer " + userToken)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "room": "안방"
+					}
+					"""))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.room").value("안방"));
+
+		this.mockMvc.perform(get("/api/devices").header("Authorization", "Bearer " + userToken))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.items[0].room").value("안방"));
+	}
+
+	@Test
 	void guardiansCanBeManaged() throws Exception {
 		String token = userToken();
 		String pairingCompleteMessage =

@@ -40,6 +40,7 @@ import './App.css'
 const PAIRED_PAIRING_STORAGE_KEY = 'lg-able-band.pairingSession'
 const LIVING_SIGNAL_REPORT_COOLDOWN_MS = 15000
 const ALERT_POLL_INTERVAL_MS = 3000
+const BOTTOM_SHEET_COLLAPSED_PEEK = 34
 
 function App() {
   const initialPairing = getStoredPairedPairingSession()
@@ -89,6 +90,13 @@ function App() {
     () => buildActiveGuideSession(bleGuide, uwbSession, selectedGuideTarget),
     [bleGuide, selectedGuideTarget, uwbSession],
   )
+  const showBottomSheet = isPaired && mode !== 'emergency'
+  const screenClassName = [
+    isPaired ? 'wearable-screen-with-mode-switch' : '',
+    showBottomSheet ? 'wearable-screen-with-bottom-sheet' : '',
+  ]
+    .filter(Boolean)
+    .join(' ')
 
   const speakText = useCallback((text) => {
     if (
@@ -653,7 +661,7 @@ function App() {
 
   return (
     <main className="app-root">
-      <WearableFrame screenClassName={isPaired ? 'wearable-screen-with-mode-switch' : ''}>
+      <WearableFrame screenClassName={screenClassName}>
         {isPaired ? (
           <ModeSwitch
             activeMode={mode === 'deviceSelect' ? 'uwb' : mode}
@@ -789,8 +797,151 @@ function App() {
             uwbSession={uwbSession}
           />
         ) : null}
+
+        {showBottomSheet ? (
+          <WearableBottomSheet
+            isBusy={isBusy}
+            onEmergencyRequest={handleEmergencyRequest}
+            onUnpair={handleUnpair}
+          />
+        ) : null}
       </WearableFrame>
     </main>
+  )
+}
+
+function WearableBottomSheet({ isBusy, onEmergencyRequest, onUnpair }) {
+  const sheetRef = useRef(null)
+  const dragStateRef = useRef({
+    moved: false,
+    pointerId: null,
+    startTranslate: 0,
+    startY: 0,
+  })
+  const translateRef = useRef(0)
+  const [isExpanded, setIsExpanded] = useState(false)
+  const [isDragging, setIsDragging] = useState(false)
+  const [travel, setTravel] = useState(0)
+  const [translate, setTranslate] = useState(0)
+
+  useEffect(() => {
+    translateRef.current = translate
+  }, [translate])
+
+  useEffect(() => {
+    function syncTravel() {
+      const height = sheetRef.current?.offsetHeight || 0
+      const nextTravel = Math.max(height - BOTTOM_SHEET_COLLAPSED_PEEK, 0)
+      setTravel(nextTravel)
+    }
+
+    syncTravel()
+    window.addEventListener('resize', syncTravel)
+
+    if (typeof ResizeObserver === 'function' && sheetRef.current) {
+      const observer = new ResizeObserver(syncTravel)
+      observer.observe(sheetRef.current)
+      return () => {
+        observer.disconnect()
+        window.removeEventListener('resize', syncTravel)
+      }
+    }
+
+    return () => window.removeEventListener('resize', syncTravel)
+  }, [])
+
+  useEffect(() => {
+    setTranslate(isExpanded ? 0 : travel)
+  }, [isExpanded, travel])
+
+  function toggleExpanded() {
+    if (dragStateRef.current.moved) {
+      dragStateRef.current.moved = false
+      return
+    }
+
+    setIsExpanded((current) => !current)
+  }
+
+  function handlePointerDown(event) {
+    if (event.pointerType === 'mouse' && event.button !== 0) {
+      return
+    }
+
+    dragStateRef.current = {
+      moved: false,
+      pointerId: event.pointerId,
+      startTranslate: translateRef.current,
+      startY: event.clientY,
+    }
+    setIsDragging(true)
+    event.currentTarget.setPointerCapture?.(event.pointerId)
+  }
+
+  function handlePointerMove(event) {
+    if (!isDragging || dragStateRef.current.pointerId !== event.pointerId) {
+      return
+    }
+
+    const deltaY = event.clientY - dragStateRef.current.startY
+    if (Math.abs(deltaY) > 6) {
+      dragStateRef.current.moved = true
+    }
+
+    setTranslate(clamp(dragStateRef.current.startTranslate + deltaY, 0, travel))
+  }
+
+  function handlePointerEnd(event) {
+    if (!isDragging || dragStateRef.current.pointerId !== event.pointerId) {
+      return
+    }
+
+    const shouldExpand = translateRef.current < travel * 0.55
+    setIsDragging(false)
+    setIsExpanded(shouldExpand)
+    setTranslate(shouldExpand ? 0 : travel)
+    dragStateRef.current.pointerId = null
+    event.currentTarget.releasePointerCapture?.(event.pointerId)
+  }
+
+  return (
+    <section
+      className={isExpanded ? 'wearable-bottom-sheet is-expanded' : 'wearable-bottom-sheet'}
+      ref={sheetRef}
+      style={{
+        transform: `translateY(${translate}px)`,
+        transition: isDragging ? 'none' : undefined,
+      }}
+    >
+      <div
+        className="wearable-bottom-sheet-header"
+        onPointerCancel={handlePointerEnd}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerEnd}
+      >
+        <button
+          aria-controls="wearable-bottom-sheet-content"
+          aria-expanded={isExpanded}
+          className="wearable-bottom-sheet-toggle"
+          type="button"
+          onClick={toggleExpanded}
+        >
+          <span className="wearable-bottom-sheet-handle" aria-hidden="true" />
+        </button>
+      </div>
+
+      <div className="wearable-bottom-sheet-body" id="wearable-bottom-sheet-content">
+        <div className="wearable-bottom-sheet-actions">
+          <button className="primary-action" type="button" disabled={isBusy} onClick={onEmergencyRequest}>
+            {isBusy ? '요청 중...' : '긴급 도움 요청'}
+          </button>
+          <button className="secondary-action" type="button" disabled={isBusy} onClick={onUnpair}>
+            연동 해제
+          </button>
+        </div>
+      </div>
+    </section>
   )
 }
 
@@ -1005,6 +1156,10 @@ function vibrationPatternForBleDistance(distanceM) {
   }
 
   return 'SLOW'
+}
+
+function clamp(value, min, max) {
+  return Math.min(max, Math.max(min, value))
 }
 
 export default App

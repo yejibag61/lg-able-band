@@ -338,7 +338,8 @@ public class WearablePairingRepository {
 			toOffsetDateTime(rs.getObject("linked_device_last_event_at", LocalDateTime.class)),
 			DEFAULT_VENDOR,
 			rs.getString("linked_vendor_device_id"),
-			rs.getBoolean("linked_device_remote_enabled")
+			rs.getBoolean("linked_device_remote_enabled"),
+			null
 		);
 	}
 
@@ -453,7 +454,8 @@ public class WearablePairingRepository {
 			pairedAt,
 			DEFAULT_VENDOR,
 			vendorDeviceId,
-			true
+			true,
+			null
 		);
 	}
 

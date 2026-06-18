@@ -75,7 +75,7 @@ public class MockDataStore {
 			new Guardian(1, "김보호", "010-0000-0000", true, true, ConnectionStatus.CONNECTED)
 		)));
 		this.devicesByUserId.put(1L, new ArrayList<>(List.of(
-			new Device(10, "세탁기", DeviceType.WASHER, ConnectionStatus.CONNECTED, true, OffsetDateTime.now().minusMinutes(10))
+			new Device(10, "세탁기", DeviceType.WASHER, ConnectionStatus.CONNECTED, true, OffsetDateTime.now().minusMinutes(10), "세탁실")
 		)));
 		this.alertsByUserId.put(1L, new ArrayList<>(List.of(
 			new Alert(101, AlertType.LIFE, Severity.LOW, "세탁 완료", "세탁이 완료되었습니다. 건조기로 옮겨주세요.", "세탁기", OffsetDateTime.now().minusMinutes(20), AlertStatus.UNREAD, "세탁기 완료 알림입니다."),
@@ -222,17 +222,39 @@ public class MockDataStore {
 		return this.users.keySet().stream().sorted().toList();
 	}
 
-	public Device addDevice(long userId, String name, DeviceType type, boolean locationSupported) {
+	public Device addDevice(long userId, String name, DeviceType type, boolean locationSupported, String room) {
 		Device device = new Device(
 			this.deviceSequence.incrementAndGet(),
 			name,
 			type,
 			ConnectionStatus.CONNECTED,
 			locationSupported,
-			OffsetDateTime.now()
+			OffsetDateTime.now(),
+			room
 		);
 		this.devicesByUserId.computeIfAbsent(userId, ignored -> new ArrayList<>()).add(0, device);
 		return device;
+	}
+
+	public Device updateDeviceRoom(long userId, long deviceId, String room) {
+		List<Device> devices = this.devicesByUserId.getOrDefault(userId, List.of());
+		for (int index = 0; index < devices.size(); index += 1) {
+			Device device = devices.get(index);
+			if (device.deviceId() == deviceId && device.connectionStatus() != ConnectionStatus.DISCONNECTED) {
+				Device updated = new Device(
+					device.deviceId(),
+					device.name(),
+					device.type(),
+					device.connectionStatus(),
+					device.locationSupported(),
+					device.lastEventAt(),
+					room
+				);
+				devices.set(index, updated);
+				return updated;
+			}
+		}
+		return null;
 	}
 
 	public List<Alert> alerts(long userId, AlertType type, AlertStatus status, int limit) {
@@ -602,7 +624,7 @@ public class MockDataStore {
 	public record NotificationPrefs(List<NotificationChannel> channels, boolean highContrast, boolean largeText) {
 	}
 
-	public record Device(long deviceId, String name, DeviceType type, ConnectionStatus connectionStatus, boolean locationSupported, OffsetDateTime lastEventAt) {
+	public record Device(long deviceId, String name, DeviceType type, ConnectionStatus connectionStatus, boolean locationSupported, OffsetDateTime lastEventAt, String room) {
 	}
 
 	public record Alert(long alertId, AlertType type, Severity severity, String title, String message, String deviceName, OffsetDateTime occurredAt, AlertStatus status, String voiceGuide) {

@@ -11,3 +11,10 @@ export async function createDevice(device) {
     body: device,
   })
 }
+
+export async function updateDevice(deviceId, device) {
+  return apiRequest(`/api/devices/${encodeURIComponent(deviceId)}`, {
+    method: 'PATCH',
+    body: device,
+  })
+}

@@ -74,10 +74,11 @@ class UwbServiceTests {
 			10,
 			"세탁기",
 			DeviceType.WASHER,
-			com.lgableband.common.ConnectionStatus.CONNECTED,
-			true,
-			OffsetDateTime.parse("2026-06-10T14:00:00+09:00")
-		)));
+				com.lgableband.common.ConnectionStatus.CONNECTED,
+				true,
+				OffsetDateTime.parse("2026-06-10T14:00:00+09:00"),
+				"세탁실"
+			)));
 		when(mockDataStore.startUwbSession(1L, 10L)).thenReturn(new MockDataStore.UwbSession(
 			9001,
 			1,
