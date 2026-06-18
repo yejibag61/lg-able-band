@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { getGuardianDashboard } from '../services/guardianDashboardService'
+import { formatStatusUpdatedAt, getSafetyStatusDisplay } from '../utils/homeSummaryUtils'
 
 const severityLabels = {
   CRITICAL: '긴급',
@@ -8,29 +9,22 @@ const severityLabels = {
   LOW: '생활',
 }
 
-const statusLabels = {
-  UNREAD: '미확인',
-  CONFIRMED: '확인 완료',
-  REPLAYED: '다시 듣기',
-  ESCALATED: '보호자 전달',
-  RESOLVED: '해결됨',
-  CANCELED: '취소됨',
-}
-
-const accessibilityLabels = {
-  VISUAL: '시각 지원',
-  HEARING: '청각 지원',
-}
-
 const sourceLabels = {
   APP: '앱',
   WEARABLE: '웨어러블',
   DEVICE: '기기',
 }
 
-const DASHBOARD_POLL_INTERVAL_MS = 3000
+const CONFIRMED_HISTORY_STORAGE_PREFIX = 'lg-able-band.guardianHistory.confirmed'
+const SAFE_GUARDIAN_MESSAGE = '오늘은 전달된 위험 알림이 없습니다.'
 
 export function GuardianPlaceholder({ account, onLogout }) {
+  const isMountedRef = useRef(true)
+  const [currentTime, setCurrentTime] = useState(() => new Date())
+  const confirmedHistoryStorageKey = getConfirmedHistoryStorageKey(account)
+  const [confirmedHistoryKeys, setConfirmedHistoryKeys] = useState(() =>
+    readConfirmedHistoryKeys(confirmedHistoryStorageKey),
+  )
   const [dashboardState, setDashboardState] = useState({
     loading: true,
     error: '',
@@ -38,62 +32,99 @@ export function GuardianPlaceholder({ account, onLogout }) {
     refreshing: false,
     lastUpdatedAt: null,
   })
-  const [actionMessage, setActionMessage] = useState('')
-  const [activeActionPanel, setActiveActionPanel] = useState('')
 
-  useEffect(() => {
-    let isMounted = true
-    let pollTimer = null
+  const loadDashboard = useCallback(async () => {
+    setDashboardState((current) => ({
+      ...current,
+      error: '',
+      refreshing: Boolean(current.data),
+    }))
 
-    async function loadDashboard({ silent = false } = {}) {
-      if (silent) {
-        setDashboardState((current) => ({
-          ...current,
-          refreshing: Boolean(current.data),
-        }))
+    try {
+      const data = await getGuardianDashboard()
+      if (!isMountedRef.current) {
+        return
       }
 
-      try {
-        const data = await getGuardianDashboard()
-        if (isMounted) {
-          setDashboardState({
-            loading: false,
-            error: '',
-            data,
-            refreshing: false,
-            lastUpdatedAt: new Date().toISOString(),
-          })
-        }
-      } catch (error) {
-        if (isMounted) {
-          setDashboardState((current) => ({
-            loading: false,
-            error: current.data
-              ? '최신 보호자 정보를 다시 확인하지 못했습니다.'
-              : error.message || '보호자 정보를 불러오지 못했습니다.',
-            data: current.data,
-            refreshing: false,
-            lastUpdatedAt: current.lastUpdatedAt,
-          }))
-        }
+      setDashboardState({
+        loading: false,
+        error: '',
+        data,
+        refreshing: false,
+        lastUpdatedAt: new Date().toISOString(),
+      })
+    } catch (error) {
+      if (!isMountedRef.current) {
+        return
       }
-    }
 
-    loadDashboard()
-    pollTimer = window.setInterval(() => loadDashboard({ silent: true }), getDashboardPollIntervalMs())
-
-    return () => {
-      isMounted = false
-      window.clearInterval(pollTimer)
+      setDashboardState((current) => ({
+        loading: false,
+        error: current.data
+          ? '최신 보호자 정보를 다시 확인하지 못했습니다.'
+          : error.message || '보호자 정보를 불러오지 못했습니다.',
+        data: current.data,
+        refreshing: false,
+        lastUpdatedAt: current.lastUpdatedAt,
+      }))
     }
   }, [])
 
+  useEffect(() => {
+    isMountedRef.current = true
+
+    return () => {
+      isMountedRef.current = false
+    }
+  }, [])
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      setCurrentTime(new Date())
+    }, 60_000)
+
+    return () => {
+      window.clearInterval(intervalId)
+    }
+  }, [])
+
+  useEffect(() => {
+    loadDashboard()
+  }, [loadDashboard])
+
+  useEffect(() => {
+    setConfirmedHistoryKeys(readConfirmedHistoryKeys(confirmedHistoryStorageKey))
+  }, [confirmedHistoryStorageKey])
+
   const dashboard = dashboardState.data
-  const latestDangerAlert = dashboard?.dangerAlerts?.[0] || null
-  const latestEmergency = dashboard?.emergencyRequests?.[0] || null
-  const safetyTone = dashboard?.summary?.activeEmergency ? 'danger' : 'safe'
+  const allHistoryItems = createGuardianHistoryItems(dashboard)
+  const historyItems = createGuardianHistoryItems(dashboard).filter(
+    (item) => !confirmedHistoryKeys.includes(item.key),
+  )
+  const visibleDangerAlertKeys = new Set(
+    historyItems.filter((item) => item.kind === 'danger').map((item) => item.key),
+  )
+  const visibleDangerAlerts = (dashboard?.dangerAlerts || []).filter((alert) =>
+    visibleDangerAlertKeys.has(getDangerHistoryKey(alert)),
+  )
+  const latestDangerAlert = visibleDangerAlerts[0] || null
+  const hasActiveHistory = historyItems.length > 0
+  const safetyLevel = hasActiveHistory ? 'EMERGENCY' : 'SAFE'
+  const safetyDisplay = getSafetyStatusDisplay(safetyLevel)
   const protectedUserName = dashboard?.user?.name || '사용자'
-  const contactMessage = useMemo(() => `${protectedUserName}님에게 연락합니다.`, [protectedUserName])
+  const updatedAtLabel = formatStatusUpdatedAt(dashboardState.lastUpdatedAt, currentTime)
+  const safetyMessage = hasActiveHistory
+    ? dashboard.summary?.safetyMessage || `${protectedUserName}님의 오늘 상태입니다.`
+    : SAFE_GUARDIAN_MESSAGE
+
+  const confirmHistoryItem = useCallback((itemKey) => {
+    setConfirmedHistoryKeys((currentKeys) =>
+      persistConfirmedHistoryKeys(
+        confirmedHistoryStorageKey,
+        currentKeys.includes(itemKey) ? currentKeys : [...currentKeys, itemKey],
+      ),
+    )
+  }, [confirmedHistoryStorageKey])
 
   if (dashboardState.loading) {
     return (
@@ -147,104 +178,55 @@ export function GuardianPlaceholder({ account, onLogout }) {
             />
           </span>
           <h1 id="guardian-title">보호자 홈</h1>
-          <p className="header-summary">{protectedUserName}님의 현재 상태와 최근 위험 알림을 확인해요.</p>
+          <p className="header-summary">{protectedUserName}님의 현재 안전 상태를 간단히 확인해요.</p>
         </div>
       </header>
 
       <div className="app-content guardian-content">
-        <section className={`status-card home-safety-card guardian-home-status-card status-${safetyTone}`}>
+        <section
+          className={`status-card home-safety-card guardian-home-status-card status-${safetyLevel.toLowerCase()}`}
+        >
           <div className="status-card-header">
             <div>
               <p className="card-label">오늘의 안전 상태</p>
-              <strong className="card-title">{dashboard.summary?.safetyMessage || '상태를 확인하는 중입니다.'}</strong>
+              <strong className="card-title safety-status-title">
+                <span>{safetyDisplay.label}</span>
+                <span className="safety-status-emoji" aria-hidden="true">
+                  {safetyDisplay.emoji}
+                </span>
+              </strong>
             </div>
-            <span className="status-badge">{dashboardState.refreshing ? '업데이트 중' : '실시간'}</span>
+            <div className="status-refresh-control">
+              {updatedAtLabel ? <span className="status-badge">{updatedAtLabel}</span> : null}
+              <button
+                className="status-refresh-button"
+                type="button"
+                aria-label="홈 정보 새로고침"
+                aria-busy={dashboardState.refreshing}
+                disabled={dashboardState.refreshing}
+                onClick={() => loadDashboard()}
+              >
+                <svg
+                  className={dashboardState.refreshing ? 'is-spinning' : undefined}
+                  viewBox="0 0 24 24"
+                  focusable="false"
+                >
+                  <path d="M20 11a8 8 0 0 0-14.7-4.4L4 8" />
+                  <path d="M4 4v4h4" />
+                  <path d="M4 13a8 8 0 0 0 14.7 4.4L20 16" />
+                  <path d="M20 20v-4h-4" />
+                </svg>
+                <span>{dashboardState.refreshing ? '동기화 중' : '새로고침'}</span>
+              </button>
+            </div>
           </div>
-          <p className="status-copy">
-            {protectedUserName} · {formatAccessibilityType(dashboard.user?.accessibilityType)}
-          </p>
-          <div className="home-metric-row" aria-label="보호자 알림 요약">
-            <span className="home-metric-pill">위험 알림 {dashboard.summary?.unreadDangerAlertCount ?? 0}건</span>
-            <span className="home-metric-pill">긴급 요청 {dashboard.summary?.emergencyRequestCount ?? 0}건</span>
-            <span className="home-metric-pill danger">{formatGuardianTime(dashboardState.lastUpdatedAt)}</span>
-          </div>
+          <p className="status-copy">{safetyMessage}</p>
           {dashboardState.error ? (
             <p className="guardian-refresh-note error" role="alert">
               {dashboardState.error}
             </p>
           ) : null}
         </section>
-
-        <section className="emergency-card guardian-home-emergency-card" aria-labelledby="guardian-emergency-title">
-          <div>
-            <p className="card-label">빠른 보호자 대응</p>
-            <strong className="card-title" id="guardian-emergency-title">
-              {latestEmergency ? latestEmergency.message : '현재 긴급 지원 요청은 없습니다.'}
-            </strong>
-            <p className="emergency-card-copy guardian-home-copy">
-              {latestEmergency
-                ? `${formatGuardianTime(latestEmergency.sentAt)} · ${formatSource(latestEmergency.source)}`
-                : '사용자가 도움을 요청하면 이 화면에서 바로 대응할 수 있어요.'}
-            </p>
-          </div>
-          <button
-            className="sos-button guardian-home-action-button"
-            type="button"
-            onClick={() => {
-              setActiveActionPanel('contact')
-              setActionMessage('')
-            }}
-          >
-            사용자에게 연락
-          </button>
-          {actionMessage ? (
-            <p className="guardian-action-message" role="status">
-              {actionMessage}
-            </p>
-          ) : null}
-        </section>
-
-        {activeActionPanel === 'contact' ? (
-          <section className="content-card guardian-home-action-card" aria-labelledby="guardian-contact-title">
-            <div className="section-title-row">
-              <div>
-                <p className="card-label">연락 지원</p>
-                <strong className="card-title" id="guardian-contact-title">
-                  {contactMessage}
-                </strong>
-              </div>
-              <button className="summary-action-button" type="button" onClick={() => setActiveActionPanel('')}>
-                닫기
-              </button>
-            </div>
-            <p className="guardian-home-copy">
-              먼저 전화로 상태를 확인하고, 필요하면 문자나 추가 지원 요청을 이어서 진행해 주세요.
-            </p>
-            <div className="guardian-home-contact-grid">
-              <button
-                className="primary-button compact-button"
-                type="button"
-                onClick={() => setActionMessage(`${protectedUserName}님에게 전화를 연결합니다.`)}
-              >
-                전화 연결
-              </button>
-              <button
-                className="secondary-button compact-button"
-                type="button"
-                onClick={() => setActionMessage(`${protectedUserName}님에게 확인 문자를 전송했습니다.`)}
-              >
-                확인 문자
-              </button>
-            </div>
-            <div className="guardian-home-script-box">
-              <p className="card-label">권장 안내</p>
-              <strong className="card-title">지금 바로 상태를 확인해 주세요.</strong>
-              <p className="guardian-home-copy">
-                응답이 어려우면 웨어러블 진동이나 최근 알림 내용을 함께 확인해 보는 것이 좋습니다.
-              </p>
-            </div>
-          </section>
-        ) : null}
 
         <section className="content-card alert-summary-card guardian-home-alert-card" aria-labelledby="guardian-alert-title">
           <div className="section-title-row">
@@ -258,16 +240,14 @@ export function GuardianPlaceholder({ account, onLogout }) {
               <span className={`severity severity-${latestDangerAlert.severity.toLowerCase()}`}>
                 {severityLabels[latestDangerAlert.severity] || latestDangerAlert.severity}
               </span>
-            ) : null}
+            ) : (
+              <span className="severity severity-low">안전</span>
+            )}
           </div>
           {latestDangerAlert ? (
             <>
               <p className="guardian-home-copy">{latestDangerAlert.message}</p>
               <dl className="guardian-detail-grid guardian-home-detail-grid">
-                <div>
-                  <dt>발생 위치</dt>
-                  <dd>{latestDangerAlert.locationName || '미등록'}</dd>
-                </div>
                 <div>
                   <dt>발생 기기</dt>
                   <dd>{latestDangerAlert.deviceName || '연동 기기'}</dd>
@@ -275,10 +255,6 @@ export function GuardianPlaceholder({ account, onLogout }) {
                 <div>
                   <dt>발생 시간</dt>
                   <dd>{formatGuardianTime(latestDangerAlert.occurredAt)}</dd>
-                </div>
-                <div>
-                  <dt>확인 상태</dt>
-                  <dd>{statusLabels[latestDangerAlert.status] || latestDangerAlert.status}</dd>
                 </div>
               </dl>
             </>
@@ -292,23 +268,38 @@ export function GuardianPlaceholder({ account, onLogout }) {
             <div>
               <p className="card-label">최근 전달 이력</p>
               <strong className="card-title" id="guardian-history-title">
-                최근 위험 알림
+                최근 전달 알림
               </strong>
             </div>
-            <span>{dashboard.dangerAlerts?.length ?? 0}건</span>
+            {historyItems.length > 0 ? (
+              <span>{historyItems.length}건</span>
+            ) : allHistoryItems.length > 0 ? (
+              <span className="severity severity-low">안전</span>
+            ) : (
+              <span className="severity severity-low">안전</span>
+            )}
           </div>
           <div className="guardian-event-list">
-            {(dashboard.dangerAlerts || []).length > 0 ? (
-              dashboard.dangerAlerts.map((alert) => (
-                <article className="guardian-event-item" key={alert.alertId}>
-                  <strong>{alert.title}</strong>
-                  <span>
-                    {severityLabels[alert.severity] || alert.severity} · {formatGuardianTime(alert.occurredAt)}
-                  </span>
+            {historyItems.length > 0 ? (
+              historyItems.map((item) => (
+                <article className="guardian-event-item" key={item.key}>
+                  <div className="guardian-event-item-header">
+                    <strong>{item.title}</strong>
+                    <button
+                      className="guardian-event-confirm-button"
+                      type="button"
+                      aria-label={`${item.title} 확인`}
+                      onClick={() => confirmHistoryItem(item.key)}
+                    >
+                      확인
+                    </button>
+                  </div>
+                  <p>{item.message}</p>
+                  <span>{item.meta}</span>
                 </article>
               ))
             ) : (
-              <p className="empty-state">최근 전달된 알림이 없습니다.</p>
+              <p className="empty-state">최근 전달된 알림이 없습니다. 현재 상태는 안전입니다.</p>
             )}
           </div>
         </section>
@@ -331,17 +322,63 @@ export function GuardianPlaceholder({ account, onLogout }) {
   )
 }
 
-function getDashboardPollIntervalMs() {
-  return (
-    parsePositiveIntervalMs(window.__ABLE_BAND_GUARDIAN_DASHBOARD_POLL_MS__) ??
-    parsePositiveIntervalMs(import.meta.env.VITE_GUARDIAN_DASHBOARD_POLL_MS) ??
-    DASHBOARD_POLL_INTERVAL_MS
-  )
+function createGuardianHistoryItems(dashboard) {
+  const dangerItems = (dashboard?.dangerAlerts || []).map((alert) => ({
+    kind: 'danger',
+    key: getDangerHistoryKey(alert),
+    title: alert.title,
+    message: alert.message,
+    occurredAt: alert.occurredAt,
+    meta: `${severityLabels[alert.severity] || alert.severity} · ${alert.deviceName || '연동 기기'} · ${formatGuardianTime(alert.occurredAt)}`,
+  }))
+  const emergencyItems = (dashboard?.emergencyRequests || []).map((request) => ({
+    kind: 'emergency',
+    key: getEmergencyHistoryKey(request),
+    title: '긴급 도움 요청',
+    message: request.message || '사용자가 긴급 도움을 요청했습니다.',
+    occurredAt: request.sentAt,
+    meta: `긴급 · ${sourceLabels[request.source] || request.source || '시스템'} · ${formatGuardianTime(request.sentAt)}`,
+  }))
+
+  return [...dangerItems, ...emergencyItems].sort((firstItem, secondItem) => {
+    const firstTime = new Date(firstItem.occurredAt || 0).getTime()
+    const secondTime = new Date(secondItem.occurredAt || 0).getTime()
+
+    return secondTime - firstTime
+  })
 }
 
-function parsePositiveIntervalMs(value) {
-  const intervalMs = Number(value)
-  return Number.isFinite(intervalMs) && intervalMs > 0 ? intervalMs : null
+function getDangerHistoryKey(alert) {
+  return `danger:${alert.alertId}`
+}
+
+function getEmergencyHistoryKey(request) {
+  return `emergency:${request.emergencyRequestId}`
+}
+
+function getConfirmedHistoryStorageKey(account) {
+  return `${CONFIRMED_HISTORY_STORAGE_PREFIX}:${account?.email || account?.name || 'guardian'}`
+}
+
+function readConfirmedHistoryKeys(storageKey) {
+  try {
+    const rawValue = window.localStorage.getItem(storageKey)
+    const parsedValue = JSON.parse(rawValue || '[]')
+
+    return Array.isArray(parsedValue) ? parsedValue.filter((value) => typeof value === 'string') : []
+  } catch {
+    return []
+  }
+}
+
+function persistConfirmedHistoryKeys(storageKey, historyKeys) {
+  try {
+    window.localStorage.setItem(storageKey, JSON.stringify(historyKeys))
+  } catch {
+    return historyKeys
+  }
+
+  return historyKeys
 }
 
 function formatGuardianTime(value) {
@@ -360,12 +397,4 @@ function formatGuardianTime(value) {
     hour: '2-digit',
     minute: '2-digit',
   })
-}
-
-function formatAccessibilityType(value) {
-  return accessibilityLabels[value] || value || '지원 정보 없음'
-}
-
-function formatSource(value) {
-  return sourceLabels[value] || value || '시스템'
 }

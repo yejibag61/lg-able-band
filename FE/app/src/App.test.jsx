@@ -15,6 +15,7 @@ describe('App login to home flow', () => {
     window.__ABLE_BAND_QR_DECODER__ = undefined
     window.__ABLE_BAND_CAMERA_FRAME_TIMEOUT_MS__ = undefined
     window.__ABLE_BAND_GUARDIAN_DASHBOARD_ERROR__ = undefined
+    window.__ABLE_BAND_GUARDIAN_DASHBOARD_EMPTY_ALERTS__ = undefined
     window.__ABLE_BAND_GUARDIAN_DASHBOARD_NETWORK_DOWN__ = undefined
     window.__ABLE_BAND_GUARDIAN_DASHBOARD_STRICT__ = undefined
     window.__ABLE_BAND_PAIRING_ACCESS_TOKEN__ = undefined
@@ -28,6 +29,7 @@ describe('App login to home flow', () => {
     delete window.__ABLE_BAND_QR_DECODER__
     delete window.__ABLE_BAND_CAMERA_FRAME_TIMEOUT_MS__
     delete window.__ABLE_BAND_GUARDIAN_DASHBOARD_ERROR__
+    delete window.__ABLE_BAND_GUARDIAN_DASHBOARD_EMPTY_ALERTS__
     delete window.__ABLE_BAND_GUARDIAN_DASHBOARD_NETWORK_DOWN__
     delete window.__ABLE_BAND_GUARDIAN_DASHBOARD_STRICT__
     delete window.__ABLE_BAND_GUARDIAN_DASHBOARD_POLL_MS__
@@ -576,8 +578,109 @@ describe('App login to home flow', () => {
     await user.click(screen.getByRole('button', { name: '로그인' }))
 
     expect(await screen.findByRole('heading', { name: '보호자 홈' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: '사용자에게 연락' })).toBeTruthy()
-    expect(screen.queryByRole('button', { name: '긴급 지원 요청' })).toBeNull()
+    expect(screen.getByText('오늘의 안전 상태')).toBeTruthy()
+    expect(screen.getByText('방금 업데이트')).toBeTruthy()
+    expect(screen.getByRole('button', { name: '홈 정보 새로고침' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '사용자에게 연락' })).toBeNull()
+    expect(screen.queryByText('빠른 보호자 대응')).toBeNull()
+  })
+
+  it('shows guardian danger details through recent delivery history', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.click(screen.getByRole('radio', { name: '보호자' }))
+    await user.type(screen.getByLabelText('이메일'), 'guardian@example.com')
+    await user.type(screen.getByLabelText('비밀번호'), 'password1234')
+    await user.click(screen.getByRole('button', { name: '로그인' }))
+
+    expect(await screen.findByRole('heading', { name: '보호자 홈' })).toBeTruthy()
+    expect(screen.queryByText('발생 위치')).toBeNull()
+    expect(screen.queryByText('확인 상태')).toBeNull()
+    expect(screen.getByText('최근 전달 알림')).toBeTruthy()
+    expect(screen.getAllByText('주방에서 위험 신호가 감지되었습니다. 보호자에게도 전달됩니다.').length)
+      .toBeGreaterThanOrEqual(1)
+    expect(screen.getAllByText(/안전 전기레인지/).length).toBeGreaterThanOrEqual(1)
+  })
+
+  it('removes a guardian emergency request from recent delivery history when confirmed', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.click(screen.getByRole('radio', { name: '보호자' }))
+    await user.type(screen.getByLabelText('이메일'), 'guardian@example.com')
+    await user.type(screen.getByLabelText('비밀번호'), 'password1234')
+    await user.click(screen.getByRole('button', { name: '로그인' }))
+
+    expect(await screen.findByRole('heading', { name: '보호자 홈' })).toBeTruthy()
+    expect(screen.getByText('긴급 도움 요청')).toBeTruthy()
+    expect(screen.getByText('사용자가 앱에서 긴급 지원을 요청했습니다.')).toBeTruthy()
+
+    await user.click(screen.getByRole('button', { name: '긴급 도움 요청 확인' }))
+
+    expect(screen.queryByText('긴급 도움 요청')).toBeNull()
+    expect(screen.queryByText('사용자가 앱에서 긴급 지원을 요청했습니다.')).toBeNull()
+    expect(screen.getByText('최근 전달 알림')).toBeTruthy()
+  })
+
+  it('shows every guardian home section as safe when all delivery history is confirmed', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.click(screen.getByRole('radio', { name: '보호자' }))
+    await user.type(screen.getByLabelText('이메일'), 'guardian@example.com')
+    await user.type(screen.getByLabelText('비밀번호'), 'password1234')
+    await user.click(screen.getByRole('button', { name: '로그인' }))
+
+    expect(await screen.findByRole('heading', { name: '보호자 홈' })).toBeTruthy()
+
+    for (const confirmButton of screen.getAllByRole('button', { name: /확인$/ })) {
+      await user.click(confirmButton)
+    }
+
+    expect(screen.getAllByText('안전').length).toBeGreaterThanOrEqual(3)
+    expect(screen.getByText('오늘은 전달된 위험 알림이 없습니다.')).toBeTruthy()
+    expect(screen.getByText('최근 위험 알림이 없습니다.')).toBeTruthy()
+    expect(screen.getByText('최근 전달된 알림이 없습니다. 현재 상태는 안전입니다.')).toBeTruthy()
+    expect(screen.queryByText('전기레인지 과열 주의')).toBeNull()
+    expect(screen.queryByText('긴급 도움 요청')).toBeNull()
+  })
+
+  it('keeps confirmed guardian delivery history hidden after reopening the guardian home', async () => {
+    const user = userEvent.setup()
+    const { unmount } = render(<App />)
+
+    await user.click(screen.getByRole('radio', { name: '보호자' }))
+    await user.type(screen.getByLabelText('이메일'), 'guardian@example.com')
+    await user.type(screen.getByLabelText('비밀번호'), 'password1234')
+    await user.click(screen.getByRole('button', { name: '로그인' }))
+
+    expect(await screen.findByRole('heading', { name: '보호자 홈' })).toBeTruthy()
+    await user.click(screen.getByRole('button', { name: '긴급 도움 요청 확인' }))
+    expect(screen.queryByText('긴급 도움 요청')).toBeNull()
+
+    unmount()
+    render(<App />)
+
+    expect(await screen.findByRole('heading', { name: '보호자 홈' })).toBeTruthy()
+    expect(screen.queryByText('긴급 도움 요청')).toBeNull()
+    expect(screen.queryByText('사용자가 앱에서 긴급 지원을 요청했습니다.')).toBeNull()
+  })
+
+  it('shows a safe guardian history state when there are no danger alerts', async () => {
+    const user = userEvent.setup()
+    window.__ABLE_BAND_GUARDIAN_DASHBOARD_EMPTY_ALERTS__ = true
+    render(<App />)
+
+    await user.click(screen.getByRole('radio', { name: '보호자' }))
+    await user.type(screen.getByLabelText('이메일'), 'guardian@example.com')
+    await user.type(screen.getByLabelText('비밀번호'), 'password1234')
+    await user.click(screen.getByRole('button', { name: '로그인' }))
+
+    expect(await screen.findByRole('heading', { name: '보호자 홈' })).toBeTruthy()
+    expect(screen.getAllByText('안전').length).toBeGreaterThanOrEqual(1)
+    expect(screen.getByText('최근 위험 알림이 없습니다.')).toBeTruthy()
+    expect(screen.getByText('최근 전달된 알림이 없습니다. 현재 상태는 안전입니다.')).toBeTruthy()
   })
 
   it('shows the LG Able Band logo while the guardian dashboard is loading', async () => {
@@ -605,7 +708,9 @@ describe('App login to home flow', () => {
 
     expect(await screen.findByRole('heading', { name: '보호자 홈' })).toBeTruthy()
     expect(screen.getByText('긴급 도움 요청이 진행 중입니다.')).toBeTruthy()
-    expect(screen.getByText(/위험 알림 \d+건/)).toBeTruthy()
+    expect(screen.getByText('방금 업데이트')).toBeTruthy()
+    expect(screen.queryByText(/위험 알림 \d+건/)).toBeNull()
+    expect(screen.queryByText('빠른 보호자 대응')).toBeNull()
   })
 
   it('shows the backend guardian dashboard error in strict mode', async () => {
@@ -630,9 +735,8 @@ describe('App login to home flow', () => {
     expect(screen.queryByText('긴급 도움 요청이 진행 중입니다.')).toBeNull()
   })
 
-  it('uses a configured guardian dashboard polling interval', async () => {
+  it('refreshes the guardian dashboard only when the refresh button is clicked', async () => {
     const user = userEvent.setup()
-    window.__ABLE_BAND_GUARDIAN_DASHBOARD_POLL_MS__ = 10
     render(<App />)
 
     await user.click(screen.getByRole('radio', { name: '보호자' }))
@@ -641,8 +745,12 @@ describe('App login to home flow', () => {
     await user.click(screen.getByRole('button', { name: '로그인' }))
 
     expect(await screen.findByRole('heading', { name: '보호자 홈' })).toBeTruthy()
+    expect(findFetchCalls('/api/guardians/dashboard')).toHaveLength(1)
+
+    await user.click(screen.getByRole('button', { name: '홈 정보 새로고침' }))
+
     await waitFor(() => {
-      expect(findFetchCalls('/api/guardians/dashboard').length).toBeGreaterThanOrEqual(2)
+      expect(findFetchCalls('/api/guardians/dashboard')).toHaveLength(2)
     })
   })
 
@@ -1236,16 +1344,14 @@ function installMockBackend() {
         )
       }
 
-      return jsonResponse({
-        user: {
-          userId: 1,
-          name: '소희',
-          accessibilityType: 'VISUAL',
-        },
-        dangerAlerts: mockAppPreview.alerts.filter(
+      const guardianDangerAlerts = window.__ABLE_BAND_GUARDIAN_DASHBOARD_EMPTY_ALERTS__
+        ? []
+        : mockAppPreview.alerts.filter(
           (alert) => alert.type === 'DANGER' || alert.severity === 'HIGH',
-        ),
-        emergencyRequests: [
+        )
+      const guardianEmergencyRequests = window.__ABLE_BAND_GUARDIAN_DASHBOARD_EMPTY_ALERTS__
+        ? []
+        : [
           {
             emergencyRequestId: 301,
             status: 'SENT',
@@ -1254,12 +1360,24 @@ function installMockBackend() {
             sentAt: '2026-06-10T14:35:00+09:00',
             guardianNotified: true,
           },
-        ],
+        ]
+      const hasGuardianDangerAlerts = guardianDangerAlerts.length > 0
+
+      return jsonResponse({
+        user: {
+          userId: 1,
+          name: '소희',
+          accessibilityType: 'VISUAL',
+        },
+        dangerAlerts: guardianDangerAlerts,
+        emergencyRequests: guardianEmergencyRequests,
         summary: {
-          unreadDangerAlertCount: 2,
-          emergencyRequestCount: 1,
-          activeEmergency: true,
-          safetyMessage: '긴급 도움 요청이 진행 중입니다.',
+          unreadDangerAlertCount: guardianDangerAlerts.filter((alert) => alert.status === 'UNREAD').length,
+          emergencyRequestCount: guardianEmergencyRequests.length,
+          activeEmergency: hasGuardianDangerAlerts || guardianEmergencyRequests.length > 0,
+          safetyMessage: hasGuardianDangerAlerts || guardianEmergencyRequests.length > 0
+            ? '긴급 도움 요청이 진행 중입니다.'
+            : '오늘은 전달된 위험 알림이 없습니다.',
         },
       })
     }
