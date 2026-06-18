@@ -5,11 +5,7 @@ import { CHATBOT_QUESTION_CATEGORIES, FALLBACK_CHAT_ALERTS } from '../data/chatb
 import { createDevice, getDevices } from '../services/deviceService'
 import { createEmergencyRequest } from '../services/emergencyService'
 import { linkGuardianByEmail } from '../services/guardianService'
-import {
-  startChatbotWakeService,
-  stopChatbotWakeService,
-  subscribeChatbotWake,
-} from '../services/chatbotWakeService'
+import { stopChatbotWakeService } from '../services/chatbotWakeService'
 import {
   playGreetingAudio,
   playTurnCueTone,
@@ -146,14 +142,11 @@ export function VoiceChatbot({
     initialOpen ? CHATBOT_VOICE_STATE.OPENING : CHATBOT_VOICE_STATE.CLOSED,
   )
   const recognitionRef = useRef(null)
-  const wakeRecognitionRef = useRef(null)
   const latestTranscriptRef = useRef('')
   const sentTranscriptRef = useRef('')
   const conversationActiveRef = useRef(false)
   const manualStopRef = useRef(false)
   const isOpenRef = useRef(false)
-  const wakeListeningRef = useRef(false)
-  const wakeRestartTimeoutRef = useRef(null)
   const recognitionStartingRef = useRef(false)
   const recognitionListeningRef = useRef(false)
   const recognitionStartTimeoutRef = useRef(null)
@@ -191,8 +184,6 @@ export function VoiceChatbot({
     }
 
     return () => {
-      wakeListeningRef.current = false
-      window.clearTimeout(wakeRestartTimeoutRef.current)
       window.clearTimeout(greetingTimeoutRef.current)
       window.clearTimeout(recognitionStartTimeoutRef.current)
       window.clearTimeout(speechEndTimeoutRef.current)
@@ -200,39 +191,9 @@ export function VoiceChatbot({
       window.clearTimeout(speechStartDelayTimeoutRef.current)
       window.clearTimeout(speechRetryTimeoutRef.current)
       window.clearTimeout(turnCueTimeoutRef.current)
-      wakeRecognitionRef.current?.stop()
       recognitionRef.current?.stop()
       window.speechSynthesis?.cancel()
       stopTurnCueAudio()
-    }
-  }, [embedded])
-
-  useEffect(() => {
-    if (embedded) {
-      return undefined
-    }
-
-    const unsubscribeWake = subscribeChatbotWake(() => {
-      if (!isOpenRef.current) {
-        openChatbot({ fromWake: true })
-      }
-    })
-
-    function restartWakeListening() {
-      if (!isOpenRef.current) {
-        scheduleWakeListening(120)
-      }
-    }
-
-    document.addEventListener('visibilitychange', restartWakeListening)
-    window.addEventListener('focus', restartWakeListening)
-    window.addEventListener('pageshow', restartWakeListening)
-
-    return () => {
-      unsubscribeWake()
-      document.removeEventListener('visibilitychange', restartWakeListening)
-      window.removeEventListener('focus', restartWakeListening)
-      window.removeEventListener('pageshow', restartWakeListening)
     }
   }, [embedded])
 
@@ -395,11 +356,6 @@ export function VoiceChatbot({
       onClose?.()
     } else {
       setIsOpen(false)
-      window.setTimeout(() => {
-        if (!isOpenRef.current) {
-          startChatbotWakeService()
-        }
-      }, 500)
     }
   }
 
@@ -467,75 +423,9 @@ export function VoiceChatbot({
     }
   }
 
-  function ensureWakeRecognition() {
-    if (!SpeechRecognition) {
-      return null
-    }
-
-    if (wakeRecognitionRef.current) {
-      return wakeRecognitionRef.current
-    }
-
-    const recognition = new SpeechRecognition()
-    recognition.lang = 'ko-KR'
-    recognition.interimResults = true
-    recognition.continuous = false
-
-    recognition.onresult = (event) => {
-      const transcript = Array.from(event.results)
-        .map((result) => result[0].transcript)
-        .join('')
-
-      if (shouldOpenChatbot(transcript)) {
-        wakeListeningRef.current = false
-        recognition.abort?.()
-        openChatbot()
-        return
-      }
-    }
-
-    recognition.onerror = (event) => {
-      wakeListeningRef.current = false
-
-      if (!isOpenRef.current && !['not-allowed', 'service-not-allowed'].includes(event.error)) {
-        scheduleWakeListening(700)
-      }
-    }
-
-    recognition.onend = () => {
-      wakeListeningRef.current = false
-
-      if (!isOpenRef.current) {
-        scheduleWakeListening(300)
-      }
-    }
-
-    wakeRecognitionRef.current = recognition
-    return recognition
-  }
-
-  function startWakeListening() {
-    if (isOpenRef.current) {
-      return
-    }
-
-    startChatbotWakeService()
-  }
-
-  function scheduleWakeListening(delayMs) {
-    window.clearTimeout(wakeRestartTimeoutRef.current)
-    wakeRestartTimeoutRef.current = window.setTimeout(() => {
-      startWakeListening()
-    }, delayMs)
-  }
-
   function stopWakeListening() {
-    const wasListening = wakeListeningRef.current
-    wakeListeningRef.current = false
-    window.clearTimeout(wakeRestartTimeoutRef.current)
     stopChatbotWakeService()
-    wakeRecognitionRef.current?.abort?.()
-    return wasListening
+    return false
   }
 
   function ensureRecognition() {
@@ -663,7 +553,7 @@ export function VoiceChatbot({
       return
     }
 
-    const wakeWasListening = stopWakeListening()
+    stopWakeListening()
     recognitionStartingRef.current = true
     setChatbotVoiceState(CHATBOT_VOICE_STATE.LISTENING)
     setStatus('마이크 연결 중...')
@@ -695,11 +585,7 @@ export function VoiceChatbot({
       }
     }
 
-    if (wakeWasListening) {
-      window.setTimeout(beginRecognition, 180)
-    } else {
-      beginRecognition()
-    }
+    beginRecognition()
   }
 
   function stopListening() {

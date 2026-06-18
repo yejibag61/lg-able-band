@@ -976,58 +976,50 @@ async function getPreferredCameraConstraints() {
     (device) => device.deviceId !== rearCamera?.deviceId && device.deviceId !== frontCamera?.deviceId,
   )
 
-  const candidates = [
-    {
-      video: {
-        facingMode: { exact: 'environment' },
-        width: { ideal: 1920 },
-        height: { ideal: 1080 },
-      },
-    },
-    {
-      video: {
-        facingMode: { ideal: 'environment' },
-        width: { ideal: 1920 },
-        height: { ideal: 1080 },
-      },
-    },
-  ]
+  if (shouldPreferRearCamera()) {
+    const candidates = []
 
-  if (rearCamera?.deviceId) {
-    candidates.unshift({
-      video: {
-        deviceId: {
-          exact: rearCamera.deviceId,
-        },
-        width: { ideal: 1920 },
-        height: { ideal: 1080 },
-      },
-    })
+    if (rearCamera?.deviceId) {
+      candidates.push(createDeviceCameraConstraint(rearCamera.deviceId))
+    }
+
+    candidates.push(createEnvironmentCameraConstraint('exact'))
+    candidates.push(createEnvironmentCameraConstraint('ideal'))
+
+    if (fallbackPhysicalCamera?.deviceId) {
+      candidates.push(createDeviceCameraConstraint(fallbackPhysicalCamera.deviceId))
+    }
+
+    if (frontCamera?.deviceId) {
+      candidates.push(createDeviceCameraConstraint(frontCamera.deviceId))
+    }
+
+    candidates.push(createGenericCameraConstraint())
+    candidates.push({ video: true })
+
+    return dedupeCameraConstraints(candidates)
   }
 
-  if (fallbackPhysicalCamera?.deviceId) {
-    candidates.push({
-      video: {
-        deviceId: {
-          exact: fallbackPhysicalCamera.deviceId,
-        },
-      },
-    })
+  const desktopPrimaryCamera =
+    frontCamera || fallbackPhysicalCamera || rearCamera || physicalCameras[0] || null
+  const desktopFallbackCameras = physicalCameras.filter(
+    (device) => device.deviceId && device.deviceId !== desktopPrimaryCamera?.deviceId,
+  )
+  const candidates = []
+
+  if (desktopPrimaryCamera?.deviceId) {
+    candidates.push(createDeviceCameraConstraint(desktopPrimaryCamera.deviceId))
   }
 
-  if (frontCamera?.deviceId) {
-    candidates.push({
-      video: {
-        deviceId: {
-          exact: frontCamera.deviceId,
-        },
-      },
-    })
-  }
+  desktopFallbackCameras.forEach((device) => {
+    candidates.push(createDeviceCameraConstraint(device.deviceId))
+  })
 
   candidates.push({ video: true })
+  candidates.push(createGenericCameraConstraint())
+  candidates.push(createEnvironmentCameraConstraint('ideal'))
 
-  return candidates
+  return dedupeCameraConstraints(candidates)
 }
 
 async function listVideoInputDevices() {
@@ -1079,7 +1071,79 @@ function waitForVisibleVideoFrame(video) {
 
 function cameraFrameTimeoutMs() {
   const override = Number(window.__ABLE_BAND_CAMERA_FRAME_TIMEOUT_MS__ || import.meta.env.VITE_CAMERA_FRAME_TIMEOUT_MS)
-  return Number.isFinite(override) && override > 0 ? override : 1200
+  if (Number.isFinite(override) && override > 0) {
+    return override
+  }
+
+  return shouldPreferRearCamera() ? 1200 : 2200
+}
+
+function shouldPreferRearCamera() {
+  if (navigator.userAgentData?.mobile) {
+    return true
+  }
+
+  if (/android|iphone|ipad|ipod|mobile/i.test(navigator.userAgent || '')) {
+    return true
+  }
+
+  if (typeof window.matchMedia === 'function') {
+    if (window.matchMedia('(pointer: coarse)').matches && window.matchMedia('(max-width: 900px)').matches) {
+      return true
+    }
+  }
+
+  if (typeof navigator.maxTouchPoints === 'number' && navigator.maxTouchPoints > 1) {
+    const narrowScreen = Math.min(window.screen?.width || 0, window.screen?.height || 0)
+    return narrowScreen > 0 && narrowScreen <= 900
+  }
+
+  return false
+}
+
+function createDeviceCameraConstraint(deviceId) {
+  return {
+    video: {
+      deviceId: {
+        exact: deviceId,
+      },
+      width: { ideal: 1920 },
+      height: { ideal: 1080 },
+    },
+  }
+}
+
+function createEnvironmentCameraConstraint(mode) {
+  return {
+    video: {
+      facingMode: { [mode]: 'environment' },
+      width: { ideal: 1920 },
+      height: { ideal: 1080 },
+    },
+  }
+}
+
+function createGenericCameraConstraint() {
+  return {
+    video: {
+      width: { ideal: 1920 },
+      height: { ideal: 1080 },
+    },
+  }
+}
+
+function dedupeCameraConstraints(candidates) {
+  const seen = new Set()
+
+  return candidates.filter((constraint) => {
+    const key = JSON.stringify(constraint)
+    if (seen.has(key)) {
+      return false
+    }
+
+    seen.add(key)
+    return true
+  })
 }
 
 function stopMediaStream(stream) {

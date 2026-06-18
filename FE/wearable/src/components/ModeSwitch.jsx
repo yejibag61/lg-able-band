@@ -1,6 +1,6 @@
 const modes = [
   { id: 'alert', label: '알림' },
-  { id: 'uwb', label: 'UWB' },
+  { id: 'uwb', label: '내 가전' },
   { id: 'idle', label: 'AI' },
 ]
 

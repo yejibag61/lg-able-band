@@ -90,6 +90,8 @@ function App() {
     () => buildActiveGuideSession(bleGuide, uwbSession, selectedGuideTarget),
     [bleGuide, selectedGuideTarget, uwbSession],
   )
+  const toastMessage = isGuardianConnectionToast(statusMessage) ? statusMessage : ''
+  const inlineStatusMessage = toastMessage ? '' : statusMessage
   const showBottomSheet = isPaired && mode !== 'emergency'
   const screenClassName = [
     isPaired ? 'wearable-screen-with-mode-switch' : '',
@@ -202,6 +204,18 @@ function App() {
     },
     [stopLivingSignalMonitoring],
   )
+
+  useEffect(() => {
+    if (!toastMessage) {
+      return undefined
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setStatusMessage((current) => (current === toastMessage ? '' : current))
+    }, 2600)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [toastMessage])
 
   useEffect(() => {
     if (isPaired || isTerminalPairingStatus(pairingStatus)) {
@@ -694,9 +708,9 @@ function App() {
           />
         ) : null}
 
-        {!isPaired && statusMessage ? (
+        {!isPaired && inlineStatusMessage ? (
           <p className="live-message" role="status">
-            {statusMessage}
+            {inlineStatusMessage}
           </p>
         ) : null}
 
@@ -705,7 +719,7 @@ function App() {
             alert={selectedAlert}
             alertPage={alertIndex + 1}
             alertTotal={alertQueue.length}
-            actionMessage={statusMessage}
+            actionMessage={inlineStatusMessage}
             isBusy={isBusy}
             syncedTime={syncedTime}
             onConfirm={handleConfirm}
@@ -718,7 +732,7 @@ function App() {
         {isPaired && mode === 'uwb' ? (
           <UwbGuideScreen
             session={activeUwbSession}
-            actionMessage={statusMessage}
+            actionMessage={inlineStatusMessage}
             isBusy={isBusy}
             onStandby={() => {
               void bleGuide.stopGuide()
@@ -741,17 +755,16 @@ function App() {
             onSpeakingChange={setIsChatbotSpeaking}
             onWakeListeningChange={setIsChatbotWakeListening}
             showFab={false}
-            statusMessage={statusMessage}
+            statusMessage={inlineStatusMessage}
             uwbSession={uwbSession}
           />
         ) : null}
 
         {isPaired && mode === 'deviceSelect' ? (
           <DeviceSelectScreen
-            actionMessage={statusMessage}
+            actionMessage={inlineStatusMessage}
             devices={uwbTargets}
             isBusy={isBusy}
-            isLoading={isUwbTargetLoading}
             onSelect={async (device) => {
               setIsBusy(true)
               setSelectedGuideTarget(device)
@@ -773,7 +786,7 @@ function App() {
 
         {isPaired && mode === 'emergency' ? (
           <WearableEmergencyScreen
-            actionMessage={statusMessage}
+            actionMessage={inlineStatusMessage}
             isBusy={isBusy}
             onCancel={() => {
               setMode('idle')
@@ -793,10 +806,12 @@ function App() {
             onSpeakingChange={setIsChatbotSpeaking}
             onWakeListeningChange={setIsChatbotWakeListening}
             showFab={false}
-            statusMessage={statusMessage}
+            statusMessage={inlineStatusMessage}
             uwbSession={uwbSession}
           />
         ) : null}
+
+        {toastMessage ? <WearableToast message={toastMessage} /> : null}
 
         {showBottomSheet ? (
           <WearableBottomSheet
@@ -807,6 +822,14 @@ function App() {
         ) : null}
       </WearableFrame>
     </main>
+  )
+}
+
+function WearableToast({ message }) {
+  return (
+    <div className="wearable-toast" aria-live="assertive" role="alert">
+      <p className="wearable-toast-message">{message}</p>
+    </div>
   )
 }
 
@@ -945,21 +968,11 @@ function WearableBottomSheet({ isBusy, onEmergencyRequest, onUnpair }) {
   )
 }
 
-function DeviceSelectScreen({ actionMessage, devices = [], isBusy, isLoading, onSelect }) {
+function DeviceSelectScreen({ actionMessage, devices = [], isBusy, onSelect }) {
   const displayDevices = devices
 
   return (
-    <section className="state-screen device-select-screen" aria-labelledby="device-select-title">
-      <div className="device-select-header">
-        <div>
-          <p className="eyebrow">UWB</p>
-          <h1 id="device-select-title">내 가전 목록</h1>
-        </div>
-        <strong>{isLoading ? '확인 중' : `${displayDevices.length}개`}</strong>
-      </div>
-      <p className="device-select-description">
-        위치 안내를 시작하면 블루투스 기기 선택창이 열립니다. `ABLE-ESP` 기기를 선택해 주세요.
-      </p>
+    <section className="state-screen device-select-screen" aria-label="내 가전 목록">
       <div className="device-select-grid">
         {displayDevices.map((device) => (
           <article className="device-select-card" key={device.deviceId || device.name}>
@@ -1160,6 +1173,10 @@ function vibrationPatternForBleDistance(distanceM) {
 
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value))
+}
+
+function isGuardianConnectionToast(message) {
+  return typeof message === 'string' && message.includes('연결된 보호자가 없습니다')
 }
 
 export default App

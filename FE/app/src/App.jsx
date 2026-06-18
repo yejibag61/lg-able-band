@@ -5,7 +5,7 @@ import { HomeScreen } from './components/HomeScreen'
 import { LoginScreen } from './components/LoginScreen'
 import { SignupScreen } from './components/SignupScreen'
 import { getStoredSession, login, logout, signup } from './services/authService'
-import { startChatbotWakeService, stopChatbotWakeService } from './services/chatbotWakeService'
+import { stopChatbotWakeService } from './services/chatbotWakeService'
 import { unlockTurnCueAudio } from './services/turnCueAudioService'
 import { AUTHENTICATION_EXPIRED_EVENT } from './services/apiClient'
 import {
@@ -82,12 +82,6 @@ function App() {
   }, [])
 
   useLayoutEffect(() => {
-    if (session?.role === 'USER') {
-      startChatbotWakeService()
-    }
-  }, [session])
-
-  useLayoutEffect(() => {
     if (session?.role !== 'USER') {
       return undefined
     }
@@ -126,7 +120,6 @@ function App() {
     if (loginForm.role === 'USER') {
       primeSpeechSynthesisForMobile()
       unlockTurnCueAudio()
-      startChatbotWakeService()
     }
 
     try {

@@ -306,8 +306,8 @@ describe('App login to home flow', () => {
     expect(screen.getByRole('heading', { name: '실시간 알림' })).toBeTruthy()
     expect(screen.getByRole('button', { name: '전체' })).toBeTruthy()
 
-    await user.click(screen.getByRole('button', { name: '메뉴' }))
-    expect(screen.getByRole('heading', { name: '메뉴' })).toBeTruthy()
+    await user.click(screen.getByRole('button', { name: '설정' }))
+    expect(screen.getByRole('heading', { name: '설정' })).toBeTruthy()
     expect(screen.getByText('보호자 연결')).toBeTruthy()
     expect(screen.getByRole('button', { name: '멤버 초대' })).toBeTruthy()
 
@@ -353,7 +353,7 @@ describe('App login to home flow', () => {
     await user.click(screen.getByRole('button', { name: '로그인' }))
 
     await screen.findByRole('heading', { name: /소희 홈/i })
-    await user.click(screen.getByRole('button', { name: '메뉴' }))
+    await user.click(screen.getByRole('button', { name: '설정' }))
     installQrScannerMock(rawValue)
     await user.click(screen.getByRole('button', { name: /밴드 QR을 카메라로 스캔해요\./ }))
     await user.click(screen.getByRole('button', { name: '카메라 켜기' }))
@@ -388,7 +388,7 @@ describe('App login to home flow', () => {
     await loginAsUser(user)
     expect(window.localStorage.getItem('lg-able-band.accessToken')).toBe('api-user-token')
 
-    await user.click(screen.getByRole('button', { name: '메뉴' }))
+    await user.click(screen.getByRole('button', { name: '설정' }))
     installQrScannerMock(rawValue)
     await user.click(screen.getByRole('button', { name: /밴드 QR을 카메라로 스캔해요\./ }))
     await user.click(screen.getByRole('button', { name: '카메라 켜기' }))
@@ -443,7 +443,7 @@ describe('App login to home flow', () => {
     await user.click(screen.getByRole('button', { name: '로그인' }))
 
     await screen.findByRole('heading', { name: /소희 홈/i })
-    await user.click(screen.getByRole('button', { name: '메뉴' }))
+    await user.click(screen.getByRole('button', { name: '설정' }))
     installQrScannerMock(rawValue)
     await user.click(screen.getByRole('button', { name: /밴드 QR을 카메라로 스캔해요\./ }))
     await user.click(screen.getByRole('button', { name: '카메라 켜기' }))
@@ -459,7 +459,7 @@ describe('App login to home flow', () => {
     render(<App />)
 
     await loginAsUser(user)
-    await user.click(screen.getByRole('button', { name: '메뉴' }))
+    await user.click(screen.getByRole('button', { name: '설정' }))
     installQrScannerMock('https://example.com/not-able-band')
     await user.click(screen.getByRole('button', { name: /밴드 QR을 카메라로 스캔해요\./ }))
     await user.click(screen.getByRole('button', { name: '카메라 켜기' }))
@@ -499,7 +499,7 @@ describe('App login to home flow', () => {
     render(<App />)
 
     await loginAsUser(user)
-    await user.click(screen.getByRole('button', { name: '메뉴' }))
+    await user.click(screen.getByRole('button', { name: '설정' }))
     installQrScannerMock(rawValue)
     await user.click(screen.getByRole('button', { name: /밴드 QR을 카메라로 스캔해요\./ }))
     await user.click(screen.getByRole('button', { name: '카메라 켜기' }))
@@ -518,7 +518,7 @@ describe('App login to home flow', () => {
     render(<App />)
 
     await loginAsUser(user)
-    await user.click(screen.getByRole('button', { name: '메뉴' }))
+    await user.click(screen.getByRole('button', { name: '설정' }))
     installQrScannerMock(rawValue)
     await user.click(screen.getByRole('button', { name: /밴드 QR을 카메라로 스캔해요\./ }))
     await user.click(screen.getByRole('button', { name: '카메라 켜기' }))
@@ -556,7 +556,7 @@ describe('App login to home flow', () => {
 
     expect(await screen.findByRole('heading', { name: /소희 홈/i })).toBeTruthy()
     expect(screen.queryByRole('heading', { name: /able band 로그인/i })).toBeNull()
-    await user.click(screen.getByRole('button', { name: '메뉴' }))
+    await user.click(screen.getByRole('button', { name: '설정' }))
     expect(screen.getByRole('button', { name: '로그아웃' })).toBeTruthy()
 
     await user.click(screen.getByRole('button', { name: '로그아웃' }))
@@ -659,7 +659,7 @@ describe('App login to home flow', () => {
     await user.click(screen.getByRole('button', { name: '로그인' }))
 
     await screen.findByRole('heading', { name: /소희 홈/i })
-    await user.click(screen.getByRole('button', { name: '메뉴' }))
+    await user.click(screen.getByRole('button', { name: '설정' }))
     installQrScannerMock(rawValue, { detector: false })
     await user.click(screen.getByRole('button', { name: /밴드 QR을 카메라로 스캔해요\./ }))
     await user.click(screen.getByRole('button', { name: '카메라 켜기' }))
@@ -728,15 +728,20 @@ describe('App login to home flow', () => {
     await user.click(screen.getByRole('button', { name: '로그인' }))
 
     await screen.findByRole('heading', { name: /소희 홈/i })
-    await user.click(screen.getByRole('button', { name: '메뉴' }))
+    await user.click(screen.getByRole('button', { name: '설정' }))
     await user.click(screen.getByRole('button', { name: /밴드 QR을 카메라로 스캔해요\./ }))
     await user.click(screen.getByRole('button', { name: '카메라 켜기' }))
 
     await waitFor(() => {
       expect(screen.getByRole('status').textContent).toContain('웨어러블 연동이 완료되었습니다.')
     })
-    expect(getUserMedia).toHaveBeenNthCalledWith(1, { video: true })
-    expect(getUserMedia).toHaveBeenNthCalledWith(2, { video: { facingMode: { ideal: 'environment' } } })
+    expect(getUserMedia).toHaveBeenNthCalledWith(1, {
+      video: {
+        width: { ideal: 1920 },
+        height: { ideal: 1080 },
+      },
+    })
+    expect(getUserMedia).toHaveBeenNthCalledWith(2, { video: true })
   })
 
   it('uses the Vite camera frame timeout override when the first stream has no visible frames', async () => {
@@ -796,14 +801,14 @@ describe('App login to home flow', () => {
     await user.click(screen.getByRole('button', { name: '로그인' }))
 
     await screen.findByRole('heading', { name: /소희 홈/i })
-    await user.click(screen.getByRole('button', { name: '메뉴' }))
+    await user.click(screen.getByRole('button', { name: '설정' }))
     await user.click(screen.getByRole('button', { name: /밴드 QR을 카메라로 스캔해요\./ }))
     await user.click(screen.getByRole('button', { name: '카메라 켜기' }))
 
     await waitFor(() => {
       expect(screen.getByRole('status').textContent).toContain('웨어러블 연동이 완료되었습니다.')
     })
-    expect(getUserMedia).toHaveBeenNthCalledWith(2, { video: { facingMode: { ideal: 'environment' } } })
+    expect(getUserMedia).toHaveBeenNthCalledWith(2, { video: true })
   })
 
   it('prefers a physical webcam over virtual camera devices', async () => {
@@ -868,7 +873,7 @@ describe('App login to home flow', () => {
     await user.click(screen.getByRole('button', { name: '로그인' }))
 
     await screen.findByRole('heading', { name: /소희 홈/i })
-    await user.click(screen.getByRole('button', { name: '메뉴' }))
+    await user.click(screen.getByRole('button', { name: '설정' }))
     await user.click(screen.getByRole('button', { name: /밴드 QR을 카메라로 스캔해요\./ }))
     await user.click(screen.getByRole('button', { name: '카메라 켜기' }))
 
@@ -880,7 +885,99 @@ describe('App login to home flow', () => {
         deviceId: {
           exact: 'usb-webcam',
         },
+        width: { ideal: 1920 },
+        height: { ideal: 1080 },
       },
+    })
+  })
+
+  it('prefers the rear camera on touch devices when a rear camera is available', async () => {
+    const user = userEvent.setup()
+    const originalMaxTouchPoints = navigator.maxTouchPoints
+    const getUserMedia = vi.fn().mockResolvedValue({
+      getTracks: () => [{ stop: vi.fn() }],
+    })
+
+    Object.defineProperty(navigator, 'maxTouchPoints', {
+      configurable: true,
+      value: 5,
+    })
+    Object.defineProperty(navigator, 'mediaDevices', {
+      configurable: true,
+      value: {
+        enumerateDevices: vi.fn().mockResolvedValue([
+          {
+            kind: 'videoinput',
+            label: 'Front Camera',
+            deviceId: 'front-camera',
+          },
+          {
+            kind: 'videoinput',
+            label: 'Rear Camera',
+            deviceId: 'rear-camera',
+          },
+        ]),
+        getUserMedia,
+      },
+    })
+    vi.spyOn(window.HTMLMediaElement.prototype, 'play').mockResolvedValue()
+    Object.defineProperty(window.HTMLMediaElement.prototype, 'readyState', {
+      configurable: true,
+      get: () => 2,
+    })
+    Object.defineProperty(window.HTMLVideoElement.prototype, 'videoWidth', {
+      configurable: true,
+      get: () => 640,
+    })
+    Object.defineProperty(window.HTMLVideoElement.prototype, 'videoHeight', {
+      configurable: true,
+      get: () => 480,
+    })
+    vi.spyOn(window.HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
+      drawImage: vi.fn(),
+      getImageData: vi.fn(() => ({
+        data: new Uint8ClampedArray(640 * 480 * 4),
+        width: 640,
+        height: 480,
+      })),
+    })
+    Object.defineProperty(window, 'BarcodeDetector', {
+      configurable: true,
+      value: class MockBarcodeDetector {
+        async detect() {
+          return []
+        }
+      },
+    })
+
+    render(<App />)
+
+    await user.click(screen.getByRole('radio', { name: '사용자' }))
+    await user.type(screen.getByLabelText('이메일'), 'user@example.com')
+    await user.type(screen.getByLabelText('비밀번호'), 'password1234')
+    await user.click(screen.getByRole('button', { name: '로그인' }))
+
+    await screen.findByRole('heading', { name: /소희 홈/i })
+    await user.click(screen.getByRole('button', { name: '설정' }))
+    await user.click(screen.getByRole('button', { name: /밴드 QR을 카메라로 스캔해요\./ }))
+    await user.click(screen.getByRole('button', { name: '카메라 켜기' }))
+
+    await waitFor(() => {
+      expect(screen.getByRole('status').textContent).toContain('카메라가 켜졌습니다.')
+    })
+    expect(getUserMedia).toHaveBeenCalledWith({
+      video: {
+        deviceId: {
+          exact: 'rear-camera',
+        },
+        width: { ideal: 1920 },
+        height: { ideal: 1080 },
+      },
+    })
+
+    Object.defineProperty(navigator, 'maxTouchPoints', {
+      configurable: true,
+      value: originalMaxTouchPoints,
     })
   })
 
@@ -1371,3 +1468,4 @@ function delay(ms) {
     window.setTimeout(resolve, ms)
   })
 }
+
