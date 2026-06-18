@@ -8928,6 +8928,33 @@ h2 {
   line-height: 1.34;
 }
 
+.phone-screen.guardian-screen .guardian-event-item-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.phone-screen.guardian-screen .guardian-event-confirm-button {
+  flex: 0 0 auto;
+  min-height: 30px;
+  padding: 0 12px;
+  border: 1px solid #d8e1ef;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #172033;
+  font-size: 12.8px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.phone-screen.guardian-screen .guardian-event-item p {
+  margin: 0;
+  color: #4b5563;
+  font-size: 13.6px;
+  line-height: 1.5;
+}
+
 .phone-screen.guardian-screen .guardian-event-item span {
   color: #6b7280;
   font-size: 13.12px;
