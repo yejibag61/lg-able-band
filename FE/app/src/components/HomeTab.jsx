@@ -2,7 +2,6 @@ import {
   createHomeAlertMetrics,
   formatStatusUpdatedAt,
   getActionableRecentAlerts,
-  getDeviceWarningSummary,
   getEmergencyAvailability,
 } from '../utils/homeSummaryUtils'
 
@@ -20,14 +19,12 @@ export function HomeTab({
   summary,
   onEmergencyRequest,
   onOpenAlerts,
-  onOpenDevices,
 }) {
   const recentAlerts = getActionableRecentAlerts(summary.recentAlerts)
   const alertMetrics = createHomeAlertMetrics(summary.recentAlerts)
   const updatedAtLabel = formatStatusUpdatedAt(summary.safetyStatus.lastCheckedAt)
   const emergencyAvailability = getEmergencyAvailability(summary)
   const emergencyStatusMessage = emergencyMessage
-  const deviceWarningSummary = getDeviceWarningSummary(summary.deviceSummary)
 
   function handleEmergencyClick() {
     onEmergencyRequest(emergencyAvailability)
@@ -76,24 +73,6 @@ export function HomeTab({
             {emergencyStatusMessage}
           </p>
         ) : null}
-      </section>
-
-      <section className="content-card device-summary-card">
-        <div className="section-title-row">
-          <div>
-            <p className="card-label">기기 연결 상태</p>
-            <strong className="card-title">
-              연결된 기기 {summary.deviceSummary.connectedCount}/{summary.deviceSummary.totalCount}개
-            </strong>
-          </div>
-          <button className="summary-action-button" type="button" onClick={onOpenDevices}>
-            기기 확인
-          </button>
-        </div>
-        <div className="device-stat-grid" aria-label="기기 상태 요약">
-          <span className="device-stat">{deviceWarningSummary.label}</span>
-          <span className="device-stat">UWB 지원 {summary.deviceSummary.uwbSupportedCount}개</span>
-        </div>
       </section>
 
       <section className="content-card alert-summary-card">

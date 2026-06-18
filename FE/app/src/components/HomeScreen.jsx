@@ -365,7 +365,6 @@ export function HomeScreen({ session, onLogout }) {
             summary={summary}
             onEmergencyRequest={handleEmergencyRequest}
             onOpenAlerts={() => handleTabChange('alerts')}
-            onOpenDevices={() => handleTabChange('devices')}
           />
         ) : null}
         {activeTab === 'alerts' ? (
