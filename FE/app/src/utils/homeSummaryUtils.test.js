@@ -44,6 +44,34 @@ describe('home summary utilities', () => {
     })
   })
 
+  it('excludes user emergency request receipts from home recent alerts', () => {
+    const alerts = [
+      {
+        alertId: 301,
+        type: 'EMERGENCY',
+        severity: 'CRITICAL',
+        title: '긴급 지원 요청 접수',
+        message: '사용자가 앱에서 긴급 지원을 요청했습니다.',
+        status: 'ESCALATED',
+      },
+      {
+        alertId: 302,
+        type: 'EMERGENCY',
+        severity: 'CRITICAL',
+        title: '가스 누출 긴급 감지',
+        message: '주방 센서에서 긴급 위험 신호가 감지되었습니다.',
+        status: 'UNREAD',
+      },
+    ]
+
+    expect(getActionableRecentAlerts(alerts).map((alert) => alert.alertId)).toEqual([302])
+    expect(createHomeAlertMetrics(alerts)).toEqual({
+      total: 1,
+      unread: 1,
+      danger: 1,
+    })
+  })
+
   it('patches alert status into home and alert state immutably', () => {
     const summary = {
       recentAlerts: [

@@ -64,8 +64,13 @@ const previewAlerts = [
   },
 ]
 
+let currentHomeSummary
+let currentPreviewAlerts
+
 describe('HomeScreen alert summary sync', () => {
   beforeEach(() => {
+    currentHomeSummary = structuredClone(homeSummary)
+    currentPreviewAlerts = structuredClone(previewAlerts)
     window.localStorage.setItem('lg-able-band.accessToken', 'api-user-token')
     window.scrollTo = vi.fn()
     window.HTMLElement.prototype.scrollTo = vi.fn()
@@ -99,6 +104,47 @@ describe('HomeScreen alert summary sync', () => {
     expect(homeContent.getByText('최근 알림이 없습니다.')).toBeTruthy()
     expect(screen.getByText('최근 알림 0건')).toBeTruthy()
   })
+
+  it('uses the same alert records as the alerts tab for the home real-time summary', async () => {
+    currentHomeSummary = {
+      ...homeSummary,
+      recentAlerts: [
+        {
+          alertId: 301,
+          type: 'DANGER',
+          severity: 'HIGH',
+          title: '요약 API에만 있는 오래된 알림',
+          message: '이 알림은 알림 탭 목록에는 없습니다.',
+          deviceName: '요약 센서',
+          occurredAt: '2026-06-10T14:10:00+09:00',
+          status: 'UNREAD',
+        },
+      ],
+    }
+    currentPreviewAlerts = [
+      {
+        alertId: 302,
+        type: 'DANGER',
+        severity: 'HIGH',
+        title: '알림 탭과 같은 최신 알림',
+        message: '홈에서도 이 알림을 보여줘야 합니다.',
+        deviceName: '알림 센서',
+        occurredAt: '2026-06-10T14:25:00+09:00',
+        status: 'UNREAD',
+      },
+    ]
+
+    render(<HomeScreen session={session} onLogout={() => {}} />)
+
+    await screen.findByRole('heading', { name: '소희 홈' })
+
+    const homeContent = within(screen.getByText('실시간 알림 요약').closest('section'))
+    expect(homeContent.queryByText('요약 API에만 있는 오래된 알림')).toBeNull()
+    expect(homeContent.getByText('알림 탭과 같은 최신 알림')).toBeTruthy()
+
+    await userEvent.click(screen.getByRole('button', { name: '알림' }))
+    expect(screen.getByText('알림 탭과 같은 최신 알림')).toBeTruthy()
+  })
 })
 
 async function mockFetch(input, init = {}) {
@@ -106,11 +152,11 @@ async function mockFetch(input, init = {}) {
   const method = (init.method || 'GET').toUpperCase()
 
   if (url === `${API_BASE_URL}/api/app/home` && method === 'GET') {
-    return jsonResponse(homeSummary)
+    return jsonResponse(currentHomeSummary)
   }
 
   if (url === `${API_BASE_URL}/api/alerts?limit=20` && method === 'GET') {
-    return jsonResponse({ items: previewAlerts })
+    return jsonResponse({ items: currentPreviewAlerts })
   }
 
   if (url === `${API_BASE_URL}/api/devices` && method === 'GET') {
@@ -122,7 +168,7 @@ async function mockFetch(input, init = {}) {
   }
 
   if (url === `${API_BASE_URL}/api/alerts/201/confirm` && method === 'POST') {
-    return jsonResponse({ ...previewAlerts[0], status: 'CONFIRMED' })
+    return jsonResponse({ ...currentPreviewAlerts[0], status: 'CONFIRMED' })
   }
 
   return jsonResponse({ message: 'not found' }, { status: 404 })

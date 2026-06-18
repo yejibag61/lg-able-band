@@ -190,7 +190,7 @@ describe('App login to home flow', () => {
     expect(window.localStorage.getItem('lg-able-band.session')).toBeNull()
   })
 
-  it('sends USER emergency requests and refreshes emergency alert data', async () => {
+  it('sends USER emergency requests without showing the request receipt as an alert', async () => {
     const user = userEvent.setup()
     render(<App />)
 
@@ -205,9 +205,11 @@ describe('App login to home flow', () => {
     await waitFor(() => {
       expect(screen.getByRole('status').textContent).toContain('보호자에게 긴급 요청을 보냈습니다.')
     })
-    await waitFor(() => {
-      expect(screen.getByText('긴급 지원 요청 접수')).toBeTruthy()
-    })
+    expect(screen.queryByText('긴급 지원 요청 접수')).toBeNull()
+
+    await user.click(screen.getByRole('button', { name: '알림' }))
+
+    expect(screen.queryByText('긴급 지원 요청 접수')).toBeNull()
 
     const emergencyCall = globalThis.fetch.mock.calls.find(([url, init]) => {
       return url === `${API_BASE_URL}/api/emergency-requests` && init.method === 'POST'

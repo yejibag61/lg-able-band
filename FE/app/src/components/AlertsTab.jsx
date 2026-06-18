@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import { confirmAlert, replayAlert } from '../services/alertService'
 import { getWarningRecommendation } from '../services/warningService'
+import { isEmergencyRequestAlert } from '../utils/homeSummaryUtils'
 
 function scrollAppContentToTop() {
   const appContent = document.querySelector('.app-content')
@@ -857,37 +858,6 @@ function filterAlert(alert, activeFilter) {
   }
 
   return true
-}
-
-function isEmergencyRequestAlert(alert) {
-  const normalizedText = normalizeAlertSearchText([
-    alert.category,
-    alert.code,
-    alert.eventType,
-    alert.requestType,
-    alert.source,
-    alert.title,
-    alert.message,
-  ])
-
-  return [
-    'EMERGENCYREQUEST',
-    'SOSREQUEST',
-    'HELPREQUEST',
-    '긴급지원요청',
-    '긴급도움요청',
-    '긴급요청',
-    '도움요청',
-  ].some((keyword) => normalizedText.includes(keyword))
-}
-
-function normalizeAlertSearchText(values) {
-  return values
-    .filter(Boolean)
-    .map((value) => String(value))
-    .join(' ')
-    .replace(/\s+/g, '')
-    .toUpperCase()
 }
 
 function isUrgentAlert(alert) {

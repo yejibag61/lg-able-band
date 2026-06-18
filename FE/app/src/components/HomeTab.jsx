@@ -15,13 +15,15 @@ const severityLabels = {
 export function HomeTab({
   emergencyMessage,
   emergencySubmitting,
+  alerts,
   statusDisplay,
   summary,
   onEmergencyRequest,
   onOpenAlerts,
 }) {
-  const recentAlerts = getActionableRecentAlerts(summary.recentAlerts)
-  const alertMetrics = createHomeAlertMetrics(summary.recentAlerts)
+  const homeAlerts = alerts || summary.recentAlerts
+  const recentAlerts = getActionableRecentAlerts(homeAlerts)
+  const alertMetrics = createHomeAlertMetrics(homeAlerts)
   const updatedAtLabel = formatStatusUpdatedAt(summary.safetyStatus.lastCheckedAt)
   const emergencyAvailability = getEmergencyAvailability(summary)
   const emergencyStatusMessage = emergencyMessage
