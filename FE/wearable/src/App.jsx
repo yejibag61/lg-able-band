@@ -83,6 +83,7 @@ function App() {
   const knownAlertIdsRef = useRef(new Set())
   const announcedAlertIdRef = useRef(null)
   const announcedUwbMessageRef = useRef('')
+  const uwbVibrationIntervalRef = useRef(null)
   const bleGuide = useBleProximityGuide()
 
   const selectedAlert = alertQueue[alertIndex] || null
@@ -195,10 +196,27 @@ function App() {
     return () => window.clearInterval(intervalId)
   }, [])
 
+  useEffect(() => {
+    if (typeof globalThis !== 'undefined') {
+      globalThis.__ABLE_BAND_VIBRATION_ENABLED__ = isPaired
+    }
+
+    if (!isPaired && typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
+      navigator.vibrate(0)
+    }
+
+    return () => {
+      if (typeof globalThis !== 'undefined') {
+        globalThis.__ABLE_BAND_VIBRATION_ENABLED__ = false
+      }
+    }
+  }, [isPaired])
+
   useEffect(
     () => () => {
       window.clearTimeout(pairingPollTimerRef.current)
       window.clearTimeout(pairingCompleteTimerRef.current)
+      window.clearInterval(uwbVibrationIntervalRef.current)
       stopLivingSignalMonitoring()
       window.speechSynthesis?.cancel()
     },
@@ -479,6 +497,10 @@ function App() {
       return
     }
 
+    if (mode !== 'alert') {
+      return
+    }
+
     if (announcedAlertIdRef.current === selectedAlert.alertId) {
       return
     }
@@ -486,7 +508,7 @@ function App() {
     announcedAlertIdRef.current = selectedAlert.alertId
     triggerVibration(vibrationPatternForAlert(selectedAlert))
     speakText(selectedAlert.voiceGuide || selectedAlert.message)
-  }, [selectedAlert, speakText])
+  }, [mode, selectedAlert, speakText])
 
   useEffect(() => {
     if (mode !== 'uwb' || !activeUwbSession?.voiceGuide) {
@@ -501,6 +523,36 @@ function App() {
     announcedUwbMessageRef.current = voiceKey
     speakText(activeUwbSession.voiceGuide)
   }, [activeUwbSession, mode, speakText])
+
+  useEffect(() => {
+    window.clearInterval(uwbVibrationIntervalRef.current)
+
+    if (!isPaired || mode !== 'uwb' || !activeUwbSession) {
+      if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
+        navigator.vibrate(0)
+      }
+      return undefined
+    }
+
+    const nextPattern = getRepeatingUwbVibrationPattern(activeUwbSession)
+    if (nextPattern === 'NONE') {
+      return undefined
+    }
+
+    triggerVibration(nextPattern)
+    uwbVibrationIntervalRef.current = window.setInterval(() => {
+      triggerVibration(nextPattern)
+    }, getRepeatingUwbVibrationIntervalMs(nextPattern))
+
+    return () => window.clearInterval(uwbVibrationIntervalRef.current)
+  }, [
+    activeUwbSession?.distanceM,
+    activeUwbSession?.navigationStatus,
+    activeUwbSession?.sessionId,
+    activeUwbSession?.vibrationPattern,
+    isPaired,
+    mode,
+  ])
 
   useEffect(() => {
     if (!isPaired || mode !== 'deviceSelect') {
@@ -1173,6 +1225,34 @@ function vibrationPatternForBleDistance(distanceM) {
   }
 
   return 'SLOW'
+}
+
+function getRepeatingUwbVibrationPattern(session) {
+  if (!session) {
+    return 'NONE'
+  }
+
+  if (session.navigationStatus === 'FAILED') {
+    return 'SLOW'
+  }
+
+  if (session.navigationStatus === 'ARRIVED') {
+    return 'LONG_TWICE'
+  }
+
+  return session.vibrationPattern || 'NONE'
+}
+
+function getRepeatingUwbVibrationIntervalMs(pattern) {
+  const intervals = {
+    SLOW: 1800,
+    MEDIUM: 1200,
+    FAST: 720,
+    LONG_TWICE: 1500,
+    STRONG: 900,
+  }
+
+  return intervals[pattern] || intervals.SLOW
 }
 
 function clamp(value, min, max) {
