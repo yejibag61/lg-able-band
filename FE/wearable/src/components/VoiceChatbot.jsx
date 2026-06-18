@@ -152,8 +152,8 @@ const WAKE_WORDS = [
 const CLOSE_WORDS = ['종료', '닫아', '챗봇꺼줘', '끝내', '대기모드로돌아가', '대기상태로돌아가']
 let speechKeepAliveTimer = null
 let speechFallbackTimer = null
+let speechHardFallbackTimer = null
 let chatbotSpeakingChangeHandler = null
-let chatbotSpeechStopRequested = false
 let speechQueue = Promise.resolve()
 
 const quickPhrases = [
@@ -314,7 +314,14 @@ export function VoiceChatbot({
     }
 
     startWakeListening()
+    const wakeHealthCheckTimer = window.setInterval(() => {
+      if (!isOpenRef.current && !wakeRecognitionRef.current) {
+        startWakeListening()
+      }
+    }, 1600)
+
     return () => {
+      window.clearInterval(wakeHealthCheckTimer)
       stopWakeListening()
     }
     // Wake listening is intentionally tied only to support/open state.
@@ -331,7 +338,6 @@ export function VoiceChatbot({
       clearSpeechTimers()
       setChatbotSpeaking(false)
       setChatbotAudioLock(false)
-      chatbotSpeechStopRequested = true
       globalThis.speechSynthesis?.cancel?.()
     },
     // Cleanup should only run when the component unmounts or callback identity changes.
@@ -400,7 +406,6 @@ export function VoiceChatbot({
     clearSpeechTimers()
     setChatbotSpeaking(false)
     setChatbotAudioLock(false)
-    chatbotSpeechStopRequested = true
     globalThis.speechSynthesis?.cancel?.()
     setIsOpen(false)
     setIsListening(false)
@@ -1118,6 +1123,7 @@ export function VoiceChatbot({
       return
     }
 
+    setChatbotAudioLock(false)
     const recognition = new SpeechRecognition()
     recognition.lang = 'ko-KR'
     recognition.interimResults = true
@@ -1163,6 +1169,9 @@ export function VoiceChatbot({
       window.clearTimeout(wakeSilenceTimerRef.current)
       if (event?.error === 'aborted') {
         wakeRecognitionRef.current = null
+        if (!isOpenRef.current && !wakeMatchedRef.current) {
+          scheduleWakeRestart(WAKE_BLOCKED_RESTART_DELAY_MS)
+        }
         return
       }
 
@@ -1218,9 +1227,10 @@ export function VoiceChatbot({
 
   function scheduleWakeRestart(delayMs = WAKE_RESTART_DELAY_MS) {
     window.clearTimeout(wakeRestartTimerRef.current)
-    if (isOpenRef.current || globalThis.__ABLE_BAND_CHATBOT_AUDIO_LOCK__ === true) {
+    if (isOpenRef.current) {
       return
     }
+    setChatbotAudioLock(false)
     wakeRestartTimerRef.current = window.setTimeout(startWakeListening, delayMs)
   }
 
@@ -1703,7 +1713,7 @@ function AnswerScreen({ answer, onOpenApp }) {
       <div className="wearable-chat-answer-icon" aria-hidden="true">
         {answer.icon}
       </div>
-      <p className="wearable-chat-answer-lines">{answer.lines.join('\n')}</p>
+      <p className="wearable-chat-answer-lines">{formatAnswerTextForDisplay(answer.lines.join('\n'))}</p>
       {hasAlertDetails ? (
         <>
           <div className="wearable-chat-detail-card">
@@ -1739,13 +1749,24 @@ function AnswerScreen({ answer, onOpenApp }) {
 }
 
 function VoiceAnswerScreen({ isRequesting, onListenAgain, onReplay, response, transcript }) {
+  const isIntro = response?.text === CHATBOT_INTRO
+
   return (
     <div className="wearable-chat-content wearable-chat-answer">
       <Header title={response?.title || 'AI 답변'} subtitle={transcript ? `질문: ${transcript}` : ''} />
       <div className="wearable-chat-answer-icon" aria-hidden="true">
         💬
       </div>
-      <p className="wearable-chat-answer-lines">{response?.text || '답변을 준비하고 있어요.'}</p>
+      {isIntro ? (
+        <div className="wearable-chat-intro-message">
+          <strong>무엇을 도와드릴까요?</strong>
+          <span>현재 알림 · 가전 상태</span>
+          <span>위치 안내 · 보호자 연결</span>
+          <strong>알림음 뒤에 원하는 기능을 말씀해주세요.</strong>
+        </div>
+      ) : (
+        <p className="wearable-chat-answer-lines">{formatAnswerTextForDisplay(response?.text || '답변을 준비하고 있어요.')}</p>
+      )}
       <button className="wearable-chat-bottom-action" type="button" disabled={isRequesting} onClick={onReplay}>
         🔊 다시듣기
       </button>
@@ -1777,7 +1798,7 @@ function createAnswers({ alert, alertQueue, isPaired, mode, statusMessage, uwbSe
         ? [
             `새 알림이 ${unreadAlerts.length}개 있어요.`,
             dangerAlerts.length ? `위험 알림 ${dangerAlerts.length}개가 있어요.` : '위험 알림은 없어요.',
-            `최근 알림은 ${recentAlert.title}입니다. ${recentAlert.voiceGuide || recentAlert.message || ''}`,
+            `최근 알림은 ${recentAlert.title}입니다.${recentAlert.voiceGuide || recentAlert.message ? `\n${recentAlert.voiceGuide || recentAlert.message}` : ''}`,
           ]
         : ['현재 새 알림은 없어요.', statusMessage || '밴드는 정상 대기 중입니다.'],
       detail: recentAlert
@@ -1864,8 +1885,6 @@ function speakTextNow(text, options = {}) {
 
   return new Promise((resolve) => {
     clearSpeechTimers()
-    chatbotSpeechStopRequested = false
-
     const finish = callOnce(async () => {
       clearSpeechTimers()
       setChatbotSpeaking(false)
@@ -1884,10 +1903,9 @@ function speakTextNow(text, options = {}) {
     utterance.volume = 1
     utterance.voice = findKoreanVoice()
     utterance.onend = finish
-    utterance.onerror = () => {
-      if (chatbotSpeechStopRequested) {
-        finish()
-      }
+    utterance.onerror = (event) => {
+      console.warn('TTS 오류:', event?.error || event)
+      finish()
     }
 
     try {
@@ -1905,6 +1923,7 @@ function speakTextNow(text, options = {}) {
       }, 250)
 
       scheduleSpeechFallback(trimmedText, finish)
+      scheduleSpeechHardFallback(trimmedText, finish)
     } catch {
       finish()
     }
@@ -1929,18 +1948,32 @@ function scheduleSpeechFallback(text, finish) {
   }, fallbackMs)
 }
 
+function scheduleSpeechHardFallback(text, finish) {
+  const hardFallbackMs = Math.max(4500, Math.min(26000, text.length * 210 + 1800))
+
+  speechHardFallbackTimer = window.setTimeout(() => {
+    try {
+      globalThis.speechSynthesis?.cancel?.()
+    } catch {
+      // Speech synthesis can already be stopped.
+    }
+    finish()
+  }, hardFallbackMs)
+}
+
 function clearSpeechTimers() {
   window.clearInterval(speechKeepAliveTimer)
   window.clearTimeout(speechFallbackTimer)
+  window.clearTimeout(speechHardFallbackTimer)
   speechKeepAliveTimer = null
   speechFallbackTimer = null
+  speechHardFallbackTimer = null
 }
 
 function stopChatbotSpeech() {
   clearSpeechTimers()
   setChatbotSpeaking(false)
   setChatbotAudioLock(false)
-  chatbotSpeechStopRequested = true
   speechQueue = Promise.resolve()
   try {
     globalThis.speechSynthesis?.cancel?.()
@@ -2075,6 +2108,14 @@ function sendPhraseToApp(phrase) {
 
 function requestAppTTS(text) {
   console.log('앱에서 TTS 출력 요청:', text)
+}
+
+function formatAnswerTextForDisplay(text) {
+  return String(text || '')
+    .replace(/\r\n/g, '\n')
+    .replace(/([^\d\s])\.\s*/g, '$1.\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
 }
 
 function openWelfareSearchInApp(category) {

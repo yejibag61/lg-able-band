@@ -56,7 +56,7 @@ function App() {
   const [alertStatuses, setAlertStatuses] = useState({})
   const [uwbSession, setUwbSession] = useState(null)
   const [uwbTargets, setUwbTargets] = useState([])
-  const [isUwbTargetLoading, setIsUwbTargetLoading] = useState(false)
+  const [, setIsUwbTargetLoading] = useState(false)
   const [isUwbPolling, setIsUwbPolling] = useState(true)
   const [statusMessage, setStatusMessage] = useState('')
   const [isBusy, setIsBusy] = useState(false)

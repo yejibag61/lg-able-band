@@ -817,6 +817,25 @@ h1 {
   line-height: 1.45;
 }
 
+.wearable-chat-intro-message {
+  display: grid;
+  gap: 5px;
+  max-width: 100%;
+  color: var(--wearable-text);
+  font-size: 0.98rem;
+  font-weight: 520;
+  line-height: 1.45;
+  text-align: center;
+}
+
+.wearable-chat-intro-message strong {
+  font-weight: 800;
+}
+
+.wearable-chat-intro-message span {
+  display: block;
+}
+
 .wearable-chat-guide {
   color: var(--wearable-text-soft);
   font-size: 0.86rem;
