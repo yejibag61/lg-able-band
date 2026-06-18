@@ -48,7 +48,8 @@ class WearablePairingServiceTests {
 			OffsetDateTime.parse("2026-06-10T09:00:00+09:00"),
 			"LG",
 			"able-band-claim-unit",
-			true
+			true,
+			null
 		);
 		when(dataService.currentUser("Bearer token")).thenReturn(currentUser(55L));
 		when(deviceService.claimWearableDevice(eq("Bearer token"), any())).thenReturn(claimedDevice);

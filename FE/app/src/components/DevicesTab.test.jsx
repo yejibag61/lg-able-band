@@ -51,6 +51,34 @@ describe('DevicesTab', () => {
     )
     expect(screen.getByText('침실')).toBeTruthy()
   })
+
+  it('updates the selected device location from the management card', async () => {
+    const user = userEvent.setup()
+    const devices = [
+      {
+        deviceId: 2,
+        name: 'TV',
+        vendorDeviceId: 'thinq-tv-001',
+        type: 'TV',
+        room: '거실',
+        connectionStatus: 'CONNECTED',
+      },
+    ]
+
+    render(<DevicesTab devices={devices} uwb={{}} />)
+
+    const locationInput = screen.getByLabelText('가전 위치 수정')
+    await user.clear(locationInput)
+    await user.type(locationInput, '안방')
+    await user.click(screen.getByRole('button', { name: '위치 저장' }))
+
+    await waitFor(() => {
+      expect(findUpdateDeviceCall()).toBeTruthy()
+    })
+    expect(JSON.parse(findUpdateDeviceCall()[1].body)).toEqual({ room: '안방' })
+    expect(screen.getByText('안방')).toBeTruthy()
+    expect(screen.getByRole('status').textContent).toContain('TV 위치를 안방으로 저장했습니다.')
+  })
 })
 
 async function mockFetch(input, init = {}) {
@@ -74,12 +102,29 @@ async function mockFetch(input, init = {}) {
     )
   }
 
+  if (url === `${API_BASE_URL}/api/devices/2` && method === 'PATCH') {
+    return jsonResponse({
+      deviceId: 2,
+      name: 'TV',
+      vendorDeviceId: 'thinq-tv-001',
+      type: 'TV',
+      connectionStatus: 'CONNECTED',
+      room: body.room,
+    })
+  }
+
   return jsonResponse({ message: 'not found' }, { status: 404 })
 }
 
 function findCreateDeviceCall() {
   return globalThis.fetch.mock.calls.find(([url, init = {}]) => {
     return url === `${API_BASE_URL}/api/devices` && init.method === 'POST'
+  })
+}
+
+function findUpdateDeviceCall() {
+  return globalThis.fetch.mock.calls.find(([url, init = {}]) => {
+    return url === `${API_BASE_URL}/api/devices/2` && init.method === 'PATCH'
   })
 }
 

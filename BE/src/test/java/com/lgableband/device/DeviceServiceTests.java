@@ -40,6 +40,7 @@ class DeviceServiceTests {
 				"able-band-demo-001",
 				"LG Able Band",
 				DeviceType.WEARABLE,
+				null,
 				false,
 				true
 			)
@@ -54,6 +55,7 @@ class DeviceServiceTests {
 			12L,
 			DeviceType.WEARABLE.name(),
 			"LG Able Band",
+			null,
 			false,
 			true,
 			41L

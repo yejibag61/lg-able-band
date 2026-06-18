@@ -114,15 +114,19 @@ export function AlertsTab({
   const [feedbackMessage, setFeedbackMessage] = useState('')
   const [inlineFeedback, setInlineFeedback] = useState(null)
   const [warningRecommendation, setWarningRecommendation] = useState(null)
+  const visibleAlertItems = useMemo(
+    () => alertItems.filter((alert) => !isEmergencyRequestAlert(alert)),
+    [alertItems],
+  )
 
   const selectedAlert =
     selectedAlertId === null
       ? null
-      : alertItems.find((alert) => alert.alertId === selectedAlertId) || alertItems[0]
+      : visibleAlertItems.find((alert) => alert.alertId === selectedAlertId) || visibleAlertItems[0]
 
   const filteredAlerts = useMemo(
-    () => alertItems.filter((alert) => filterAlert(alert, activeFilter)),
-    [activeFilter, alertItems],
+    () => visibleAlertItems.filter((alert) => filterAlert(alert, activeFilter)),
+    [activeFilter, visibleAlertItems],
   )
 
 
@@ -169,7 +173,7 @@ export function AlertsTab({
     setInlineFeedback(null)
     setWarningRecommendation(null)
 
-    const alert = alertItems.find((item) => item.alertId === alertId)
+    const alert = visibleAlertItems.find((item) => item.alertId === alertId)
     if (!alert) {
       return
     }
@@ -853,6 +857,37 @@ function filterAlert(alert, activeFilter) {
   }
 
   return true
+}
+
+function isEmergencyRequestAlert(alert) {
+  const normalizedText = normalizeAlertSearchText([
+    alert.category,
+    alert.code,
+    alert.eventType,
+    alert.requestType,
+    alert.source,
+    alert.title,
+    alert.message,
+  ])
+
+  return [
+    'EMERGENCYREQUEST',
+    'SOSREQUEST',
+    'HELPREQUEST',
+    '긴급지원요청',
+    '긴급도움요청',
+    '긴급요청',
+    '도움요청',
+  ].some((keyword) => normalizedText.includes(keyword))
+}
+
+function normalizeAlertSearchText(values) {
+  return values
+    .filter(Boolean)
+    .map((value) => String(value))
+    .join(' ')
+    .replace(/\s+/g, '')
+    .toUpperCase()
 }
 
 function isUrgentAlert(alert) {

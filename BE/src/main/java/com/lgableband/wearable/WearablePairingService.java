@@ -153,12 +153,13 @@ public class WearablePairingService {
 			authorization,
 			new DeviceService.DeviceCreateRequest(
 				DEFAULT_VENDOR,
-				session.deviceId(),
-				session.deviceName(),
-				DeviceType.WEARABLE,
-				false,
-				true
-			)
+					session.deviceId(),
+					session.deviceName(),
+					DeviceType.WEARABLE,
+					null,
+					false,
+					true
+				)
 		);
 		WearablePairingSession paired = session.pair(
 			user.userId(),

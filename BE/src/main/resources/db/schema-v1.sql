@@ -108,6 +108,7 @@ CREATE TABLE IF NOT EXISTS device (
 	device_type VARCHAR(30) NOT NULL,
 	vendor_device_id VARCHAR(255) NULL,
 	name VARCHAR(100) NOT NULL,
+	room VARCHAR(100) NULL,
 	connection_status VARCHAR(20) NOT NULL DEFAULT 'CONNECTED',
 	location_supported BOOLEAN NOT NULL DEFAULT FALSE,
 	remote_enabled BOOLEAN NOT NULL DEFAULT FALSE,

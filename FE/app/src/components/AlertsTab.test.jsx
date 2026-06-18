@@ -28,6 +28,45 @@ describe('AlertsTab', () => {
     expect(screen.getByText('도어센서 장시간 열림')).toBeTruthy()
   })
 
+  it('hides emergency request receipts while keeping real emergency alerts visible', async () => {
+    const user = userEvent.setup()
+    const alerts = [
+      {
+        alertId: 301,
+        type: 'EMERGENCY',
+        severity: 'CRITICAL',
+        title: '긴급 지원 요청 접수',
+        message: '사용자가 앱에서 긴급 지원을 요청했습니다.',
+        deviceName: 'Able Band 앱',
+        locationName: '앱',
+        occurredAt: '2026-06-10T14:35:00+09:00',
+        status: 'ESCALATED',
+      },
+      {
+        alertId: 302,
+        type: 'EMERGENCY',
+        severity: 'CRITICAL',
+        title: '가스 누출 긴급 감지',
+        message: '주방 센서에서 긴급 위험 신호가 감지되었습니다.',
+        deviceName: '가스 감지 센서',
+        locationName: '주방',
+        occurredAt: '2026-06-10T14:34:00+09:00',
+        status: 'UNREAD',
+      },
+      ...mockAppPreview.alerts,
+    ]
+
+    render(<AlertsTab accessibilityType="VISUAL" alerts={alerts} />)
+
+    expect(screen.queryByText('긴급 지원 요청 접수')).toBeNull()
+    expect(screen.getByText('가스 누출 긴급 감지')).toBeTruthy()
+
+    await user.click(screen.getByRole('button', { name: '긴급' }))
+
+    expect(screen.queryByText('긴급 지원 요청 접수')).toBeNull()
+    expect(screen.getByText('가스 누출 긴급 감지')).toBeTruthy()
+  })
+
   it('does not show delivery recommendation fields for ordinary life alerts', async () => {
     const user = userEvent.setup()
     render(<AlertsTab accessibilityType="VISUAL" alerts={mockAppPreview.alerts} />)
