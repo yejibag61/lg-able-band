@@ -1210,7 +1210,7 @@ export function VoiceChatbot({
       recognition.start()
     } catch {
       window.clearTimeout(wakeStartGuardTimerRef.current)
-      onWakeListeningChange?.(false)
+      onWakeListeningChange?.(true)
       wakeRecognitionRef.current = null
       scheduleWakeRestart()
     }
@@ -1264,7 +1264,7 @@ export function VoiceChatbot({
       wakeRecognitionRef.current = null
       wakeTranscriptRef.current = ''
       wakeMatchedRef.current = false
-      onWakeListeningChange?.(false)
+      onWakeListeningChange?.(true)
       scheduleWakeRestart(WAKE_BLOCKED_RESTART_DELAY_MS)
     }, 2500)
   }

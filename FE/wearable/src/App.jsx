@@ -326,6 +326,7 @@ function App() {
       isChatbotWakeListening ||
       isChatbotOpen ||
       isChatbotSpeaking ||
+      mode === 'idle' ||
       mode === 'uwb' ||
       mode === 'emergency'
     ) {
@@ -851,7 +852,10 @@ function WearableBottomSheet({ isBusy, onEmergencyRequest, onUnpair }) {
   }, [])
 
   useEffect(() => {
-    setTranslate(isExpanded ? 0 : travel)
+    const frameId = window.requestAnimationFrame(() => {
+      setTranslate(isExpanded ? 0 : travel)
+    })
+    return () => window.cancelAnimationFrame(frameId)
   }, [isExpanded, travel])
 
   function toggleExpanded() {
