@@ -87,8 +87,30 @@ export function getDeviceWarningSummary(deviceSummary) {
   }
 }
 
+export function isEmergencyRequestAlert(alert) {
+  const normalizedText = normalizeAlertSearchText([
+    alert.category,
+    alert.code,
+    alert.eventType,
+    alert.requestType,
+    alert.source,
+    alert.title,
+    alert.message,
+  ])
+
+  return [
+    'EMERGENCYREQUEST',
+    'SOSREQUEST',
+    'HELPREQUEST',
+    '긴급지원요청',
+    '긴급도움요청',
+    '긴급요청',
+    '도움요청',
+  ].some((keyword) => normalizedText.includes(keyword))
+}
+
 function isActionableAlert(alert) {
-  return alert.status !== 'CONFIRMED'
+  return alert.status !== 'CONFIRMED' && !isEmergencyRequestAlert(alert)
 }
 
 function isDangerAlert(alert) {
@@ -98,4 +120,13 @@ function isDangerAlert(alert) {
     alert.severity === 'HIGH' ||
     alert.severity === 'CRITICAL'
   )
+}
+
+function normalizeAlertSearchText(values) {
+  return values
+    .filter(Boolean)
+    .map((value) => String(value))
+    .join(' ')
+    .replace(/\s+/g, '')
+    .toUpperCase()
 }

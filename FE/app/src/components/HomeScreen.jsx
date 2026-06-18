@@ -361,6 +361,7 @@ export function HomeScreen({ session, onLogout }) {
           <HomeTab
             emergencyMessage={emergencyMessage}
             emergencySubmitting={emergencySubmitting}
+            alerts={preview.alerts}
             statusDisplay={statusDisplay}
             summary={summary}
             onEmergencyRequest={handleEmergencyRequest}
