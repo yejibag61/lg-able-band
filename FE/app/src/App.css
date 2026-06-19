@@ -9253,14 +9253,120 @@ h2 {
   min-height: 0;
 }
 
-.phone-screen.login-screen,
-.phone-screen.signup-screen,
 .phone-screen.placeholder-screen {
   min-height: 100dvh;
 }
 
 .phone-screen.login-screen .login-brand-logo {
   width: min(76%, 216px);
+}
+
+.phone-screen.login-screen,
+.phone-screen.signup-screen {
+  --auth-control-radius: 18px;
+  grid-template-rows: auto auto;
+  align-content: center;
+  gap: 18px;
+  padding: 22px 18px 18px;
+}
+
+.phone-screen.login-screen .login-panel,
+.phone-screen.signup-screen .login-panel {
+  align-self: start;
+  gap: 14px;
+  width: 100%;
+  padding: 18px;
+}
+
+.phone-screen.login-screen .login-panel,
+.phone-screen.signup-screen .login-panel {
+  border-radius: 28px;
+  box-shadow: 0 16px 34px rgba(15, 23, 42, 0.07);
+}
+
+.phone-screen.login-screen .login-hero,
+.phone-screen.signup-screen .login-hero {
+  justify-items: center;
+  text-align: center;
+  gap: 10px;
+  padding-inline: 6px;
+}
+
+.phone-screen.login-screen .eyebrow,
+.phone-screen.signup-screen .eyebrow {
+  font-size: 0.78rem;
+}
+
+.phone-screen.login-screen .hero-copy,
+.phone-screen.signup-screen .hero-copy {
+  max-width: 24ch;
+  font-size: 0.92rem;
+  line-height: 1.56;
+}
+
+.phone-screen.login-screen .role-group,
+.phone-screen.signup-screen .role-group {
+  gap: 10px 12px;
+}
+
+.phone-screen.login-screen .role-group legend,
+.phone-screen.signup-screen .role-group legend {
+  margin-bottom: 2px;
+}
+
+.phone-screen.login-screen .role-card,
+.phone-screen.signup-screen .role-card,
+.phone-screen.login-screen .field input,
+.phone-screen.signup-screen .field input,
+.phone-screen.login-screen .primary-button,
+.phone-screen.login-screen .secondary-button,
+.phone-screen.signup-screen .primary-button,
+.phone-screen.signup-screen .secondary-button {
+  border-radius: var(--auth-control-radius);
+}
+
+.phone-screen.login-screen .role-card,
+.phone-screen.signup-screen .role-card {
+  min-height: 48px;
+  padding: 0 10px;
+}
+
+.phone-screen.login-screen .field,
+.phone-screen.signup-screen .field {
+  gap: 7px;
+}
+
+.phone-screen.login-screen .field > span,
+.phone-screen.signup-screen .field > span {
+  padding-left: 2px;
+}
+
+.phone-screen.login-screen .field input,
+.phone-screen.signup-screen .field input {
+  min-height: 44px;
+  padding: 0 12px;
+}
+
+.phone-screen.login-screen .primary-button,
+.phone-screen.login-screen .secondary-button,
+.phone-screen.signup-screen .primary-button,
+.phone-screen.signup-screen .secondary-button {
+  min-height: 44px;
+  margin-top: 4px;
+}
+
+.phone-screen.login-screen .form-error,
+.phone-screen.login-screen .status-message,
+.phone-screen.signup-screen .form-error,
+.phone-screen.signup-screen .status-message {
+  padding: 12px 14px;
+}
+
+.phone-screen.login-screen .status-message-notice {
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  background: #f8fafc;
+  color: #475569;
+  font-weight: 520;
 }
 
 @media (max-aspect-ratio: 390/667) {

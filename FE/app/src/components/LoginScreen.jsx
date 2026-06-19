@@ -4,6 +4,7 @@ export function LoginScreen({
   password,
   error,
   message,
+  messageTone = 'success',
   isSubmitting,
   onRoleChange,
   onEmailChange,
@@ -24,7 +25,7 @@ export function LoginScreen({
   }
 
   return (
-    <main className="phone-screen login-screen" aria-labelledby="login-title">
+    <main className="phone-screen login-screen app-screen" aria-labelledby="login-title">
       <h1 id="login-title" style={visuallyHiddenStyle}>
         Able Band 로그인
       </h1>
@@ -89,7 +90,14 @@ export function LoginScreen({
         ) : null}
 
         {message ? (
-          <p className="status-message" role="status">
+          <p
+            className={
+              messageTone === 'notice'
+                ? 'status-message status-message-notice'
+                : 'status-message'
+            }
+            role="status"
+          >
             {message}
           </p>
         ) : null}
