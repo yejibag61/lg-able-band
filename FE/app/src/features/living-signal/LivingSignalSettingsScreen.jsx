@@ -582,7 +582,7 @@ export function LivingSignalSettingsScreen({
       <section className="living-signal-detect-section" aria-labelledby="living-signal-detect-title">
         <div className="living-signal-section-row">
           <h3 id="living-signal-detect-title">상시 감지</h3>
-          <span>웨어러블 전용</span>
+          <span>앱·웨어러블</span>
         </div>
 
         <label className="living-signal-threshold">
@@ -598,7 +598,7 @@ export function LivingSignalSettingsScreen({
         </label>
 
         <p className="living-signal-info">
-          앱에서는 계속 듣지 않습니다. 등록한 생활 알림음의 상시 감지와 즉시 알림은 웨어러블에서만 실행됩니다.
+          앱이 켜져 있으면 등록한 생활 알림음을 계속 감지합니다. 챗봇 사용 중이거나 직접 녹음하는 동안에는 잠시 멈춥니다.
         </p>
         {syncError ? <p className="living-signal-warning">{syncError}</p> : null}
       </section>

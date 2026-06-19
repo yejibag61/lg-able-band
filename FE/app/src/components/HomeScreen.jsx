@@ -1,6 +1,11 @@
 import jsQR from 'jsqr'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { LivingSignalSettingsScreen } from '../features/living-signal'
+import { createAmbientDetectionSession, isMicrophoneSupported } from '../features/living-signal/livingSignalAudio'
+import {
+  createLivingSignalDetectionAlert,
+  getLivingSignalState,
+} from '../features/living-signal/livingSignalService'
 import { getAccessibilitySettings, updateAccessibilitySettings } from '../services/accessibilityService'
 import { startChatbotWakeService, stopChatbotWakeService } from '../services/chatbotWakeService'
 import { applyContextAiSafetyStatus, getAppPreview, getHomeSummary } from '../services/homeService'
@@ -16,7 +21,11 @@ import { AdminAlertBroadcastTab } from './AdminAlertBroadcastTab'
 import { AlertsTab } from './AlertsTab'
 import { DevicesTab } from './DevicesTab'
 import { HomeTab } from './HomeTab'
-import { CHATBOT_INTERRUPT_EVENT, VoiceChatbot } from './VoiceChatbot'
+import {
+  CHATBOT_ACTIVITY_EVENT,
+  CHATBOT_INTERRUPT_EVENT,
+  VoiceChatbot,
+} from './VoiceChatbot'
 import { completeWearablePairing } from '../services/wearablePairingService'
 import {
   getEmergencyAvailability,
@@ -55,6 +64,8 @@ const tabTitles = {
 
 const MAX_DEVICE_COUNT = 6
 const HOME_ALERT_SYNC_INTERVAL_MS = 3000
+const LIVING_SIGNAL_SYNC_INTERVAL_MS = 5000
+const LIVING_SIGNAL_REPORT_COOLDOWN_MS = 15000
 
 const connectionStatusLabels = {
   CONNECTED: '연결됨',
@@ -80,12 +91,20 @@ export function HomeScreen({ session, onLogout }) {
     refreshing: false,
     error: '',
   })
+  const [livingSignalConfig, setLivingSignalConfig] = useState({
+    threshold: 0.8,
+    sounds: [],
+  })
+  const [isChatbotActive, setIsChatbotActive] = useState(false)
   const [homeState, setHomeState] = useState({
     loading: true,
     error: '',
     summary: null,
     preview: null,
   })
+  const livingSignalSessionRef = useRef(null)
+  const livingSignalCooldownRef = useRef({ key: '', at: 0 })
+  const livingSignalConfigKeyRef = useRef('')
 
   const loadHomeView = useCallback(async () => {
     const [summary, preview] = await Promise.all([getHomeSummary(), getAppPreview()])
@@ -108,6 +127,16 @@ export function HomeScreen({ session, onLogout }) {
       },
     }
   }, [sessionAccessibilityType, sessionEmail])
+
+  const stopLivingSignalMonitoring = useCallback(async () => {
+    const session = livingSignalSessionRef.current
+    if (!session) {
+      return
+    }
+
+    livingSignalSessionRef.current = null
+    await session.stop()
+  }, [])
 
   const visibleTabs = useMemo(() => {
     return isAdminAccount ? [...baseTabs, adminTab] : baseTabs
@@ -174,12 +203,160 @@ export function HomeScreen({ session, onLogout }) {
   }, [homeRefreshState.refreshing, homeState.loading, loadHomeView])
 
   useEffect(() => {
+    const shouldPauseWakeListening =
+      !homeState.loading &&
+      livingSignalConfig.sounds.length > 0 &&
+      menuScreen !== 'livingSignals' &&
+      !isChatbotActive
+
+    if (shouldPauseWakeListening) {
+      stopChatbotWakeService()
+      return undefined
+    }
+
     startChatbotWakeService()
 
     return () => {
       stopChatbotWakeService()
     }
+  }, [homeState.loading, isChatbotActive, livingSignalConfig.sounds.length, menuScreen])
+
+  useEffect(() => {
+    function handleChatbotActivity(event) {
+      setIsChatbotActive(Boolean(event.detail?.active))
+    }
+
+    window.addEventListener(CHATBOT_ACTIVITY_EVENT, handleChatbotActivity)
+    return () => {
+      window.removeEventListener(CHATBOT_ACTIVITY_EVENT, handleChatbotActivity)
+    }
   }, [])
+
+  useEffect(() => {
+    if (homeState.loading) {
+      return undefined
+    }
+
+    let isMounted = true
+
+    async function syncLivingSignalConfig() {
+      try {
+        const state = await getLivingSignalState(homeState.preview?.livingSignals)
+        if (!isMounted) {
+          return
+        }
+
+        const nextConfig = {
+          threshold: state.threshold ?? 0.8,
+          sounds: state.sounds || [],
+        }
+        const nextConfigKey = getLivingSignalConfigKey(nextConfig)
+        if (livingSignalConfigKeyRef.current === nextConfigKey) {
+          return
+        }
+
+        livingSignalConfigKeyRef.current = nextConfigKey
+        setLivingSignalConfig(nextConfig)
+      } catch {
+        // Keep the last synced config when the refresh fails.
+      }
+    }
+
+    syncLivingSignalConfig()
+    const intervalId = window.setInterval(syncLivingSignalConfig, LIVING_SIGNAL_SYNC_INTERVAL_MS)
+
+    return () => {
+      isMounted = false
+      window.clearInterval(intervalId)
+    }
+  }, [homeState.loading, homeState.preview?.livingSignals])
+
+  useEffect(() => {
+    if (
+      homeState.loading ||
+      menuScreen === 'livingSignals' ||
+      isChatbotActive ||
+      !livingSignalConfig.sounds.length
+    ) {
+      stopLivingSignalMonitoring()
+      return undefined
+    }
+
+    if (!isMicrophoneSupported()) {
+      return undefined
+    }
+
+    let isMounted = true
+
+    async function startLivingSignalMonitoring() {
+      try {
+        const session = await createAmbientDetectionSession({
+          sounds: livingSignalConfig.sounds,
+          threshold: livingSignalConfig.threshold ?? 0.8,
+          onLevel: () => {},
+          onMatch: async (match) => {
+            if (!match?.predicted || !isMounted) {
+              return
+            }
+
+            const detectionKey = `${match.registeredSoundName}:${match.soundType}`
+            const now = Date.now()
+            if (
+              livingSignalCooldownRef.current.key === detectionKey &&
+              now - livingSignalCooldownRef.current.at < LIVING_SIGNAL_REPORT_COOLDOWN_MS
+            ) {
+              return
+            }
+
+            livingSignalCooldownRef.current = {
+              key: detectionKey,
+              at: now,
+            }
+
+            try {
+              const createdAlertResponse = await createLivingSignalDetectionAlert({
+                registeredSoundName: match.registeredSoundName,
+                soundType: match.soundType,
+                similarity: Number(match.similarity.toFixed(4)),
+                detectedAt: match.detectedAt,
+              })
+              const createdAlert = normalizeLivingSignalAlert(createdAlertResponse, match)
+
+              if (!isMounted) {
+                return
+              }
+
+              setHomeState((currentState) => mergeLivingSignalAlertIntoHomeState(currentState, createdAlert))
+            } catch {
+              // Keep listening and retry on the next confirmed match.
+            }
+          },
+        })
+
+        if (!isMounted) {
+          await session.stop()
+          return
+        }
+
+        livingSignalSessionRef.current = session
+      } catch {
+        // Keep the current home screen stable even if microphone access is unavailable.
+      }
+    }
+
+    startLivingSignalMonitoring()
+
+    return () => {
+      isMounted = false
+      stopLivingSignalMonitoring()
+    }
+  }, [
+    homeState.loading,
+    isChatbotActive,
+    livingSignalConfig,
+    menuScreen,
+    stopLivingSignalMonitoring,
+  ])
 
   useEffect(() => {
     let isMounted = true
@@ -1885,6 +2062,74 @@ function updateDeviceSummary(summary, devices) {
       uwbSupportedCount: locationSupportedDevices.length,
     },
   }
+}
+
+function normalizeLivingSignalAlert(alert, match) {
+  return {
+    alertId: alert?.alertId || alert?.id || `living-signal-${match.soundType}-${match.detectedAt}`,
+    type: alert?.type || alert?.alertType || 'LIFE',
+    severity: alert?.severity || 'LOW',
+    title: alert?.title || `${match.registeredSoundName} 감지`,
+    message:
+      alert?.message ||
+      `${match.registeredSoundName} 생활 알림음이 감지되었습니다.`,
+    voiceGuide:
+      alert?.voiceGuide ||
+      alert?.message ||
+      `${match.registeredSoundName} 생활 알림음이 감지되었습니다.`,
+    deviceName: alert?.deviceName || 'Able Band',
+    locationName: alert?.locationName || '앱',
+    occurredAt: alert?.occurredAt || alert?.createdAt || match.detectedAt,
+    status: alert?.status || (alert?.isRead ? 'CONFIRMED' : 'UNREAD'),
+    requiresGuardianNotify: alert?.requiresGuardianNotify ?? false,
+  }
+}
+
+function getLivingSignalConfigKey(config) {
+  const sounds = (config?.sounds || []).map((sound) => ({
+    soundId: sound.soundId,
+    soundType: sound.soundType,
+    updatedAt: sound.updatedAt || '',
+    recordings: (sound.recordings || []).map((recording) => ({
+      recordingId: recording.recordingId,
+      label: recording.label,
+      createdAt: recording.createdAt || '',
+    })),
+  }))
+
+  return JSON.stringify({
+    threshold: config?.threshold ?? 0.8,
+    sounds,
+  })
+}
+
+function mergeLivingSignalAlertIntoHomeState(currentState, createdAlert) {
+  if (!currentState.summary || !currentState.preview) {
+    return currentState
+  }
+
+  const nextSummaryAlerts = prependUniqueAlert(currentState.summary.recentAlerts, createdAlert)
+  const nextPreviewAlerts = prependUniqueAlert(currentState.preview.alerts, createdAlert)
+
+  return {
+    ...currentState,
+    summary: {
+      ...currentState.summary,
+      recentAlerts: nextSummaryAlerts,
+    },
+    preview: {
+      ...currentState.preview,
+      alerts: nextPreviewAlerts,
+    },
+  }
+}
+
+function prependUniqueAlert(alerts, createdAlert) {
+  const currentAlerts = Array.isArray(alerts) ? alerts : []
+
+  return currentAlerts.some((alert) => alert.alertId === createdAlert.alertId)
+    ? currentAlerts
+    : [createdAlert, ...currentAlerts]
 }
 
 function normalizeGuardianForView(guardian) {

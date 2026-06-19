@@ -1,5 +1,16 @@
 const EMBEDDING_BUCKETS = 8
 const SIGNAL_FLOOR = 0.08
+const LIVE_EMBEDDING_WINDOW = 4
+
+const PREFERRED_AUDIO_CONSTRAINTS = {
+  audio: {
+    echoCancellation: false,
+    noiseSuppression: false,
+    autoGainControl: false,
+    channelCount: 1,
+    sampleRate: { ideal: 44100 },
+  },
+}
 
 function createAudioContext() {
   const AudioContextClass = window.AudioContext || window.webkitAudioContext
@@ -9,6 +20,14 @@ function createAudioContext() {
   }
 
   return new AudioContextClass()
+}
+
+async function openDetectionAudioStream() {
+  try {
+    return await navigator.mediaDevices.getUserMedia(PREFERRED_AUDIO_CONSTRAINTS)
+  } catch {
+    return navigator.mediaDevices.getUserMedia({ audio: true })
+  }
 }
 
 function calculateSignalLevel(frequencyData) {
@@ -97,15 +116,17 @@ export function isMicrophoneSupported() {
 }
 
 export async function createWearableLivingSignalSession({ sounds, threshold, onLevel, onMatch }) {
-  const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+  const stream = await openDetectionAudioStream()
   const audioContext = createAudioContext()
   const source = audioContext.createMediaStreamSource(stream)
   const analyser = audioContext.createAnalyser()
   analyser.fftSize = 2048
+  analyser.smoothingTimeConstant = 0.72
   source.connect(analyser)
 
   const soundEmbeddings = buildSoundEmbeddings(sounds)
   const frequencyData = new Uint8Array(analyser.frequencyBinCount)
+  const liveFrames = []
   let lastSoundId = null
   let sameSoundCount = 0
   let lastReportedAt = 0
@@ -117,12 +138,18 @@ export async function createWearableLivingSignalSession({ sounds, threshold, onL
     onLevel?.(level)
 
     if (level < SIGNAL_FLOOR) {
+      liveFrames.length = 0
       lastSoundId = null
       sameSoundCount = 0
       return
     }
 
-    const liveEmbedding = createEmbedding(frame)
+    liveFrames.push(createEmbedding(frame))
+    if (liveFrames.length > LIVE_EMBEDDING_WINDOW) {
+      liveFrames.shift()
+    }
+
+    const liveEmbedding = averageEmbeddings(liveFrames)
     let bestMatch = null
 
     soundEmbeddings.forEach((sound) => {

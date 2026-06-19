@@ -39,6 +39,13 @@ export async function updateLivingSignalThreshold(threshold) {
   })
 }
 
+export async function createLivingSignalDetectionAlert(payload) {
+  return apiRequest('/api/living-signals/detections', {
+    method: 'POST',
+    body: payload,
+  })
+}
+
 function toSoundPayload(sound) {
   return {
     registeredSoundName: sound.registeredSoundName,
