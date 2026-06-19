@@ -99,8 +99,8 @@ public class LivingSignalService {
 			);
 
 			return new LivingSignalStateResponse(threshold, DEFAULT_WORKFLOW, sounds);
-		} catch (DataAccessException ignored) {
-			return fallbackStateResponse(user.userId());
+		} catch (DataAccessException exception) {
+			throw persistenceReadFailed(exception);
 		}
 	}
 
@@ -116,8 +116,8 @@ public class LivingSignalService {
 			long soundId = insertSound(jdbcTemplate, user.userId(), request);
 			insertRecordings(jdbcTemplate, soundId, request.recordings());
 			return soundById(jdbcTemplate, user.userId(), soundId);
-		} catch (DataAccessException ignored) {
-			return createFallbackSound(user.userId(), request);
+		} catch (DataAccessException exception) {
+			throw persistenceWriteFailed(exception);
 		}
 	}
 
@@ -151,8 +151,8 @@ public class LivingSignalService {
 			jdbcTemplate.update("DELETE FROM living_signal_recording WHERE sound_id = ?", soundId);
 			insertRecordings(jdbcTemplate, soundId, request.recordings());
 			return soundById(jdbcTemplate, user.userId(), soundId);
-		} catch (DataAccessException ignored) {
-			return updateFallbackSound(user.userId(), soundId, request);
+		} catch (DataAccessException exception) {
+			throw persistenceWriteFailed(exception);
 		}
 	}
 
@@ -175,8 +175,8 @@ public class LivingSignalService {
 			if (deletedRows == 0) {
 				throw notFound();
 			}
-		} catch (DataAccessException ignored) {
-			deleteFallbackSound(user.userId(), soundId);
+		} catch (DataAccessException exception) {
+			throw persistenceWriteFailed(exception);
 		}
 	}
 
@@ -201,8 +201,8 @@ public class LivingSignalService {
 			);
 
 			return new ThresholdResponse(normalizedThreshold);
-		} catch (DataAccessException ignored) {
-			return updateFallbackThreshold(user.userId(), normalizedThreshold);
+		} catch (DataAccessException exception) {
+			throw persistenceWriteFailed(exception);
 		}
 	}
 
@@ -764,6 +764,22 @@ public class LivingSignalService {
 
 	private ApiException notFound() {
 		return new ApiException(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND", "생활 신호를 찾을 수 없습니다.");
+	}
+
+	private ApiException persistenceReadFailed(DataAccessException exception) {
+		return new ApiException(
+			HttpStatus.SERVICE_UNAVAILABLE,
+			"LIVING_SIGNAL_STATE_UNAVAILABLE",
+			"생활 신호 설정을 DB에서 불러오지 못했습니다."
+		);
+	}
+
+	private ApiException persistenceWriteFailed(DataAccessException exception) {
+		return new ApiException(
+			HttpStatus.SERVICE_UNAVAILABLE,
+			"LIVING_SIGNAL_PERSISTENCE_FAILED",
+			"생활 신호 설정을 DB에 저장하지 못했습니다."
+		);
 	}
 
 	private JdbcTemplate jdbcTemplate() {

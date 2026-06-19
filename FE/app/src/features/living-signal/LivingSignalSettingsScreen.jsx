@@ -62,7 +62,7 @@ export function LivingSignalSettingsScreen({
   dataHandlers = defaultDataHandlers,
 }) {
   const initialState = useMemo(() => createInitialState(livingSignals), [livingSignals])
-  const [sounds, setSounds] = useState(initialState.sounds)
+  const [sounds, setSounds] = useState([])
   const [threshold, setThreshold] = useState(initialState.threshold)
   const [editor, setEditor] = useState(buildInitialEditor())
   const [screenMode, setScreenMode] = useState('list')
@@ -74,6 +74,7 @@ export function LivingSignalSettingsScreen({
   })
   const [sampleSaveMode, setSampleSaveMode] = useState('append')
   const [syncError, setSyncError] = useState('')
+  const [isStateReady, setIsStateReady] = useState(false)
 
   const enrollmentSessionRef = useRef(null)
   const isHydratingRef = useRef(true)
@@ -91,10 +92,13 @@ export function LivingSignalSettingsScreen({
         }
 
         setSyncError(error.message || '생활 신호 설정을 불러오지 못했습니다.')
+        setSounds([])
+        setThreshold(initialState.threshold)
       } finally {
         if (isMounted) {
           isHydratingRef.current = false
           thresholdReadyRef.current = true
+          setIsStateReady(true)
         }
       }
     }
@@ -505,6 +509,31 @@ export function LivingSignalSettingsScreen({
         <button className="living-signal-save" type="button" onClick={saveSound}>
           {screenMode === 'create' ? '추가 완료' : '수정 완료'}
         </button>
+        </section>
+      </section>
+    )
+  }
+
+  if (!isStateReady) {
+    return (
+      <section className="living-signal-screen" aria-labelledby="living-signal-list-title">
+        <section className="living-signal-list-section" aria-labelledby="living-signal-list-title">
+          <div className="living-signal-section-row">
+            <div className="device-add-hero">
+              {showBackButton ? (
+                <button
+                  className="text-button back-button alert-detail-back"
+                  type="button"
+                  aria-label="목록으로 돌아가기"
+                  onClick={onBack}
+                >
+                  <span aria-hidden="true">←</span>
+                </button>
+              ) : null}
+              <strong className="card-title" id="living-signal-list-title">등록된 알림음</strong>
+            </div>
+          </div>
+          <p className="living-signal-empty" role="status">등록된 알림음을 불러오는 중입니다.</p>
         </section>
       </section>
     )
