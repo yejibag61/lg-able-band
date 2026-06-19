@@ -1,0 +1,64 @@
+[INFO] Scanning for projects...
+[INFO] 
+[INFO] -----------------------< com.lgableband:backend >-----------------------
+[INFO] Building lg-able-band-backend 0.0.1-SNAPSHOT
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] >>> spring-boot:4.0.6:run (default-cli) > test-compile @ backend >>>
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ backend ---
+[INFO] Copying 1 resource from src\main\resources to target\classes
+[INFO] Copying 2 resources from src\main\resources to target\classes
+[INFO] 
+[INFO] --- compiler:3.14.1:compile (default-compile) @ backend ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- resources:3.3.1:testResources (default-testResources) @ backend ---
+[INFO] skip non existing resourceDirectory C:\Users\lab4dx\Desktop\lg-able-band\BE\src\test\resources
+[INFO] 
+[INFO] --- compiler:3.14.1:testCompile (default-testCompile) @ backend ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] <<< spring-boot:4.0.6:run (default-cli) < test-compile @ backend <<<
+[INFO] 
+[INFO] 
+[INFO] --- spring-boot:4.0.6:run (default-cli) @ backend ---
+[INFO] Attaching agents: []
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+
+ :: Spring Boot ::                (v4.0.6)
+
+2026-06-19T17:19:06.037+09:00  INFO 19552 --- [lg-able-band-backend] [           main] com.lgableband.BackendApplication        : Starting BackendApplication using Java 25.0.2 with PID 19552 (C:\Users\lab4dx\Desktop\lg-able-band\BE\target\classes started by lab4dx in C:\Users\lab4dx\Desktop\lg-able-band\BE)
+2026-06-19T17:19:06.040+09:00  INFO 19552 --- [lg-able-band-backend] [           main] com.lgableband.BackendApplication        : No active profile set, falling back to 1 default profile: "default"
+2026-06-19T17:19:06.977+09:00  INFO 19552 --- [lg-able-band-backend] [           main] o.s.boot.tomcat.TomcatWebServer          : Tomcat initialized with port 8080 (http)
+2026-06-19T17:19:06.989+09:00  INFO 19552 --- [lg-able-band-backend] [           main] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+2026-06-19T17:19:06.989+09:00  INFO 19552 --- [lg-able-band-backend] [           main] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/11.0.21]
+2026-06-19T17:19:07.033+09:00  INFO 19552 --- [lg-able-band-backend] [           main] b.w.c.s.WebApplicationContextInitializer : Root WebApplicationContext: initialization completed in 937 ms
+2026-06-19T17:19:07.310+09:00  INFO 19552 --- [lg-able-band-backend] [           main] com.zaxxer.hikari.HikariDataSource       : able-band-mysql - Starting...
+2026-06-19T17:19:10.318+09:00  INFO 19552 --- [lg-able-band-backend] [           main] com.zaxxer.hikari.pool.HikariPool        : able-band-mysql - Added connection com.mysql.cj.jdbc.ConnectionImpl@3e377967
+2026-06-19T17:19:10.320+09:00  INFO 19552 --- [lg-able-band-backend] [           main] com.zaxxer.hikari.HikariDataSource       : able-band-mysql - Start completed.
+2026-06-19T17:19:10.594+09:00  INFO 19552 --- [lg-able-band-backend] [           main] o.s.boot.tomcat.TomcatWebServer          : Tomcat started on port 8080 (http) with context path '/'
+2026-06-19T17:19:10.598+09:00  INFO 19552 --- [lg-able-band-backend] [           main] com.lgableband.BackendApplication        : Started BackendApplication in 5.036 seconds (process running for 5.39)
+2026-06-19T17:19:17.177+09:00  INFO 19552 --- [lg-able-band-backend] [nio-8080-exec-1] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring DispatcherServlet 'dispatcherServlet'
+2026-06-19T17:19:17.178+09:00  INFO 19552 --- [lg-able-band-backend] [nio-8080-exec-1] o.s.web.servlet.DispatcherServlet        : Initializing Servlet 'dispatcherServlet'
+2026-06-19T17:19:17.179+09:00  INFO 19552 --- [lg-able-band-backend] [nio-8080-exec-1] o.s.web.servlet.DispatcherServlet        : Completed initialization in 1 ms
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD FAILURE
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  10:58 min
+[INFO] Finished at: 2026-06-19T17:30:01+09:00
+[INFO] ------------------------------------------------------------------------
+[ERROR] Failed to execute goal org.springframework.boot:spring-boot-maven-plugin:4.0.6:run (default-cli) on project backend: Process terminated with exit code: -1 -> [Help 1]
+[ERROR] 
+[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.
+[ERROR] Re-run Maven using the -X switch to enable full debug logging.
+[ERROR] 
+[ERROR] For more information about the errors and possible solutions, please read the following articles:
+[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoExecutionException
