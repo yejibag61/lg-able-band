@@ -84,16 +84,7 @@ export function LivingSignalSettingsScreen({
 
     async function loadState() {
       try {
-        const remoteState = await dataHandlers.loadState(initialState)
-
-        if (!isMounted) {
-          return
-        }
-
-        isHydratingRef.current = true
-        setSounds(remoteState.sounds)
-        setThreshold(remoteState.threshold)
-        setSyncError('')
+        await hydrateFromRemoteState({ isMounted })
       } catch (error) {
         if (!isMounted) {
           return
@@ -210,6 +201,20 @@ export function LivingSignalSettingsScreen({
     }
   }
 
+  async function hydrateFromRemoteState({ isMounted = true } = {}) {
+    const remoteState = await dataHandlers.loadState(initialState)
+
+    if (!isMounted) {
+      return remoteState
+    }
+
+    isHydratingRef.current = true
+    setSounds(remoteState.sounds)
+    setThreshold(remoteState.threshold)
+    setSyncError('')
+    return remoteState
+  }
+
   async function startEnrollmentRecording() {
     if (!audioHandlers.isMicrophoneSupported()) {
       setRecordingState((current) => ({
@@ -322,15 +327,12 @@ export function LivingSignalSettingsScreen({
 
     try {
       if (editor.mode === 'create') {
-        const createdSound = await dataHandlers.createSound(payload)
-        setSounds((current) => [normalizeSound(createdSound), ...current])
+        await dataHandlers.createSound(payload)
       } else {
-        const updatedSound = await dataHandlers.updateSound(editor.soundId, payload)
-        setSounds((current) =>
-          current.map((sound) => (sound.soundId === editor.soundId ? normalizeSound(updatedSound) : sound)),
-        )
+        await dataHandlers.updateSound(editor.soundId, payload)
       }
 
+      await hydrateFromRemoteState()
       setSyncError('')
       closeEditorPage()
     } catch (error) {
@@ -354,7 +356,7 @@ export function LivingSignalSettingsScreen({
 
     try {
       await dataHandlers.deleteSound(soundId)
-      setSounds((current) => current.filter((sound) => sound.soundId !== soundId))
+      await hydrateFromRemoteState()
       setSyncError('')
     } catch (error) {
       setSyncError(error.message || '생활 신호 삭제에 실패했습니다.')

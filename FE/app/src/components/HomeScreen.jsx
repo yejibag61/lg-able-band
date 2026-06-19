@@ -182,7 +182,11 @@ export function HomeScreen({ session, onLogout }) {
     let isMounted = true
 
     const intervalId = window.setInterval(async () => {
-      if (document.visibilityState === 'hidden' || homeRefreshState.refreshing) {
+      if (
+        document.visibilityState === 'hidden' ||
+        homeRefreshState.refreshing ||
+        menuScreen === 'livingSignals'
+      ) {
         return
       }
 
@@ -200,26 +204,15 @@ export function HomeScreen({ session, onLogout }) {
       isMounted = false
       window.clearInterval(intervalId)
     }
-  }, [homeRefreshState.refreshing, homeState.loading, loadHomeView])
+  }, [homeRefreshState.refreshing, homeState.loading, loadHomeView, menuScreen])
 
   useEffect(() => {
-    const shouldPauseWakeListening =
-      !homeState.loading &&
-      livingSignalConfig.sounds.length > 0 &&
-      menuScreen !== 'livingSignals' &&
-      !isChatbotActive
-
-    if (shouldPauseWakeListening) {
-      stopChatbotWakeService()
-      return undefined
-    }
-
     startChatbotWakeService()
 
     return () => {
       stopChatbotWakeService()
     }
-  }, [homeState.loading, isChatbotActive, livingSignalConfig.sounds.length, menuScreen])
+  }, [])
 
   useEffect(() => {
     function handleChatbotActivity(event) {

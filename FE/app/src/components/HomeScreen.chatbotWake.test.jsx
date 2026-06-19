@@ -9,6 +9,7 @@ vi.mock('../services/chatbotWakeService', () => ({
 }))
 
 vi.mock('./VoiceChatbot', () => ({
+  CHATBOT_ACTIVITY_EVENT: 'lg-able-band:chatbot-activity',
   CHATBOT_INTERRUPT_EVENT: 'lg-able-band:interrupt-chatbot',
   VoiceChatbot: () => <div data-testid="voice-chatbot" />,
 }))
