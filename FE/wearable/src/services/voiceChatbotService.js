@@ -1,22 +1,40 @@
 const DEFAULT_SOUND_CHATBOT_URL = 'http://127.0.0.1:8002/api/ai/voice-chat'
 const PROXIED_SOUND_CHATBOT_URL = '/api/ai/voice-chat'
+const RETRY_DELAYS_MS = [600, 1200]
 
 export async function requestVoiceChat(payload) {
-  const response = await fetch(soundChatbotUrl(), {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(payload),
-  })
+  const url = soundChatbotUrl()
+  const body = JSON.stringify(payload)
+  let lastError = null
 
-  const data = await response.json().catch(() => null)
+  for (let attempt = 0; attempt <= RETRY_DELAYS_MS.length; attempt += 1) {
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'ngrok-skip-browser-warning': 'true',
+        },
+        body,
+      })
 
-  if (!response.ok) {
-    throw new Error(data?.message || '음성 챗봇 서버 요청에 실패했습니다.')
+      const data = await response.json().catch(() => null)
+
+      if (!response.ok) {
+        throw new Error(data?.message || 'Voice chatbot server request failed.')
+      }
+
+      return data
+    } catch (error) {
+      lastError = error
+      if (attempt >= RETRY_DELAYS_MS.length) {
+        break
+      }
+      await sleep(RETRY_DELAYS_MS[attempt])
+    }
   }
 
-  return data
+  throw lastError || new Error('Voice chatbot server request failed.')
 }
 
 export function soundChatbotUrl() {
@@ -25,4 +43,8 @@ export function soundChatbotUrl() {
     return configuredUrl
   }
   return import.meta.env.MODE === 'test' ? DEFAULT_SOUND_CHATBOT_URL : PROXIED_SOUND_CHATBOT_URL
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms))
 }
