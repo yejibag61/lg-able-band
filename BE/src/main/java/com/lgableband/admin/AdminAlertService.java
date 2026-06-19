@@ -461,7 +461,7 @@ public class AdminAlertService {
 			ps.setString(2, template.alertType().name());
 			ps.setString(3, template.severity().name());
 			ps.setString(4, payloadJson);
-			ps.setTimestamp(5, Timestamp.valueOf(toLocalDateTime(occurredAt)));
+			ps.setObject(5, toLocalDateTime(occurredAt));
 			return ps;
 		}, keyHolder);
 		return keyHolder.getKey().longValue();
@@ -495,7 +495,7 @@ public class AdminAlertService {
 			template.title(),
 			template.message(),
 			template.voiceGuide(),
-			Timestamp.valueOf(toLocalDateTime(occurredAt))
+			toLocalDateTime(occurredAt)
 		);
 	}
 

@@ -458,7 +458,7 @@ public class LivingSignalService {
 					requiresGuardianNotify
 				)
 			);
-			ps.setTimestamp(5, Timestamp.valueOf(toLocalDateTime(detectedAt)));
+			ps.setObject(5, toLocalDateTime(detectedAt));
 			return ps;
 		}, keyHolder);
 
@@ -506,7 +506,7 @@ public class LivingSignalService {
 			ps.setString(6, message);
 			ps.setString(7, voiceGuide);
 			ps.setString(8, AlertStatus.UNREAD.name());
-			ps.setTimestamp(9, Timestamp.valueOf(toLocalDateTime(detectedAt)));
+			ps.setObject(9, toLocalDateTime(detectedAt));
 			return ps;
 		}, keyHolder);
 
@@ -531,7 +531,7 @@ public class LivingSignalService {
 				recording.durationSec(),
 				blankToNull(recording.audioDataUrl()),
 				toJsonArray(recording.embedding()),
-				Timestamp.valueOf(toLocalDateTime(recording.createdAt()))
+				toLocalDateTime(recording.createdAt())
 			);
 		}
 	}
