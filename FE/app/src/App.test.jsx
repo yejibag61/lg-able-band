@@ -334,7 +334,7 @@ describe('App login to home flow', () => {
 
     await user.click(screen.getByRole('button', { name: '기기' }))
     expect(screen.getByRole('heading', { name: '기기와 UWB' })).toBeTruthy()
-    expect(screen.getByRole('heading', { name: '우리 집 가전을 연결해요.' })).toBeTruthy()
+    expect(screen.getAllByRole('region', { name: '내 가전 목록' }).length).toBeGreaterThan(0)
     expect(await screen.findByRole('button', { name: '세탁기 관리 열기' })).toBeTruthy()
 
     await user.click(screen.getByRole('button', { name: '알림' }))
@@ -347,22 +347,23 @@ describe('App login to home flow', () => {
     expect(screen.getByRole('button', { name: '멤버 초대' })).toBeTruthy()
 
     await user.click(screen.getByRole('button', { name: '멤버 초대' }))
-    expect(screen.getByRole('heading', { name: '보호자 연결' })).toBeTruthy()
-    expect(screen.getByLabelText('보호자 이메일')).toBeTruthy()
-    await user.type(screen.getByLabelText('보호자 이메일'), 'guardian2@example.com')
+    expect(screen.getByRole('heading', { name: '보호자 초대' })).toBeTruthy()
+    expect(screen.getByLabelText('보호자 이름')).toBeTruthy()
+    await user.type(screen.getByLabelText('보호자 이름'), '김추가')
+    await user.type(screen.getByLabelText('보호자 연락처'), '010-2222-3333')
     await user.click(screen.getByRole('button', { name: '보호자 등록' }))
     await waitFor(() => {
-      expect(screen.getByRole('status').textContent).toContain('김추가 보호자와 연결했습니다.')
+      expect(screen.getByRole('status').textContent).toContain('김추가 보호자를 등록했습니다.')
     })
 
     await user.click(screen.getByRole('button', { name: '메뉴로 돌아가기' }))
-    expect(screen.getByRole('button', { name: /밴드 QR을 카메라로 스캔해요\./ })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /카메라로 밴드 QR코드 스캔/ })).toBeTruthy()
 
     installQrScannerMock(
       'lg-able-band://pair?pairingSessionId=pairing-able-260610-1440&deviceId=able-band-demo-001&pairingCode=ABLE-4IN-260610&nonce=nonce-able-001&source=wearable',
     )
-    await user.click(screen.getByRole('button', { name: /밴드 QR을 카메라로 스캔해요\./ }))
-    expect(screen.getByRole('heading', { name: '밴드 QR을 스캔해주세요.' })).toBeTruthy()
+    await user.click(screen.getByRole('button', { name: /카메라로 밴드 QR코드 스캔/ }))
+    expect(screen.getByRole('region', { name: '밴드 QR을 스캔해주세요.' })).toBeTruthy()
     await user.click(screen.getByRole('button', { name: '카메라 켜기' }))
     await waitFor(() => {
       expect(screen.getByRole('status').textContent).toContain('웨어러블 연동이 완료되었습니다.')
@@ -370,7 +371,7 @@ describe('App login to home flow', () => {
     expect(screen.getByText('연동 정보: LG Able Band · able-band-demo-001 · ABLE-4IN-260610')).toBeTruthy()
     expect(findFetchCall('/api/wearable/pairing-sessions/pairing-able-260610-1440/complete', 'POST')).toBeTruthy()
 
-    await user.click(screen.getByRole('button', { name: '메뉴로 돌아가기' }))
+    await user.click(screen.getByRole('button', { name: '목록으로 돌아가기' }))
     await user.click(screen.getByRole('button', { name: /생활 신호 설정/i }))
     expect(screen.getAllByRole('heading', { name: '생활 신호 설정' }).length).toBeGreaterThan(0)
     expect(screen.getByText('등록된 알림음')).toBeTruthy()
@@ -390,7 +391,7 @@ describe('App login to home flow', () => {
     await screen.findByRole('heading', { name: /소희 홈/i })
     await user.click(screen.getByRole('button', { name: '설정' }))
     installQrScannerMock(rawValue)
-    await user.click(screen.getByRole('button', { name: /밴드 QR을 카메라로 스캔해요\./ }))
+    await user.click(screen.getByRole('button', { name: /카메라로 밴드 QR코드 스캔/ }))
     await user.click(screen.getByRole('button', { name: '카메라 켜기' }))
 
     await waitFor(() => {
@@ -425,7 +426,7 @@ describe('App login to home flow', () => {
 
     await user.click(screen.getByRole('button', { name: '설정' }))
     installQrScannerMock(rawValue)
-    await user.click(screen.getByRole('button', { name: /밴드 QR을 카메라로 스캔해요\./ }))
+    await user.click(screen.getByRole('button', { name: /카메라로 밴드 QR코드 스캔/ }))
     await user.click(screen.getByRole('button', { name: '카메라 켜기' }))
 
     await waitFor(() => {
@@ -480,11 +481,11 @@ describe('App login to home flow', () => {
     await screen.findByRole('heading', { name: /소희 홈/i })
     await user.click(screen.getByRole('button', { name: '설정' }))
     installQrScannerMock(rawValue)
-    await user.click(screen.getByRole('button', { name: /밴드 QR을 카메라로 스캔해요\./ }))
+    await user.click(screen.getByRole('button', { name: /카메라로 밴드 QR코드 스캔/ }))
     await user.click(screen.getByRole('button', { name: '카메라 켜기' }))
 
     await waitFor(() => {
-      expect(screen.getByRole('status').textContent).toContain('Able Band 연동용 QR이 아닙니다.')
+      expect(screen.getByRole('status').textContent).toContain('Able Band 연동 QR이 아닙니다.')
     })
     expect(findWearablePairingCompleteCalls()).toHaveLength(0)
   })
@@ -496,11 +497,11 @@ describe('App login to home flow', () => {
     await loginAsUser(user)
     await user.click(screen.getByRole('button', { name: '설정' }))
     installQrScannerMock('https://example.com/not-able-band')
-    await user.click(screen.getByRole('button', { name: /밴드 QR을 카메라로 스캔해요\./ }))
+    await user.click(screen.getByRole('button', { name: /카메라로 밴드 QR코드 스캔/ }))
     await user.click(screen.getByRole('button', { name: '카메라 켜기' }))
 
     await waitFor(() => {
-      expect(screen.getByRole('status').textContent).toContain('Able Band 연동용 QR이 아닙니다.')
+      expect(screen.getByRole('status').textContent).toContain('Able Band 연동 QR이 아닙니다.')
     })
     expect(findWearablePairingCompleteCalls()).toHaveLength(0)
   })
@@ -536,7 +537,7 @@ describe('App login to home flow', () => {
     await loginAsUser(user)
     await user.click(screen.getByRole('button', { name: '설정' }))
     installQrScannerMock(rawValue)
-    await user.click(screen.getByRole('button', { name: /밴드 QR을 카메라로 스캔해요\./ }))
+    await user.click(screen.getByRole('button', { name: /카메라로 밴드 QR코드 스캔/ }))
     await user.click(screen.getByRole('button', { name: '카메라 켜기' }))
 
     await waitFor(() => {
@@ -555,7 +556,7 @@ describe('App login to home flow', () => {
     await loginAsUser(user)
     await user.click(screen.getByRole('button', { name: '설정' }))
     installQrScannerMock(rawValue)
-    await user.click(screen.getByRole('button', { name: /밴드 QR을 카메라로 스캔해요\./ }))
+    await user.click(screen.getByRole('button', { name: /카메라로 밴드 QR코드 스캔/ }))
     await user.click(screen.getByRole('button', { name: '카메라 켜기' }))
 
     await waitFor(() => {
@@ -802,7 +803,7 @@ describe('App login to home flow', () => {
     await screen.findByRole('heading', { name: /소희 홈/i })
     await user.click(screen.getByRole('button', { name: '설정' }))
     installQrScannerMock(rawValue, { detector: false })
-    await user.click(screen.getByRole('button', { name: /밴드 QR을 카메라로 스캔해요\./ }))
+    await user.click(screen.getByRole('button', { name: /카메라로 밴드 QR코드 스캔/ }))
     await user.click(screen.getByRole('button', { name: '카메라 켜기' }))
 
     await waitFor(() => {
@@ -870,19 +871,19 @@ describe('App login to home flow', () => {
 
     await screen.findByRole('heading', { name: /소희 홈/i })
     await user.click(screen.getByRole('button', { name: '설정' }))
-    await user.click(screen.getByRole('button', { name: /밴드 QR을 카메라로 스캔해요\./ }))
+    await user.click(screen.getByRole('button', { name: /카메라로 밴드 QR코드 스캔/ }))
     await user.click(screen.getByRole('button', { name: '카메라 켜기' }))
 
     await waitFor(() => {
       expect(screen.getByRole('status').textContent).toContain('웨어러블 연동이 완료되었습니다.')
     })
-    expect(getUserMedia).toHaveBeenNthCalledWith(1, {
+    expect(getUserMedia).toHaveBeenNthCalledWith(1, { video: true })
+    expect(getUserMedia).toHaveBeenNthCalledWith(2, {
       video: {
-        width: { ideal: 1920 },
-        height: { ideal: 1080 },
+        width: { ideal: 1280 },
+        height: { ideal: 720 },
       },
     })
-    expect(getUserMedia).toHaveBeenNthCalledWith(2, { video: true })
   })
 
   it('uses the Vite camera frame timeout override when the first stream has no visible frames', async () => {
@@ -943,13 +944,18 @@ describe('App login to home flow', () => {
 
     await screen.findByRole('heading', { name: /소희 홈/i })
     await user.click(screen.getByRole('button', { name: '설정' }))
-    await user.click(screen.getByRole('button', { name: /밴드 QR을 카메라로 스캔해요\./ }))
+    await user.click(screen.getByRole('button', { name: /카메라로 밴드 QR코드 스캔/ }))
     await user.click(screen.getByRole('button', { name: '카메라 켜기' }))
 
     await waitFor(() => {
       expect(screen.getByRole('status').textContent).toContain('웨어러블 연동이 완료되었습니다.')
     })
-    expect(getUserMedia).toHaveBeenNthCalledWith(2, { video: true })
+    expect(getUserMedia).toHaveBeenNthCalledWith(2, {
+      video: {
+        width: { ideal: 1280 },
+        height: { ideal: 720 },
+      },
+    })
   })
 
   it('prefers a physical webcam over virtual camera devices', async () => {
@@ -1015,7 +1021,7 @@ describe('App login to home flow', () => {
 
     await screen.findByRole('heading', { name: /소희 홈/i })
     await user.click(screen.getByRole('button', { name: '설정' }))
-    await user.click(screen.getByRole('button', { name: /밴드 QR을 카메라로 스캔해요\./ }))
+    await user.click(screen.getByRole('button', { name: /카메라로 밴드 QR코드 스캔/ }))
     await user.click(screen.getByRole('button', { name: '카메라 켜기' }))
 
     await waitFor(() => {
@@ -1026,19 +1032,26 @@ describe('App login to home flow', () => {
         deviceId: {
           exact: 'usb-webcam',
         },
-        width: { ideal: 1920 },
-        height: { ideal: 1080 },
+        width: { ideal: 1280 },
+        height: { ideal: 720 },
       },
     })
   })
 
   it('prefers the rear camera on touch devices when a rear camera is available', async () => {
     const user = userEvent.setup()
+    const originalUserAgentData = navigator.userAgentData
     const originalMaxTouchPoints = navigator.maxTouchPoints
     const getUserMedia = vi.fn().mockResolvedValue({
       getTracks: () => [{ stop: vi.fn() }],
     })
 
+    Object.defineProperty(navigator, 'userAgentData', {
+      configurable: true,
+      value: {
+        mobile: true,
+      },
+    })
     Object.defineProperty(navigator, 'maxTouchPoints', {
       configurable: true,
       value: 5,
@@ -1100,7 +1113,7 @@ describe('App login to home flow', () => {
 
     await screen.findByRole('heading', { name: /소희 홈/i })
     await user.click(screen.getByRole('button', { name: '설정' }))
-    await user.click(screen.getByRole('button', { name: /밴드 QR을 카메라로 스캔해요\./ }))
+    await user.click(screen.getByRole('button', { name: /카메라로 밴드 QR코드 스캔/ }))
     await user.click(screen.getByRole('button', { name: '카메라 켜기' }))
 
     await waitFor(() => {
@@ -1111,8 +1124,8 @@ describe('App login to home flow', () => {
         deviceId: {
           exact: 'rear-camera',
         },
-        width: { ideal: 1920 },
-        height: { ideal: 1080 },
+        width: { ideal: 1280 },
+        height: { ideal: 720 },
       },
     })
 
@@ -1120,6 +1133,55 @@ describe('App login to home flow', () => {
       configurable: true,
       value: originalMaxTouchPoints,
     })
+    Object.defineProperty(navigator, 'userAgentData', {
+      configurable: true,
+      value: originalUserAgentData,
+    })
+  })
+
+  it('throttles jsQR fallback when native detection keeps missing for wearable pairing', async () => {
+    const user = userEvent.setup()
+    const rawValue =
+      'lg-able-band://pair?pairingSessionId=pairing-throttle-260619&deviceId=able-band-demo-001&pairingCode=ABLE-4IN-260610&nonce=nonce-throttle&source=wearable'
+    const detectorDetect = vi.fn(async () => [])
+    const rafCallbacks = []
+    let now = 1000
+
+    window.__ABLE_BAND_QR_DECODER__ = vi.fn(() => '')
+    vi.spyOn(Date, 'now').mockImplementation(() => now)
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+      rafCallbacks.push(callback)
+      return rafCallbacks.length
+    })
+    vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => {})
+
+    installQrScannerMock(rawValue, { detect: detectorDetect })
+    render(<App />)
+
+    await user.click(screen.getByRole('radio', { name: '사용자' }))
+    await user.type(screen.getByLabelText('이메일'), 'user@example.com')
+    await user.type(screen.getByLabelText('비밀번호'), 'password1234')
+    await user.click(screen.getByRole('button', { name: '로그인' }))
+
+    await screen.findByRole('heading', { name: /소희 홈/i })
+    await user.click(screen.getByRole('button', { name: '설정' }))
+    await user.click(screen.getByRole('button', { name: /카메라로 밴드 QR코드 스캔/ }))
+    await user.click(screen.getByRole('button', { name: '카메라 켜기' }))
+
+    await waitFor(() => {
+      expect(detectorDetect).toHaveBeenCalledTimes(1)
+    })
+    expect(window.__ABLE_BAND_QR_DECODER__).toHaveBeenCalledTimes(1)
+
+    now += 60
+    await rafCallbacks.shift()?.()
+    now += 60
+    await rafCallbacks.shift()?.()
+    now += 60
+    await rafCallbacks.shift()?.()
+
+    expect(detectorDetect).toHaveBeenCalledTimes(4)
+    expect(window.__ABLE_BAND_QR_DECODER__).toHaveBeenCalledTimes(2)
   })
 
   it('shows invalid login error and keeps the user on login screen', async () => {
@@ -1398,6 +1460,24 @@ function installMockBackend() {
       return jsonResponse({ items: guardians })
     }
 
+    if (url === `${API_BASE_URL}/api/guardians` && method === 'POST') {
+      const guardian = {
+        guardianId: Math.max(0, ...guardians.map((item) => item.guardianId)) + 1,
+        name: body.name,
+        phone: body.phone,
+        isPrimary: body.isPrimary,
+        notifyOnDanger: body.notifyOnDanger,
+        connectionStatus: 'CONNECTED',
+      }
+
+      if (guardian.isPrimary) {
+        guardians = guardians.map((item) => ({ ...item, isPrimary: false }))
+      }
+
+      guardians = [...guardians, guardian]
+      return jsonResponse(guardian, { status: 201 })
+    }
+
     if (url === `${API_BASE_URL}/api/guardians/dashboard` && method === 'GET') {
       if (window.__ABLE_BAND_GUARDIAN_DASHBOARD_NETWORK_DOWN__) {
         throw new TypeError('network down')
@@ -1511,7 +1591,7 @@ function installSpeechSynthesisMock() {
   })
 }
 
-function installQrScannerMock(rawValue, { detector = true } = {}) {
+function installQrScannerMock(rawValue, { detector = true, detect = null } = {}) {
   Object.defineProperty(navigator, 'mediaDevices', {
     configurable: true,
     value: {
@@ -1554,6 +1634,9 @@ function installQrScannerMock(rawValue, { detector = true } = {}) {
     configurable: true,
     value: class MockBarcodeDetector {
       async detect() {
+        if (detect) {
+          return detect()
+        }
         return [{ rawValue }]
       }
     },

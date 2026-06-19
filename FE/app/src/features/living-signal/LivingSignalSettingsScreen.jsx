@@ -4,7 +4,6 @@ import {
   SOUND_TYPE_OPTIONS,
   buildInitialEditor,
   cloneLivingSignalState,
-  countTotalRecordings,
   createRecordingEntry,
   getSoundTypeLabel,
 } from './livingSignalUtils'
@@ -18,7 +17,7 @@ import {
 
 function scrollAppContentToTop() {
   const appContent = document.querySelector('.app-content')
-  if (appContent instanceof HTMLElement) {
+  if (appContent instanceof HTMLElement && typeof appContent.scrollTo === 'function') {
     appContent.scrollTo({ top: 0, left: 0 })
   }
 
@@ -79,7 +78,6 @@ export function LivingSignalSettingsScreen({
   const enrollmentSessionRef = useRef(null)
   const isHydratingRef = useRef(true)
   const thresholdReadyRef = useRef(false)
-  const totalRecordings = useMemo(() => countTotalRecordings(sounds), [sounds])
 
   useEffect(() => {
     let isMounted = true

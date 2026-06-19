@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { LivingSignalSettingsScreen } from '../features/living-signal'
 import { getAccessibilitySettings, updateAccessibilitySettings } from '../services/accessibilityService'
 import { applyContextAiSafetyStatus, getAppPreview, getHomeSummary } from '../services/homeService'
+import { getDevices } from '../services/deviceService'
 import { createEmergencyRequest } from '../services/emergencyService'
 import {
   createGuardian,
@@ -363,6 +364,10 @@ export function HomeScreen({ session, onLogout }) {
     })
   }
 
+  async function handleWearablePaired() {
+    handleDevicesChange(await getDevices())
+  }
+
   async function handleAccessibilityChange(nextSettings) {
     const accessibilityType =
       sessionAccessibilityType || homeState.summary?.user?.accessibilityType || 'VISUAL'
@@ -553,7 +558,10 @@ export function HomeScreen({ session, onLogout }) {
           />
         ) : null}
         {activeTab === 'menu' && menuScreen === 'wearablePairing' ? (
-          <WearablePairingScannerScreen onBack={() => setMenuScreen('root')} />
+          <WearablePairingScannerScreen
+            onBack={() => setMenuScreen('root')}
+            onPaired={handleWearablePaired}
+          />
         ) : null}
         {activeTab === 'admin' && isAdminAccount ? (
           <AdminAlertBroadcastTab onBroadcastComplete={handleHomeRefresh} />
@@ -815,7 +823,7 @@ function MenuTab({
   )
 }
 
-function WearablePairingScannerScreen({ onBack }) {
+function WearablePairingScannerScreen({ onBack, onPaired }) {
   const [scannerMessage, setScannerMessage] = useState(
     '웨어러블 화면의 QR 코드를 프레임 안에 맞춰주세요.',
   )
@@ -827,6 +835,7 @@ function WearablePairingScannerScreen({ onBack }) {
   const streamRef = useRef(null)
   const scanFrameRef = useRef(null)
   const activeScanRef = useRef(false)
+  const lastQrFallbackAtRef = useRef(0)
 
   function stopScanResources() {
     activeScanRef.current = false
@@ -859,6 +868,7 @@ function WearablePairingScannerScreen({ onBack }) {
     setScanStatus('scanning')
     setIsVideoReady(false)
     setDetectedValue('')
+    lastQrFallbackAtRef.current = 0
 
     if (!navigator.mediaDevices?.getUserMedia) {
       setScannerMessage('이 환경에서는 카메라를 사용할 수 없어 스캔 화면만 표시합니다.')
@@ -909,7 +919,10 @@ function WearablePairingScannerScreen({ onBack }) {
 
       try {
         const codes = detector ? await detector.detect(canvas) : []
-        const rawValue = codes[0]?.rawValue || decodeQrFromCanvas(context, canvas)
+        let rawValue = codes[0]?.rawValue || ''
+        if (!rawValue && shouldRunQrFallback(detector, lastQrFallbackAtRef)) {
+          rawValue = decodeQrFromCanvas(context, canvas)
+        }
 
         if (rawValue && await handleQrDetected(rawValue)) {
           return
@@ -940,6 +953,7 @@ function WearablePairingScannerScreen({ onBack }) {
 
     try {
       await completeWearablePairing(pairing)
+      await Promise.resolve().then(() => onPaired?.()).catch(() => undefined)
       stopScanResources()
       setScanStatus('paired')
       setDetectedValue(rawValue)
@@ -1024,6 +1038,22 @@ function WearablePairingScannerScreen({ onBack }) {
       </section>
     </section>
   )
+}
+
+const qrFallbackIntervalMs = 180
+
+function shouldRunQrFallback(detector, lastQrFallbackAtRef) {
+  if (!detector) {
+    return true
+  }
+
+  const now = Date.now()
+  if (now - lastQrFallbackAtRef.current < qrFallbackIntervalMs) {
+    return false
+  }
+
+  lastQrFallbackAtRef.current = now
+  return true
 }
 
 async function openCameraStream(video) {
@@ -1196,14 +1226,19 @@ function shouldPreferRearCamera() {
   return false
 }
 
+const qrScannerVideoSize = {
+  width: 1280,
+  height: 720,
+}
+
 function createDeviceCameraConstraint(deviceId) {
   return {
     video: {
       deviceId: {
         exact: deviceId,
       },
-      width: { ideal: 1920 },
-      height: { ideal: 1080 },
+      width: { ideal: qrScannerVideoSize.width },
+      height: { ideal: qrScannerVideoSize.height },
     },
   }
 }
@@ -1212,8 +1247,8 @@ function createEnvironmentCameraConstraint(mode) {
   return {
     video: {
       facingMode: { [mode]: 'environment' },
-      width: { ideal: 1920 },
-      height: { ideal: 1080 },
+      width: { ideal: qrScannerVideoSize.width },
+      height: { ideal: qrScannerVideoSize.height },
     },
   }
 }
@@ -1221,8 +1256,8 @@ function createEnvironmentCameraConstraint(mode) {
 function createGenericCameraConstraint() {
   return {
     video: {
-      width: { ideal: 1920 },
-      height: { ideal: 1080 },
+      width: { ideal: qrScannerVideoSize.width },
+      height: { ideal: qrScannerVideoSize.height },
     },
   }
 }
