@@ -6,7 +6,7 @@ export const mockHomeSummary = {
   },
   safetyStatus: {
     level: 'SAFE',
-    message: 'Able Band가 실시간 안전 상태를 확인 중입니다.',
+    message: 'Able Band가 안전 상태를 확인하고 있습니다.',
     lastCheckedAt: '2026-06-10T14:30:00+09:00',
   },
   recentAlerts: [

@@ -620,16 +620,43 @@ const accessibilityToggleItems = [
   {
     key: 'voiceGuide',
     label: '음성 안내',
-    icon: '음',
-    description: '위험 알림과 주요 안내를 음성으로 들려줍니다.',
+    icon: 'voice',
+    description: '위험·주요 안내를 음성으로 제공합니다.',
   },
   {
     key: 'vibrationGuide',
     label: '진동 안내',
-    icon: '진',
+    icon: 'vibration',
     description: '밴드와 앱 알림을 진동 중심으로 전달합니다.',
   },
 ]
+
+function AccessibilityQuickIcon({ name }) {
+  if (name === 'voice') {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <path d="M12 4a2.5 2.5 0 0 1 2.5 2.5v4.5A2.5 2.5 0 0 1 12 13.5 2.5 2.5 0 0 1 9.5 11V6.5A2.5 2.5 0 0 1 12 4Z" />
+        <path d="M7.5 10.5a4.5 4.5 0 0 0 9 0" />
+        <path d="M12 13.5V18" />
+        <path d="M9.5 18h5" />
+      </svg>
+    )
+  }
+
+  if (name === 'vibration') {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <rect x="9" y="5" width="6" height="14" rx="2" />
+        <path d="M6.5 8.5 5 10" />
+        <path d="M6.5 15.5 5 14" />
+        <path d="M17.5 8.5 19 10" />
+        <path d="M17.5 15.5 19 14" />
+      </svg>
+    )
+  }
+
+  return null
+}
 
 function MenuTab({
   accessibility,
@@ -697,12 +724,12 @@ function MenuTab({
         <div className="accessibility-card-header" id="menu-title">
           <div>
             <p className="card-label">접근성 설정</p>
-            <h2>알림과 화면 보조 설정</h2>
+            <h2 className="card-title">알림과 화면 보조 설정</h2>
           </div>
           <span className="accessibility-type-badge">{accessibility.disabilityType}</span>
         </div>
         <p className="accessibility-quick-copy">
-          필요한 안내 방식을 켜두면 알림과 위험 안내 설정으로 저장됩니다.
+          설정한 안내 방식이 알림과 위험 상황에 적용됩니다.
         </p>
         <div className="accessibility-quick-grid">
           {accessibilityToggleItems.map((item) => {
@@ -718,7 +745,7 @@ function MenuTab({
                 onClick={() => handleAccessibilityToggle(item.key)}
               >
                 <span className="accessibility-quick-icon" aria-hidden="true">
-                  {item.icon}
+                  <AccessibilityQuickIcon name={item.icon} />
                 </span>
                 <span className="accessibility-quick-text">
                   <strong>
@@ -800,7 +827,7 @@ function MenuTab({
         <span>
           <p className="card-label">웨어러블 연동</p>
           <strong className="card-title">카메라로 밴드 QR코드 스캔</strong>
-          <p>웨어러블 화면의 QR 코드를 비추면 연결을 시작합니다.</p>
+          <p>웨어러블 화면의 QR 코드를 비추면 연결됩니다.</p>
         </span>
         <span className="wearable-pairing-icon" aria-hidden="true">
           QR
@@ -1624,25 +1651,22 @@ function GuardianManagementScreen({
   }
 
   return (
-    <section className="tab-stack guardian-connection-screen" aria-labelledby="guardian-management-title">
-      <div className="section-title-row">
-        <button
-          className="text-button back-button alert-detail-back"
-          type="button"
-          aria-label="메뉴로 돌아가기"
-          onClick={onBack}
-        >
-          <span aria-hidden="true">←</span>
-        </button>
-        <div>
-          <p className="card-label">보호자 연결</p>
+    <section className="tab-stack guardian-connection-screen guardian-management-screen" aria-labelledby="guardian-management-title">
+      <section className="content-card connected-guardian-card guardian-management-card" aria-labelledby="connected-guardian-title">
+        <div className="guardian-form-hero device-add-hero guardian-management-header">
+          <button
+            className="text-button back-button alert-detail-back"
+            type="button"
+            aria-label="메뉴로 돌아가기"
+            onClick={onBack}
+          >
+            <span aria-hidden="true">←</span>
+          </button>
           <strong className="card-title" id="guardian-management-title">
-            보호자 관리
+            등록된 보호자를 관리해 주세요.
           </strong>
         </div>
-      </div>
 
-      <section className="content-card connected-guardian-card" aria-labelledby="connected-guardian-title">
         <div className="section-title-row">
           <strong className="card-title" id="connected-guardian-title">등록된 보호자</strong>
           <span>{guardians.length}명</span>
@@ -1677,7 +1701,7 @@ function GuardianManagementScreen({
                   <p>{guardian.isPrimary ? '대표 보호자' : guardian.relation || '보호자'}</p>
                   <strong>{guardian.name}</strong>
                   <span>{guardian.phone || '연락처 미등록'}</span>
-                  <div>
+                  <div className="connected-guardian-chip-row">
                     <span className="guardian-chip">
                       {formatConnectionStatus(guardian.connectionStatus)}
                     </span>

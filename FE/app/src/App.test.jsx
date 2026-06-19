@@ -160,7 +160,7 @@ describe('App login to home flow', () => {
     await user.click(screen.getByRole('button', { name: '로그인' }))
 
     expect(await screen.findByRole('heading', { name: /소희 홈/i })).toBeTruthy()
-    expect(screen.getByText('Able Band가 실시간 안전 상태를 확인 중입니다.')).toBeTruthy()
+    expect(screen.getByText('Able Band가 안전 상태를 확인하고 있습니다.')).toBeTruthy()
     expect(screen.getByText('오늘의 안전 상태')).toBeTruthy()
     expect(screen.getByRole('button', { name: '긴급 지원 요청' })).toBeTruthy()
   })

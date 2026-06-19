@@ -73,7 +73,7 @@ const deviceCatalog = [
   },
   {
     templateId: 'air',
-    name: 'LG 공기질 센서',
+    name: '공기질 센서',
     type: 'AIR_SENSOR',
     typeLabel: '공기질 센서',
     room: '거실',
@@ -751,13 +751,23 @@ export function DevicesTab({ devices = [], uwb, onDevicesChange }) {
             </div>
             <div>
               <dt>위치 안내</dt>
-              <dd>임시 BLE 테스트 가능</dd>
+              <dd className="device-ble-status">BLE 연결 가능</dd>
             </div>
             <div>
               <dt>주요 알림</dt>
               <dd>{selectedDevice.primarySignal}</dd>
             </div>
           </dl>
+          {deleteState.error ? (
+            <p className="form-error" role="alert">
+              {deleteState.error}
+            </p>
+          ) : null}
+          <div className="device-feature-list" aria-label={`${selectedDevice.name} 관리 기능`}>
+            {selectedDevice.management.map((feature) => (
+              <span key={feature}>{feature}</span>
+            ))}
+          </div>
           {isLocationEditorOpen ? (
             <div className="device-location-editor">
               <label className="field">
@@ -831,16 +841,6 @@ export function DevicesTab({ devices = [], uwb, onDevicesChange }) {
               </button>
             </div>
           )}
-          {deleteState.error ? (
-            <p className="form-error" role="alert">
-              {deleteState.error}
-            </p>
-          ) : null}
-          <div className="device-feature-list" aria-label={`${selectedDevice.name} 관리 기능`}>
-            {selectedDevice.management.map((feature) => (
-              <span key={feature}>{feature}</span>
-            ))}
-          </div>
         </section>
       ) : null}
 
@@ -902,10 +902,12 @@ function isDeviceConnected(connectedDevices, selectedDevice) {
 
 function enrichDevice(device, catalogByType) {
   const template = catalogByType[device.type] || createFallbackTemplate(device)
+  const normalizedName = normalizeDeviceDisplayName(device.name || template.name, device.type)
 
   return {
     ...template,
     ...device,
+    name: normalizedName,
     vendorDeviceId: getDeviceVendorId({ ...template, ...device }),
     room: device.room || device.locationName || template.room,
     typeLabel: device.typeLabel || template.typeLabel,
@@ -918,7 +920,7 @@ function enrichDevice(device, catalogByType) {
 
 function createFallbackTemplate(device) {
   return {
-    name: device.name,
+    name: normalizeDeviceDisplayName(device.name, device.type),
     type: device.type,
     typeLabel: device.type,
     room: '기기 위치',
@@ -939,6 +941,14 @@ function getGuideTarget(devices, selectedDevice, uwb) {
   }
 
   return devices[0] || null
+}
+
+function normalizeDeviceDisplayName(name, type) {
+  if (type === 'AIR_SENSOR' && name === 'LG 공기질 센서') {
+    return '공기질 센서'
+  }
+
+  return name
 }
 
 

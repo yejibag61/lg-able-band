@@ -1292,6 +1292,14 @@ button:disabled {
   font-weight: 900;
 }
 
+.device-detail-grid .device-ble-status {
+  display: block;
+  margin-top: 6px;
+  font-size: 0.76rem;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
 .device-feature-list {
   display: grid;
   grid-template-columns: 1fr;
@@ -1797,10 +1805,56 @@ button:disabled {
   font-weight: 800;
 }
 
-.connected-guardian-item div {
+.connected-guardian-chip-row {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+}
+
+.guardian-management-screen {
+  gap: 12px;
+}
+
+.guardian-management-header {
+  align-items: center;
+  gap: 6px;
+}
+
+.guardian-management-header .card-title {
+  margin: 0;
+}
+
+.guardian-management-card {
+  gap: 4px;
+}
+
+.guardian-management-card .section-title-row {
+  margin-top: -2px;
+  margin-bottom: 0;
+}
+
+.guardian-management-card .connected-guardian-list {
+  gap: 12px;
+}
+
+.guardian-management-card .connected-guardian-item {
+  gap: 9px;
+  padding: 14px;
+}
+
+.guardian-management-card .field.compact-field {
+  display: grid;
+  gap: 6px;
+}
+
+.guardian-management-card .guardian-option-grid {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+}
+
+.guardian-management-card .guardian-option-card {
+  min-height: 0;
+  padding: 12px;
 }
 
 .guardian-chip {
@@ -2028,19 +2082,29 @@ button:disabled {
   gap: 10px;
 }
 
+.accessibility-card-header > div {
+  display: grid;
+  gap: 3px;
+}
+
 .accessibility-card-header h2 {
   font-size: 1.12rem;
 }
 
 .accessibility-type-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   flex: 0 0 auto;
-  border: 1px solid #f3c5d0;
+  border: 0;
   border-radius: 999px;
-  padding: 6px 9px;
-  background: rgba(255, 255, 255, 0.8);
-  color: #9f1239;
-  font-size: 0.7rem;
+  padding: 7px 9px;
+  background: #fff1f2;
+  color: #e11d48;
+  font-size: 0.72rem;
   font-weight: 900;
+  line-height: 1;
+  white-space: nowrap;
 }
 
 .accessibility-quick-copy {
@@ -2262,10 +2326,19 @@ button:disabled {
   height: 34px;
   place-items: center;
   border-radius: 10px;
-  background: #f1f5f9;
-  color: #64748b;
-  font-size: 0.78rem;
-  font-weight: 1000;
+  background: linear-gradient(145deg, #e11d48, #be185d);
+  color: #ffffff;
+  box-shadow: 0 5px 12px rgba(190, 24, 93, 0.18);
+}
+
+.accessibility-quick-icon svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .accessibility-quick-text {
@@ -5389,6 +5462,10 @@ h2 {
   gap: 14px;
 }
 
+.phone-screen .accessibility-summary-card {
+  gap: 10px !important;
+}
+
 .settings-grid {
   gap: 10px;
 }
@@ -5462,9 +5539,12 @@ h2 {
 }
 
 .accessibility-type-badge {
-  padding: 5px 9px;
-  font-size: 0.68rem;
-  font-weight: 500 !important;
+  height: 32px;
+  min-height: 32px;
+  padding: 0 12px;
+  font-size: 0.72rem;
+  font-weight: 420 !important;
+  line-height: 1;
 }
 
 .accessibility-quick-copy {
@@ -5490,8 +5570,11 @@ h2 {
   width: 32px;
   height: 32px;
   border-radius: 11px;
-  font-size: 0.74rem;
-  font-weight: 560;
+}
+
+.accessibility-quick-icon svg {
+  width: 17px;
+  height: 17px;
 }
 
 .accessibility-quick-text {
@@ -5623,6 +5706,12 @@ h2 {
   font-weight: 500 !important;
 }
 
+.phone-screen .accessibility-type-badge {
+  border: 0 !important;
+  background: #fff1f2 !important;
+  color: #e11d48 !important;
+}
+
 .phone-screen .settings-logout-button {
   font-weight: 420 !important;
 }
@@ -5706,7 +5795,7 @@ h2 {
   gap: 8px;
 }
 
-.connected-guardian-item > div {
+.connected-guardian-chip-row {
   align-items: center;
 }
 
@@ -7762,6 +7851,14 @@ h2 {
 .phone-screen .home-safety-card .home-metric-pills {
   flex: 1 1 auto !important;
   min-width: 0 !important;
+  gap: 4px !important;
+}
+
+.phone-screen .home-safety-card .home-metric-pill {
+  padding: 11px 4px !important;
+  font-size: 0.68rem !important;
+  line-height: 1.2 !important;
+  letter-spacing: -0.02em !important;
 }
 
 .phone-screen .emergency-card .sos-button {
@@ -7778,6 +7875,13 @@ h2 {
 
 .phone-screen .home-member-card .member-status-message {
   margin-top: 8px !important;
+  display: block !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+  padding: 12px 14px !important;
+}
+
+.phone-screen .wearable-scanner-card .member-status-message {
   display: block !important;
   width: 100% !important;
   box-sizing: border-box !important;
@@ -7803,6 +7907,42 @@ h2 {
 
 .phone-screen .connected-guardian-card .section-title-row {
   margin-bottom: 0 !important;
+}
+
+.phone-screen .guardian-management-screen {
+  gap: 10px !important;
+}
+
+.phone-screen .guardian-management-hero-card {
+  gap: 0 !important;
+}
+
+.phone-screen .guardian-management-header {
+  align-items: center !important;
+  gap: 4px !important;
+}
+
+.phone-screen .guardian-management-card {
+  gap: 3px !important;
+}
+
+.phone-screen .guardian-management-card .section-title-row {
+  margin-top: -2px !important;
+}
+
+.phone-screen .guardian-management-card .connected-guardian-item {
+  gap: 8px !important;
+  padding: 13px !important;
+}
+
+.phone-screen .guardian-management-card .guardian-option-grid {
+  grid-template-columns: minmax(0, 1fr) !important;
+  gap: 8px !important;
+}
+
+.phone-screen .guardian-management-card .guardian-option-card {
+  min-height: 0 !important;
+  padding: 12px !important;
 }
 
 .phone-screen .home-member-header > div,
@@ -8474,9 +8614,11 @@ h2 {
 
 .phone-screen .stats-summary-card strong {
   color: #111827;
-  font-size: 1.08rem;
+  font-size: 0.98rem;
   font-weight: 520;
-  line-height: 1.22;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  overflow-wrap: anywhere;
   word-break: keep-all;
   font-variant-numeric: tabular-nums;
 }
@@ -9041,9 +9183,10 @@ h2 {
 
 .device-delete-button,
 .phone-screen .device-delete-button {
-  border-color: #f4cfd8;
-  background: #fff4f7;
-  color: #b42343;
+  border-color: #e11d48;
+  background: #e11d48;
+  color: #ffffff;
+  box-shadow: 0 10px 22px rgba(225, 29, 72, 0.16);
 }
 
 .device-delete-button.confirming,
@@ -9056,7 +9199,7 @@ h2 {
 
 /* Fully responsive app viewport fit */
 .phone-screen.app-screen {
-  --app-demo-aspect-width: 375;
+  --app-demo-aspect-width: 390;
   --app-demo-aspect-height: 667;
   width: min(100vw, calc(100dvh * var(--app-demo-aspect-width) / var(--app-demo-aspect-height)));
   height: min(100dvh, calc(100vw * var(--app-demo-aspect-height) / var(--app-demo-aspect-width)));
@@ -9082,7 +9225,7 @@ h2 {
   width: min(76%, 216px);
 }
 
-@media (max-aspect-ratio: 375/667) {
+@media (max-aspect-ratio: 390/667) {
   .phone-screen.app-screen {
     width: 100vw;
     height: 100dvh;
@@ -9090,7 +9233,7 @@ h2 {
   }
 }
 
-@media (min-aspect-ratio: 375/667) {
+@media (min-aspect-ratio: 390/667) {
   .phone-screen.app-screen {
     width: auto;
     height: 100dvh;

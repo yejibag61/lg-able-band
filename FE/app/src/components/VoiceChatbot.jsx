@@ -98,7 +98,7 @@ const deviceVoiceCatalog = [
   },
   {
     aliases: ['공기질 센서', '공기 센서', '공기청정 센서'],
-    defaultName: 'LG 공기질 센서',
+    defaultName: '공기질 센서',
     defaultVendorDeviceId: 'thinq-air-001',
     locationSupported: true,
     remoteEnabled: false,
