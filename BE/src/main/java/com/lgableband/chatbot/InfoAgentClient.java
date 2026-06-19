@@ -16,7 +16,7 @@ public class InfoAgentClient {
 		ObjectMapper objectMapper,
 		@Value("${ml.info-agent.base-url:http://127.0.0.1:8004}") String baseUrl,
 		@Value("${ml.info-agent.connect-timeout-ms:1000}") long connectTimeoutMs,
-		@Value("${ml.info-agent.timeout-ms:12000}") long timeoutMs
+		@Value("${ml.info-agent.timeout-ms:30000}") long timeoutMs
 	) {
 		this.client = new JsonAiClient(
 			objectMapper,
