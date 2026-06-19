@@ -25,9 +25,9 @@ def normalize_accessibility_type(value: str) -> str:
     return normalized if normalized in ACCESSIBILITY_TYPES else "ALL"
 
 
-def normalize_top_k(value: int) -> int:
-    """Clamp top_k to the supported range of 1 through 10."""
-    normalized = int(value)
+def normalize_top_k(value: int | None) -> int:
+    """Normalize top_k to the supported range of 1 through 10."""
+    normalized = int(value if value is not None else 5)
     return max(1, min(10, normalized))
 
 

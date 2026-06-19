@@ -1,10 +1,18 @@
 """Category prediction with an optional joblib model and rule fallback."""
 
+import sys
 from pathlib import Path
 from typing import Any, Optional, Tuple
 
 
-MODEL_PATH = Path(__file__).resolve().parents[1] / "models" / "category_classifier.joblib"
+MODULE_DIR = Path(__file__).resolve().parents[1]
+if str(MODULE_DIR) not in sys.path:
+    sys.path.insert(0, str(MODULE_DIR))
+
+from transformer_joblib_model import JoblibTransformerClassifier  # noqa: E402,F401
+
+
+MODEL_PATH = MODULE_DIR / "models" / "category_classifier.joblib"
 
 CATEGORY_RULES = [
     ("재난/안전", ("폭염", "화재", "재난", "대피", "긴급", "지진")),

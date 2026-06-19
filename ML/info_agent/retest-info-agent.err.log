@@ -1,0 +1,16 @@
+INFO:     Started server process [15464]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:8004 (Press CTRL+C to quit)
+C:\Users\lab4dx\Desktop\AbleBand\lg-able-band\ML\info_agent\url_content_collector.py:137: MarkupResemblesLocatorWarning: The input passed in on this line looks more like a URL than HTML or XML.
+
+If you meant to use Beautiful Soup to parse the web page found at a certain URL, then something has gone wrong. You should use an Python package like 'requests' to fetch the content behind the URL. Once you have the content as a string, you can feed that string into Beautiful Soup.
+
+However, if you want to parse some data that happens to look like a URL, then nothing has gone wrong: you are using Beautiful Soup correctly, and this warning is spurious and can be filtered. To make this warning go away, run this code before calling the BeautifulSoup constructor:
+
+    from bs4 import MarkupResemblesLocatorWarning
+    import warnings
+
+    warnings.filterwarnings("ignore", category=MarkupResemblesLocatorWarning)
+    
+  text = BeautifulSoup(raw, "html.parser").get_text(" ", strip=True)

@@ -4,6 +4,8 @@ pydantic
 requests
 pandas
 numpy
+torch
+transformers
 feedparser
 beautifulsoup4
 python-dotenv

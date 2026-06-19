@@ -1,12 +1,20 @@
 """Run the three pre-trained info-agent classifiers with rule corrections."""
 
+import sys
 from pathlib import Path
 from typing import Any
 
 import joblib
 
 
-MODEL_DIR = Path(__file__).resolve().parent / "models"
+MODULE_DIR = Path(__file__).resolve().parent
+if str(MODULE_DIR) not in sys.path:
+    sys.path.insert(0, str(MODULE_DIR))
+
+from transformer_joblib_model import JoblibTransformerClassifier  # noqa: E402,F401
+
+
+MODEL_DIR = MODULE_DIR / "models"
 MODEL_PATHS = {
     "category": MODEL_DIR / "category_classifier.joblib",
     "accessibilityTarget": MODEL_DIR / "accessibility_target_classifier.joblib",
@@ -32,10 +40,9 @@ VISUAL_HEARING_KEYWORDS = (
     "deafblind",
     "헬렌켈러",
     "헬렌 켈러",
-    "촉수화",
+    "촉수어",
     "점화",
     "촉각 수어",
-    "의사소통 지원",
 )
 VISUAL_HEARING_SUPPORT_KEYWORDS = (
     "지원",
@@ -66,13 +73,22 @@ VISUAL_KEYWORDS = (
     "시각 장애",
     "점자",
     "점자정보단말기",
-    "화면낭독",
+    "화면해설",
     "스크린리더",
     "음성안내",
     "음성 안내",
     "안내견",
     "점자블록",
     "음성유도기",
+)
+PHYSICAL_KEYWORDS = (
+    "지체장애",
+    "지체 장애",
+    "휠체어",
+    "전동휠체어",
+    "전동스쿠터",
+    "이동지원",
+    "활동지원",
 )
 COMMUNICATION_SUPPORT_KEYWORDS = (
     "수어통역",
@@ -91,7 +107,7 @@ ASSISTIVE_DEVICE_KEYWORDS = (
     "보청기",
     "인공와우",
     "점자정보단말기",
-    "화면낭독",
+    "화면해설",
     "스크린리더",
     "AI 보조기기",
     "스마트 보조기기",
@@ -125,21 +141,31 @@ RIGHTS_HIGH_KEYWORDS = (
     "권리구제",
     "정당한 편의",
 )
+MEDICAL_KEYWORDS = (
+    "의료",
+    "건강",
+    "병원",
+    "진료",
+    "재활",
+    "의료비",
+    "치료비",
+)
 DISASTER_KEYWORDS = (
     "재난",
     "안전",
     "화재",
-    "대피",
+    "폭염",
     "위험",
     "태풍",
     "재난문자",
     "긴급",
     "위기",
     "응급",
+    "대피",
 )
 DISASTER_URGENT_KEYWORDS = (
     "화재",
-    "대피",
+    "폭염",
     "재난",
     "위험",
     "태풍",
@@ -147,6 +173,7 @@ DISASTER_URGENT_KEYWORDS = (
     "위기",
     "응급",
     "사고",
+    "대피",
 )
 
 
@@ -166,6 +193,10 @@ def _apply_rules(text: str, prediction: dict[str, str]) -> tuple[dict[str, str],
         final["accessibilityTarget"] = "VISUAL_IMPAIRED"
         rule_applied = True
 
+    if _contains(text, PHYSICAL_KEYWORDS):
+        final["accessibilityTarget"] = "PHYSICAL_IMPAIRED"
+        rule_applied = True
+
     if _contains(text, COMMUNICATION_SUPPORT_KEYWORDS):
         final["category"] = "복지지원"
         final["priority"] = "HIGH"
@@ -183,14 +214,20 @@ def _apply_rules(text: str, prediction: dict[str, str]) -> tuple[dict[str, str],
         if _contains(text, RIGHTS_HIGH_KEYWORDS):
             final["priority"] = "HIGH"
 
+    if _contains(text, MEDICAL_KEYWORDS):
+        final["category"] = "의료/건강"
+        if final.get("priority") == "LOW":
+            final["priority"] = "MEDIUM"
+        rule_applied = True
+
     if _contains(text, DISASTER_KEYWORDS):
         final["category"] = "재난/안전"
         rule_applied = True
         if _contains(text, DISASTER_URGENT_KEYWORDS):
             final["priority"] = "URGENT"
 
-    # Apply the combined target last because "시청각장애" also contains
-    # keywords that match the individual hearing/visual rules.
+    # Keep the legacy combined target path even though the new model predicts
+    # only ALL, HEARING_IMPAIRED, PHYSICAL_IMPAIRED, and VISUAL_IMPAIRED.
     if _contains(text, VISUAL_HEARING_KEYWORDS):
         final["accessibilityTarget"] = "VISUAL_HEARING_IMPAIRED"
         rule_applied = True

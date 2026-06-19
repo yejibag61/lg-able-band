@@ -26,6 +26,7 @@ class InfoAgentQueryRequest(BaseModel):
     query: str
     userAccessibilityType: Optional[str] = "ALL"
     topK: Optional[int] = 5
+    top_k: Optional[int] = None
     context: Optional[dict[str, Any]] = None
 
 
@@ -58,7 +59,7 @@ def query_info_agent(request: InfoAgentQueryRequest):
         return run_info_agent(
             query=request.query,
             user_accessibility_type=request.userAccessibilityType,
-            top_k=request.topK or 5,
+            top_k=request.top_k if request.top_k is not None else request.topK,
             safe_mode=True,
             context=request.context,
         )

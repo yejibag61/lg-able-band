@@ -43,6 +43,10 @@ ACCESSIBILITY_TYPES = {
 NO_RESULT_MESSAGE = (
     "관련 정보를 찾지 못했습니다. 나중에 다시 확인하거나 보호자 또는 담당 기관에 문의하세요."
 )
+SAFE_APPLY_METHOD_MESSAGE = (
+    "신청 방법은 문서에서 확인되지 않았어요. 주소지 읍면동 주민센터 또는 해당 기관에 문의하세요."
+)
+SAFE_CONTACT_MESSAGE = "문의처는 문서에서 확인되지 않았어요."
 ACTION_BY_CATEGORY = {
     "권리/차별": "신고 방법을 출처에서 확인하고, 필요하면 관련 기관에 상담하세요.",
     "보조기기": "지원 가능한 기기와 신청 조건을 출처에서 확인하고, 필요하면 담당 기관에 문의하세요.",
@@ -78,6 +82,12 @@ BROAD_QUERY_PATTERNS = {
     "복지 정보 알려줘",
     "지원 알려줘",
     "지원 정보 알려줘",
+    "신청 방법",
+    "신청 방법 알려줘",
+    "문의처 알려줘",
+    "대상 알려줘",
+    "자격 알려줘",
+    "필요 서류 알려줘",
     "장애인 복지",
     "장애인 복지 알려줘",
     "장애인 지원 알려줘",
@@ -254,6 +264,36 @@ def build_recommended_action(
     return _recommended_action(category, priority)
 
 
+def _decode_escape_sequences(text: str) -> str:
+    normalized = str(text or "")
+    if "\\u" in normalized:
+        normalized = re.sub(
+            r"\\u([0-9a-fA-F]{4})",
+            lambda match: chr(int(match.group(1), 16)),
+            normalized,
+        )
+    if "\\/" in normalized:
+        normalized = normalized.replace("\\/", "/")
+    return normalized
+
+
+def _clean_user_text(text: Any, limit: int | None = None) -> str:
+    cleaned = clean_repeated_phrases(_decode_escape_sequences(str(text or "")))
+    if limit is not None:
+        cleaned = _truncate(cleaned, limit)
+    return cleaned
+
+
+def _clean_response_strings(value: Any) -> Any:
+    if isinstance(value, dict):
+        return {key: _clean_response_strings(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_clean_response_strings(item) for item in value]
+    if isinstance(value, str):
+        return _clean_user_text(value)
+    return value
+
+
 def safety_guide(query: str) -> dict[str, str] | None:
     normalized = str(query or "")
     return next(
@@ -421,6 +461,22 @@ def should_use_llm(
         return False, "safety_rule"
     if not results:
         return False, "no_results"
+    top_text = " ".join(
+        str(results[0].get(field, ""))
+        for field in ("title", "summary", "source", "category")
+    )
+    if (
+        any(keyword in normalized for keyword in ("수어통역", "수어 통역", "통역 지원", "의사소통 지원"))
+        and "문자통역" in top_text
+        and "수어통역" not in top_text
+        and "수어 통역" not in top_text
+    ):
+        return False, "sign_language_fallback"
+    if (
+        any(keyword in normalized for keyword in ("차별", "신고", "진정", "권리구제", "인권위"))
+        and any(keyword in normalized for keyword in ("어디", "신고", "진정", "상담"))
+    ):
+        return False, "rights_report_guard"
     if rag_result.get("fallbackUsed") is True:
         return False, "low_confidence"
     fields = _important_fields(results[0])
@@ -493,9 +549,9 @@ def build_llm_augmented_response(
         cache_llm_response(cache_key, llm_response, config["cacheTtlSec"])
         cache_hit = False
 
-    response["answerText"] = llm_response["answer"]
-    response["voiceText"] = llm_response["shortVoiceAnswer"]
-    response["voiceMessage"] = llm_response["shortVoiceAnswer"]
+    response["answerText"] = _clean_user_text(llm_response["answer"], 360)
+    response["voiceText"] = _clean_user_text(llm_response["shortVoiceAnswer"], 180)
+    response["voiceMessage"] = _clean_user_text(llm_response["shortVoiceAnswer"], 180)
     response["_llmMeta"] = _llm_meta(used=True, cache_hit=cache_hit)
     return response
 
@@ -618,10 +674,31 @@ def _source_documents(results: list[dict[str, Any]]) -> list[dict[str, Any]]:
         "accessibilityTarget",
         "priority",
         "finalScore",
+        "serviceScope",
+        "region",
+        "selectionScores",
         "importantFields",
         "importantFieldQuality",
     )
     return [{field: result.get(field, "") for field in fields} for result in results]
+
+
+def _selected_document(result: dict[str, Any] | None) -> dict[str, Any] | None:
+    if not isinstance(result, dict) or not result:
+        return None
+    return {
+        "docId": result.get("docId", ""),
+        "title": result.get("title", ""),
+        "source": result.get("source", ""),
+        "url": result.get("url", ""),
+        "category": result.get("category", ""),
+        "accessibilityTarget": result.get("accessibilityTarget", ""),
+        "priority": result.get("priority", ""),
+        "finalScore": result.get("finalScore", ""),
+        "serviceScope": result.get("serviceScope", ""),
+        "region": result.get("region", ""),
+        "selectionScores": result.get("selectionScores", {}),
+    }
 
 
 def _sanitize_important_field(field: str, value: str, document: dict[str, Any]) -> str:
@@ -710,6 +787,25 @@ def _important_fields(document: dict[str, Any]) -> dict[str, str]:
                     fields[field] = sanitized
                     break
     return fields
+
+
+def _action_items(fields: dict[str, str], action: str) -> list[str]:
+    candidates = [
+        fields.get("applyMethod") or fields.get("applicationMethod"),
+        "지원 대상 여부를 확인하세요." if fields.get("supportTarget") or fields.get("eligibility") else "",
+        f"{fields.get('contact')}에 문의하세요." if fields.get("contact") else "",
+        action,
+    ]
+    items: list[str] = []
+    for candidate in candidates:
+        text = _clean_user_text(candidate, 40)
+        if text and text not in items:
+            items.append(text)
+        if len(items) >= 3:
+            break
+    if not items:
+        items.append("공식 출처에서 내용을 확인하세요.")
+    return items[:3]
 
 
 def _condition_hint_fields(card: dict[str, Any]) -> dict[str, str]:
@@ -1177,6 +1273,140 @@ def _response_note(
     return " ".join(dict.fromkeys(notes))
 
 
+TRANSPORT_NOTICE_KEYWORDS = (
+    "교통비", "교통 지원", "이동지원", "이동 지원", "교통약자",
+    "장애인 콜택시", "콜택시", "특별교통수단",
+)
+RIGHTS_REPORT_NOTICE_KEYWORDS = ("차별", "신고", "어디에 신고", "진정", "권리구제", "인권위", "상담", "피해")
+RIGHTS_REPORT_DOCUMENT_KEYWORDS = (
+    "신고접수", "신고 접수", "진정", "상담", "상담기관",
+    "국가인권위원회", "인권위", "권리구제", "구제절차", "차별구제",
+)
+RIGHTS_STRONG_REPORT_DOCUMENT_KEYWORDS = (
+    "신고접수", "신고 접수", "진정", "상담기관",
+    "권리구제", "구제절차", "차별구제",
+)
+RIGHTS_NEWS_DOCUMENT_KEYWORDS = (
+    "시정 권고", "권고 수용", "투숙 거부", "응시자",
+    "소송", "집회", "기자회견", "반발", "논평",
+)
+SIGN_DIRECT_NOTICE_KEYWORDS = ("수어통역", "수어 통역", "의사소통 지원")
+SIGN_FALLBACK_NOTICE_KEYWORDS = ("문자통역", "문자 통역")
+
+
+def _query_has_region(query: str) -> bool:
+    region_words = (
+        "서울", "부산", "대구", "인천", "광주", "대전", "울산", "세종",
+        "경기", "경기도", "강원", "충북", "충남", "전북", "전남", "경북",
+        "경남", "제주", "수원", "성남", "고양", "용인", "평택", "창원",
+    )
+    return any(word in str(query or "") for word in region_words)
+
+
+def _is_transport_query(query: str) -> bool:
+    return any(keyword in str(query or "") for keyword in TRANSPORT_NOTICE_KEYWORDS)
+
+
+def _is_rights_report_query(query: str) -> bool:
+    normalized = str(query or "")
+    return (
+        any(keyword in normalized for keyword in RIGHTS_REPORT_NOTICE_KEYWORDS)
+        and any(keyword in normalized for keyword in ("차별", "신고", "진정", "피해", "인권"))
+    )
+
+
+def _document_text(document: dict[str, Any]) -> str:
+    fields = _important_fields(document)
+    return " ".join(
+        str(value or "")
+        for value in (
+            document.get("title"),
+            document.get("summary"),
+            document.get("source"),
+            document.get("category"),
+            *fields.values(),
+        )
+    )
+
+
+def _has_rights_report_action(document: dict[str, Any]) -> bool:
+    text = _document_text(document)
+    fields = _important_fields(document)
+    source = str(document.get("source", ""))
+    has_action_keyword = any(keyword in text for keyword in RIGHTS_REPORT_DOCUMENT_KEYWORDS)
+    has_strong_action_keyword = any(keyword in text for keyword in RIGHTS_STRONG_REPORT_DOCUMENT_KEYWORDS)
+    has_action_field = bool(
+        fields.get("applyMethod") or fields.get("applicationMethod") or fields.get("contact")
+    )
+    has_rights_context = any(keyword in text for keyword in ("장애", "차별", "인권", "권리"))
+    if source in {"더인디고", "에이블뉴스", "웰페어뉴스", "소셜포커스"}:
+        return False
+    return has_rights_context and (has_strong_action_keyword or (has_action_keyword and has_action_field))
+
+
+def _is_news_only_rights_document(document: dict[str, Any]) -> bool:
+    text = _document_text(document)
+    source = str(document.get("source", ""))
+    news_source = source in {"더인디고", "에이블뉴스", "웰페어뉴스", "소셜포커스"}
+    article_marker = any(keyword in text for keyword in RIGHTS_NEWS_DOCUMENT_KEYWORDS)
+    return (news_source or article_marker) and not _has_rights_report_action(document)
+
+
+def _select_valid_representative(
+    query: str,
+    results: list[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], str]:
+    if not results or not _is_rights_report_query(query):
+        return results, ""
+    if _has_rights_report_action(results[0]) and not _is_news_only_rights_document(results[0]):
+        return results, ""
+    for index, candidate in enumerate(results[1:], start=1):
+        if _has_rights_report_action(candidate) and not _is_news_only_rights_document(candidate):
+            reordered = [candidate, *results[:index], *results[index + 1:]]
+            return reordered, ""
+    return [], (
+        "신고 방법을 직접 안내하는 문서는 자료집에서 확인되지 않았어요. "
+        "장애 차별 관련 상담이나 진정은 국가인권위원회 또는 장애인권익옹호기관 등 "
+        "공식 기관을 통해 확인하는 것이 안전해요."
+    )
+
+
+def _local_transport_notice(query: str, document: dict[str, Any]) -> str:
+    if (
+        _is_transport_query(query)
+        and not _query_has_region(query)
+        and str(document.get("serviceScope", "")).lower() == "local"
+    ):
+        return (
+            "이 정보는 특정 지역 기준의 지원 정보예요. "
+            "거주 지역에 따라 지원 내용이 다를 수 있어요."
+        )
+    return ""
+
+
+def _sign_language_fallback_notice(query: str, document: dict[str, Any]) -> str:
+    normalized = str(query or "")
+    if not any(keyword in normalized for keyword in ("수어통역", "수어 통역", "통역 지원", "의사소통 지원")):
+        return ""
+    text = _document_text(document)
+    has_direct = any(keyword in text for keyword in SIGN_DIRECT_NOTICE_KEYWORDS)
+    has_fallback = any(keyword in text for keyword in SIGN_FALLBACK_NOTICE_KEYWORDS)
+    if has_fallback and not has_direct:
+        return (
+            "수어통역 문서는 직접 확인되지 않았지만, "
+            "청각장애 의사소통 지원 정보로 문자통역 지원 문서가 확인됐어요."
+        )
+    return ""
+
+
+def _prepend_notice(text: str, notice: str, limit: int = 120) -> str:
+    if not notice:
+        return text
+    if notice in str(text or ""):
+        return _truncate(str(text or ""), limit)
+    return _truncate(f"{notice} {text}", limit)
+
+
 def build_info_response(
     query: str,
     user_accessibility_type: str = "ALL",
@@ -1254,6 +1484,7 @@ def build_info_response(
             "notifyGuardian": False,
             "note": "",
             "sourceDocuments": _source_documents([feature_doc]),
+            "selectedDocument": _selected_document(feature_doc),
             "rag": {
                 "resultCount": 1,
                 "fallbackUsed": False,
@@ -1261,7 +1492,9 @@ def build_info_response(
             },
         }
         response["_llmMeta"] = _llm_meta(reason="app_feature")
-        return attach_quality_debug(response, rag_result, classification, [feature_doc])
+        return _clean_response_strings(
+            attach_quality_debug(response, rag_result, classification, [feature_doc])
+        )
 
     search_query = _contextual_search_query(query, request_context)
     rag_result = search_documents(query=search_query, top_k=top_k)
@@ -1273,6 +1506,7 @@ def build_info_response(
     category = classification["category"]
     priority = classification["priority"]
     results = rag_result.get("results", [])
+    safety_fallback_answer = ""
     last_info_agent = _last_info_card(request_context)
     followup_type = classify_followup_type(query)
     if results:
@@ -1282,6 +1516,7 @@ def build_info_response(
         )
         if enriched_representative is not None and enriched_representative is not results[0]:
             results = [enriched_representative, *results[1:]]
+    results, safety_fallback_answer = _select_valid_representative(query, results)
     is_followup = (
         isinstance(last_info_agent, dict)
         and bool(last_info_agent.get("title"))
@@ -1315,6 +1550,7 @@ def build_info_response(
             "notifyGuardian": False,
             "note": "",
             "sourceDocuments": _source_documents(results),
+            "selectedDocument": _selected_document(results[0] if results else None),
             "rag": {
                 "resultCount": rag_result.get("resultCount", len(results)),
                 "fallbackUsed": rag_result.get("fallbackUsed", False),
@@ -1328,12 +1564,14 @@ def build_info_response(
             results=results,
             rag_result=rag_result,
         )
-        return attach_quality_debug(
-            response,
-            rag_result,
-            classification,
-            results,
-            is_followup=True,
+        return _clean_response_strings(
+            attach_quality_debug(
+                response,
+                rag_result,
+                classification,
+                results,
+                is_followup=True,
+            )
         )
     if _is_broad_query(query):
         overview_action = "의료비, 보조기기, 이동, 취업·교육 중 필요한 분야를 알려주세요."
@@ -1363,7 +1601,8 @@ def build_info_response(
             "recommendedChannels": [],
             "notifyGuardian": False,
             "note": "",
-            "sourceDocuments": _source_documents(results),
+            "sourceDocuments": [],
+            "selectedDocument": None,
             "rag": {
                 "resultCount": rag_result.get("resultCount", len(results)),
                 "fallbackUsed": rag_result.get("fallbackUsed", False),
@@ -1371,7 +1610,9 @@ def build_info_response(
             },
         }
         response["_llmMeta"] = _llm_meta(reason="broad_query")
-        return attach_quality_debug(response, rag_result, classification, results)
+        return _clean_response_strings(
+            attach_quality_debug(response, rag_result, classification, results)
+        )
     note = _response_note(
         query,
         classification,
@@ -1401,6 +1642,13 @@ def build_info_response(
             source=source,
             category=category,
         )
+        local_notice = _local_transport_notice(query, representative)
+        sign_fallback_notice = _sign_language_fallback_notice(query, representative)
+        notice_text = local_notice or sign_fallback_notice
+        if notice_text:
+            app_summary = _prepend_notice(app_summary, notice_text)
+            answer_text = _prepend_notice(answer_text, notice_text, 180)
+            note = " ".join(part for part in (note, notice_text) if part)
         notification = answer_text
         voice = _truncate(f"{answer_text} {action}", 180)
         band_message = _truncate(_band_message(query, category, priority), 24)
@@ -1414,14 +1662,14 @@ def build_info_response(
             voice = _truncate(f"{title}입니다. {action}", 180)
             band_message = _truncate(_band_message(query, category, priority), 24)
     else:
-        title = "관련 정보 안내"
-        app_summary = NO_RESULT_MESSAGE
+        title = "차별 신고 안내" if safety_fallback_answer else "관련 정보 안내"
+        app_summary = safety_fallback_answer or NO_RESULT_MESSAGE
         action = _recommended_action(category, priority)
         source = ""
         url = ""
-        answer_text = NO_RESULT_MESSAGE
-        notification = NO_RESULT_MESSAGE
-        voice = NO_RESULT_MESSAGE
+        answer_text = safety_fallback_answer or NO_RESULT_MESSAGE
+        notification = safety_fallback_answer or NO_RESULT_MESSAGE
+        voice = safety_fallback_answer or NO_RESULT_MESSAGE
         band_message = "관련 정보 없음"
 
     notify_guardian = (
@@ -1445,6 +1693,8 @@ def build_info_response(
         "url": url,
     } if results else None
     if app_card:
+        app_card["serviceScope"] = representative.get("serviceScope", "")
+        app_card["region"] = representative.get("region", "")
         for field in (
             "supportTarget",
             "eligibility",
@@ -1462,6 +1712,19 @@ def build_info_response(
         ):
             if important_fields.get(field):
                 app_card[field] = important_fields[field]
+        if not app_card.get("applyMethod"):
+            app_card["applyMethod"] = SAFE_APPLY_METHOD_MESSAGE
+        if not app_card.get("contact"):
+            app_card["contact"] = SAFE_CONTACT_MESSAGE
+        app_card["summary"] = _clean_user_text(app_card.get("summary", ""), 120)
+        app_card["recommendedAction"] = _clean_user_text(
+            app_card.get("recommendedAction", ""),
+            120,
+        )
+        app_card["actionItems"] = _action_items(
+            important_fields,
+            app_card["recommendedAction"],
+        )
         verification_notice = _official_confirmation_notice(important_fields)
         if verification_notice and not guide:
             app_card["verificationNotice"] = verification_notice
@@ -1488,6 +1751,7 @@ def build_info_response(
         "notifyGuardian": notify_guardian if show_delivery_channels else False,
         "note": note,
         "sourceDocuments": _source_documents(results),
+        "selectedDocument": _selected_document(results[0] if results else None),
         "rag": {
             "resultCount": rag_result.get("resultCount", len(results)),
             "fallbackUsed": rag_result.get("fallbackUsed", False),
@@ -1501,4 +1765,6 @@ def build_info_response(
         results=results,
         rag_result=rag_result,
     )
-    return attach_quality_debug(response, rag_result, classification, results)
+    return _clean_response_strings(
+        attach_quality_debug(response, rag_result, classification, results)
+    )
