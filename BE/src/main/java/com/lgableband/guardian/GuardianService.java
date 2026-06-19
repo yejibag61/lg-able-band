@@ -121,6 +121,7 @@ public class GuardianService {
 			List<GuardianEmergencySummary> emergencies = this.mockDataStore.emergencies(linkedUserId).stream()
 				.map(request -> new GuardianEmergencySummary(
 					request.emergencyRequestId(),
+					null,
 					request.status(),
 					request.message(),
 					request.source(),
@@ -139,8 +140,8 @@ public class GuardianService {
 
 		long linkedUserId = linkedUserId(jdbcTemplate, guardian.guardianId());
 		GuardianUserSummary user = guardianUser(jdbcTemplate, linkedUserId);
-		List<GuardianAlertSummary> alerts = guardianAlerts(jdbcTemplate, linkedUserId);
-		List<GuardianEmergencySummary> emergencies = guardianEmergencies(jdbcTemplate, linkedUserId);
+		List<GuardianAlertSummary> alerts = guardianAlerts(jdbcTemplate, linkedUserId, guardian.guardianId());
+		List<GuardianEmergencySummary> emergencies = guardianEmergencies(jdbcTemplate, linkedUserId, guardian.guardianId());
 		return new GuardianDashboardResponse(user, alerts, emergencies, createDashboardSummary(alerts, emergencies));
 	}
 
@@ -303,12 +304,13 @@ public class GuardianService {
 			.orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND", "사용자를 찾을 수 없습니다."));
 	}
 
-	private List<GuardianAlertSummary> guardianAlerts(JdbcTemplate jdbcTemplate, long userId) {
+	private List<GuardianAlertSummary> guardianAlerts(JdbcTemplate jdbcTemplate, long userId, long guardianId) {
 		return jdbcTemplate.query(
 			"""
 			SELECT a.alert_id, a.alert_type, a.severity, a.title, a.message, a.occurred_at, a.status,
 			       COALESCE(d.name, '') AS device_name
 			FROM alert a
+			JOIN alert_delivery ad ON ad.alert_id = a.alert_id AND ad.target_guardian_id = ?
 			LEFT JOIN device_event de ON de.event_id = a.event_id
 			LEFT JOIN device d ON d.device_id = de.device_id
 			WHERE a.user_id = ?
@@ -326,29 +328,53 @@ public class GuardianService {
 				toOffsetDateTime(rs.getObject("occurred_at", LocalDateTime.class)),
 				rs.getString("status")
 			),
+			guardianId,
 			userId
 		);
 	}
 
-	private List<GuardianEmergencySummary> guardianEmergencies(JdbcTemplate jdbcTemplate, long userId) {
+	private List<GuardianEmergencySummary> guardianEmergencies(JdbcTemplate jdbcTemplate, long userId, long guardianId) {
 		return jdbcTemplate.query(
 			"""
-			SELECT emergency_id, status, message, source, requested_at
-			FROM emergency_request
-			WHERE user_id = ?
-			ORDER BY requested_at DESC, emergency_id DESC
+			SELECT er.emergency_id,
+			       er.alert_id,
+			       CASE
+			         WHEN er.status NOT IN ('RESOLVED', 'CANCELED') AND a.status = 'CONFIRMED' THEN 'RESOLVED'
+			         ELSE er.status
+			       END AS status,
+			       er.message,
+			       er.source,
+			       er.requested_at
+			FROM emergency_request er
+			JOIN alert_delivery ad ON ad.alert_id = er.alert_id AND ad.target_guardian_id = ?
+			LEFT JOIN alert a ON a.alert_id = er.alert_id AND a.user_id = er.user_id
+			WHERE er.user_id = ?
+			ORDER BY CASE
+			    WHEN er.status NOT IN ('RESOLVED', 'CANCELED')
+			      AND (a.status IS NULL OR a.status <> 'CONFIRMED') THEN 0
+			    ELSE 1
+			  END,
+			  er.requested_at DESC,
+			  er.emergency_id DESC
 			LIMIT 10
 			""",
 			(rs, rowNum) -> new GuardianEmergencySummary(
 				rs.getLong("emergency_id"),
+				nullableLong(rs, "alert_id"),
 				rs.getString("status"),
 				rs.getString("message"),
 				rs.getString("source"),
 				toOffsetDateTime(rs.getObject("requested_at", LocalDateTime.class)),
 				true
 			),
+			guardianId,
 			userId
 		);
+	}
+
+	private Long nullableLong(java.sql.ResultSet rs, String column) throws java.sql.SQLException {
+		long value = rs.getLong(column);
+		return rs.wasNull() ? null : value;
 	}
 
 	private GuardianDashboardSummary createDashboardSummary(
@@ -449,6 +475,7 @@ public class GuardianService {
 
 	public record GuardianEmergencySummary(
 		long emergencyRequestId,
+		Long alertId,
 		String status,
 		String message,
 		String source,

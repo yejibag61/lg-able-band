@@ -1,4 +1,4 @@
-import { apiRequest } from './apiClient'
+import { apiRequest, getAccessToken } from './apiClient'
 import { mockHomeSummary } from '../mocks/homeMock'
 import { mockAppPreview, resetMockDevices } from '../mocks/appPreviewMock'
 import { getAlerts } from './alertService'
@@ -8,7 +8,11 @@ import { getDevices } from './deviceService'
 export async function getHomeSummary() {
   try {
     return normalizeHomeSummary(await apiRequest('/api/app/home'))
-  } catch {
+  } catch (error) {
+    if (!shouldUseMockFallback()) {
+      throw error
+    }
+
     return normalizeHomeSummary(structuredClone(mockHomeSummary))
   }
 }
@@ -23,18 +27,30 @@ export async function getAppPreview() {
   try {
     const alerts = await getAlerts()
     preview.alerts = alerts.map((alert) => normalizeAlert(alert, preview.alerts))
-  } catch {
+  } catch (error) {
+    if (!shouldUseMockFallback()) {
+      throw error
+    }
+
     // Keep the preview usable while the backend alert API is unavailable.
   }
 
   try {
     const devices = await getDevices()
     preview.devices = devices
-  } catch {
+  } catch (error) {
+    if (!shouldUseMockFallback()) {
+      throw error
+    }
+
     preview.devices = structuredClone(mockAppPreview.devices)
   }
 
   return preview
+}
+
+function shouldUseMockFallback() {
+  return !getAccessToken()
 }
 
 export async function applyContextAiSafetyStatus(summary, alerts = []) {

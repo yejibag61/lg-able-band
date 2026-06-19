@@ -1,3 +1,5 @@
+import { isEmergencyRequestAlert } from '../utils/homeSummaryUtils'
+
 const DEFAULT_CONTEXT_AI_BASE_URL = 'http://127.0.0.1:8000'
 
 const severityRank = {
@@ -59,7 +61,7 @@ async function requestContextJudgment(alert, summary) {
 
 function selectContextSourceAlerts(alerts) {
   return alerts
-    .filter((alert) => alert && alert.status !== 'CONFIRMED')
+    .filter((alert) => alert && alert.status !== 'CONFIRMED' && !isEmergencyRequestAlert(alert))
     .sort((left, right) => {
       const rightRank = severityRank[right.severity] || 0
       const leftRank = severityRank[left.severity] || 0

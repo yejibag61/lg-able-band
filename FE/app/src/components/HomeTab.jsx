@@ -133,7 +133,7 @@ export function HomeTab({
                   <h3>{alert.title}</h3>
                   <p>{alert.message}</p>
                   <small>
-                    {alert.deviceName} · {alert.occurredAt.slice(11, 16)} ·{' '}
+                    {alert.deviceName} · {formatCompactAlertTime(alert.occurredAt)} ·{' '}
                     {alert.status === 'UNREAD' ? '미확인' : '확인 완료'}
                   </small>
                 </div>
@@ -174,4 +174,21 @@ function getEmergencyToastTone(message) {
   }
 
   return 'success'
+}
+
+function formatCompactAlertTime(value) {
+  if (!value) {
+    return '--:--'
+  }
+
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    return '--:--'
+  }
+
+  return date.toLocaleTimeString('ko-KR', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  })
 }

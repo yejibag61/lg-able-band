@@ -13,6 +13,17 @@ export async function getGuardianDashboard() {
   }
 }
 
+export async function confirmGuardianHistoryItem(item) {
+  const alertId = item?.alertId
+  if (!alertId) {
+    return null
+  }
+
+  return apiRequest(`/api/alerts/${alertId}/confirm`, {
+    method: 'POST',
+  })
+}
+
 function isGuardianDashboardStrictMode() {
   return (
     parseOptionalBoolean(window.__ABLE_BAND_GUARDIAN_DASHBOARD_STRICT__) ??

@@ -125,10 +125,18 @@ public class EmergencyService {
 			user.userId(),
 			emergencyRequestId
 		);
-		if (current.alertId() != null && "RESOLVED".equals(status)) {
-			jdbcTemplate.update("UPDATE alert SET status = 'CONFIRMED' WHERE alert_id = ?", current.alertId());
+		if (current.alertId() != null && isTerminalStatus(status)) {
+			jdbcTemplate.update(
+				"UPDATE alert SET status = 'CONFIRMED' WHERE alert_id = ? AND user_id = ?",
+				current.alertId(),
+				user.userId()
+			);
 		}
 		return detail(authorization, emergencyRequestId);
+	}
+
+	private boolean isTerminalStatus(String status) {
+		return "RESOLVED".equals(status) || "CANCELED".equals(status);
 	}
 
 	private EmergencyRequestSummary createDbEmergency(

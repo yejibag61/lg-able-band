@@ -10,7 +10,9 @@ import com.lgableband.mock.MockDataStore;
 import java.sql.PreparedStatement;
 import java.sql.Statement;
 import java.sql.Timestamp;
+import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
@@ -23,6 +25,8 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class AdminAlertService {
+
+	private static final ZoneOffset SERVICE_OFFSET = ZoneOffset.ofHours(9);
 
 	private static final Set<String> ADMIN_EMAILS = Set.of(
 		"admin@example.com",
@@ -319,7 +323,7 @@ public class AdminAlertService {
 		requireAdmin(authorization);
 		AlertTemplate template = findTemplate(templateId);
 		BroadcastAudience targetAudience = audience == null ? BroadcastAudience.ALL : audience;
-		OffsetDateTime occurredAt = OffsetDateTime.now();
+		OffsetDateTime occurredAt = OffsetDateTime.now(SERVICE_OFFSET);
 		JdbcTemplate jdbcTemplate = jdbcTemplateProvider.getIfAvailable();
 
 		if (jdbcTemplate == null) {
@@ -457,7 +461,7 @@ public class AdminAlertService {
 			ps.setString(2, template.alertType().name());
 			ps.setString(3, template.severity().name());
 			ps.setString(4, payloadJson);
-			ps.setTimestamp(5, Timestamp.valueOf(occurredAt.toLocalDateTime()));
+			ps.setTimestamp(5, Timestamp.valueOf(toLocalDateTime(occurredAt)));
 			return ps;
 		}, keyHolder);
 		return keyHolder.getKey().longValue();
@@ -491,8 +495,12 @@ public class AdminAlertService {
 			template.title(),
 			template.message(),
 			template.voiceGuide(),
-			Timestamp.valueOf(occurredAt.toLocalDateTime())
+			Timestamp.valueOf(toLocalDateTime(occurredAt))
 		);
+	}
+
+	private LocalDateTime toLocalDateTime(OffsetDateTime dateTime) {
+		return dateTime.atZoneSameInstant(SERVICE_OFFSET).toLocalDateTime();
 	}
 
 	private String buildPayloadJson(AlertTemplate template) {

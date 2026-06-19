@@ -240,6 +240,7 @@ export function VoiceChatbot({
   embedded = false,
   isPaired = true,
   mode,
+  notificationSettings = { voiceGuide: true, vibrationGuide: true },
   onOpenChange,
   onSpeakingChange,
   onWakeListeningChange,
@@ -291,6 +292,8 @@ export function VoiceChatbot({
     selectedQuestion === 'welfare'
       ? createWelfareAnswer(selectedWelfareType)
       : answers[selectedQuestion] || answers.alert
+  const voiceFeedbackEnabled = notificationSettings.voiceGuide === true
+  const vibrationFeedbackEnabled = notificationSettings.vibrationGuide === true
   const supportsSpeechRecognition = Boolean(getSpeechRecognitionConstructor())
 
   useEffect(() => {
@@ -465,7 +468,7 @@ export function VoiceChatbot({
     setSelectedQuestion(questionId)
     setSelectedWelfareType('')
     setCurrentChatScreen('answer')
-    speakText((answers[questionId] || answers.alert).lines.join(' '))
+    speakAnswer(answers[questionId] || answers.alert)
   }
 
   function selectWelfareType(welfareType) {
@@ -473,6 +476,18 @@ export function VoiceChatbot({
     setSelectedWelfareType(welfareType)
     setCurrentChatScreen('answer')
     speakText(createWelfareAnswer(welfareType).lines.join(' '))
+  }
+
+  function speakAnswer(answer) {
+    if (isNotificationAnswer(answer) && !voiceFeedbackEnabled) {
+      return
+    }
+
+    speakText(answer.lines.join(' '))
+  }
+
+  function isNotificationAnswer(answer) {
+    return ['alert', 'uwb'].includes(answer?.appPayload?.type)
   }
 
   async function startVoiceTurn() {
@@ -698,9 +713,14 @@ export function VoiceChatbot({
       setChatResponse({
         title: intent,
         text: actionResult.text,
+        notificationFeedback: Boolean(actionResult.notificationFeedback),
         quickReplies: [],
       })
-      runAiTurn(actionResult.text, { closeAfter: actionResult.closeAfter })
+      runAiTurn(actionResult.text, {
+        closeAfter: actionResult.closeAfter,
+        notificationFeedback: Boolean(actionResult.notificationFeedback),
+        voiceEnabled: !actionResult.notificationFeedback || voiceFeedbackEnabled,
+      })
     } finally {
       setIsRequesting(false)
     }
@@ -761,7 +781,7 @@ export function VoiceChatbot({
       (intent === VOICE_INTENT.GUARDIAN_CONNECT || intent === VOICE_INTENT.SHARE_TO_GUARDIAN)
     ) {
       pendingActionRef.current = { type: 'emergencySend' }
-      return { text: '보호자에게 긴급 요청을 다시 보낼게요. 보내려면 네라고 말해주세요.' }
+      return withNotificationFeedback({ text: '보호자에게 긴급 요청을 다시 보낼게요. 보내려면 네라고 말해주세요.' })
     }
 
     switch (intent) {
@@ -774,13 +794,13 @@ export function VoiceChatbot({
       case VOICE_INTENT.FIND_FRIDGE:
         return handleFindDevice('냉장고')
       case VOICE_INTENT.GUARDIAN_CONNECT:
-        triggerVibration('STRONG')
+        notifyVibration('STRONG')
         pendingActionRef.current = { type: 'guardianConfirm' }
-        return { text: '보호자에게 도움 요청을 보낼까요? 보내려면 보내줘, 취소하려면 취소라고 말해주세요.' }
+        return withNotificationFeedback({ text: '보호자에게 도움 요청을 보낼까요? 보내려면 보내줘, 취소하려면 취소라고 말해주세요.' })
       case VOICE_INTENT.EMERGENCY_REQUEST:
-        triggerVibration('STRONG')
+        notifyVibration('STRONG')
         pendingActionRef.current = { type: 'emergencySend' }
-        return { text: '보호자에게 긴급 요청을 보낼게요. 정말 보낼까요?' }
+        return withNotificationFeedback({ text: '보호자에게 긴급 요청을 보낼게요. 정말 보낼까요?' })
       case VOICE_INTENT.SUBSTITUTE_SPEECH:
         pendingActionRef.current = { type: 'substituteSpeech' }
         return { text: '전하고 싶은 말을 말씀해주세요. 제가 대신 전달할 문장으로 준비할게요.' }
@@ -815,13 +835,13 @@ export function VoiceChatbot({
       pendingActionRef.current = null
       try {
         const response = await requestWearableEmergencyHelp('웨어러블 음성 챗봇에서 긴급 요청')
-        triggerVibration('LONG_TWICE')
+        notifyVibration('LONG_TWICE')
         const delivered = response?.guardianTargets?.some((target) => target.deliveryStatus === 'SENT')
-        return {
+        return withNotificationFeedback({
           text: delivered
             ? '긴급 요청을 보냈어요. 보호자에게 요청이 전달됐어요.'
             : '긴급 요청을 보냈어요. 보호자 앱 수신 상태를 확인하고 있어요.',
-        }
+        })
       } catch {
         return { text: '요청 전송에 실패했어요. 연결 상태를 확인한 뒤 다시 시도할게요.' }
       }
@@ -851,10 +871,10 @@ export function VoiceChatbot({
     ]
 
     if (firstUrgent) {
-      triggerVibration(vibrationPatternForAlert(firstUrgent))
+      notifyVibration(vibrationPatternForAlert(firstUrgent))
       lines.push('긴급 알림부터 들려드릴게요.')
       lines.push(formatAlertSpeech(firstUrgent, { includeTime: false }))
-      triggerShortVibration(2)
+      notifyShortVibration(2)
     }
 
     if (firstLife) {
@@ -865,7 +885,7 @@ export function VoiceChatbot({
     const text = lines.join(' ')
     lastAlertSummaryRef.current = text
     pendingActionRef.current = { type: 'confirmAlerts', alertIds: unreadAlerts.map((item) => item.alertId).filter(Boolean) }
-    return { text }
+    return withNotificationFeedback({ text })
   }
 
   async function handleReadUrgentAlert() {
@@ -875,11 +895,11 @@ export function VoiceChatbot({
       return { text: '현재 긴급 알림은 없어요.' }
     }
 
-    triggerVibration('STRONG')
+    notifyVibration('STRONG')
     pendingActionRef.current = { type: 'guardianConfirm' }
     const text = `${formatAlertSpeech(urgentAlert, { includeTime: true })} 보호자에게 다시 연락하려면 보호자에게 보내줘라고 말해주세요. 취소하려면 취소라고 말해주세요.`
     lastAlertSummaryRef.current = text
-    return { text }
+    return withNotificationFeedback({ text })
   }
 
   async function handleReadApplianceStatus(spokenText = '') {
@@ -906,7 +926,7 @@ export function VoiceChatbot({
   }
 
   async function handleFindDevice(deviceName) {
-    triggerShortVibration(1)
+    notifyShortVibration(1)
     pendingActionRef.current = null
 
     try {
@@ -929,10 +949,10 @@ export function VoiceChatbot({
       })
       activeVoiceUwbSessionRef.current = session
       startUwbPolling(session.sessionId)
-      triggerVibration(session.vibrationPattern || 'MEDIUM')
-      return {
+      notifyVibration(session.vibrationPattern || 'MEDIUM')
+      return withNotificationFeedback({
         text: `위치 안내 기기와 연결됐어요. ${deviceName} 위치 안내를 시작합니다. 가까워질수록 진동이 빨라집니다. 안내를 멈추려면 탐색 종료라고 말해주세요.`,
-      }
+      })
     } catch {
       return {
         text: '위치 안내 기기를 찾지 못했어요. 기기가 켜져 있는지 확인이 필요해요.',
@@ -955,8 +975,8 @@ export function VoiceChatbot({
     try {
       await markWearableAlertsRead(alertIds)
       pendingActionRef.current = null
-      triggerVibration('MEDIUM')
-      return { text: '현재 알림을 확인 완료 처리했어요.' }
+      notifyVibration('MEDIUM')
+      return withNotificationFeedback({ text: '현재 알림을 확인 완료 처리했어요.' })
     } catch {
       return { text: '알림 확인 완료 처리에 실패했어요. 잠시 뒤 다시 시도해주세요.' }
     }
@@ -972,8 +992,8 @@ export function VoiceChatbot({
       stopUwbPolling()
       await stopWearableUwbSession(sessionId)
       activeVoiceUwbSessionRef.current = null
-      triggerVibration('SLOW')
-      return { text: '위치 안내를 종료했어요.' }
+      notifyVibration('SLOW')
+      return withNotificationFeedback({ text: '위치 안내를 종료했어요.' })
     } catch {
       return { text: '위치 안내 종료에 실패했어요. 잠시 뒤 다시 시도해주세요.' }
     }
@@ -1001,8 +1021,11 @@ export function VoiceChatbot({
         const guide = createUwbDistanceGuide(session)
         if (guide && guide.zone !== lastUwbGuideZoneRef.current) {
           lastUwbGuideZoneRef.current = guide.zone
-          triggerVibration(guide.vibrationPattern)
-          runAiTurn(guide.message)
+          notifyVibration(guide.vibrationPattern)
+          runAiTurn(guide.message, {
+            notificationFeedback: true,
+            voiceEnabled: voiceFeedbackEnabled,
+          })
         }
 
         if (guide?.zone === 'ARRIVED' || status === 'ARRIVED') {
@@ -1054,7 +1077,31 @@ export function VoiceChatbot({
     }))
   }
 
-  function runAiTurn(text, { closeAfter = false } = {}) {
+  function notifyVibration(pattern) {
+    if (!vibrationFeedbackEnabled) {
+      return false
+    }
+
+    return triggerVibration(pattern)
+  }
+
+  function notifyShortVibration(count = 1) {
+    if (!vibrationFeedbackEnabled) {
+      return false
+    }
+
+    triggerShortVibration(count)
+    return true
+  }
+
+  function withNotificationFeedback(result) {
+    return { ...result, notificationFeedback: true }
+  }
+
+  function runAiTurn(
+    text,
+    { closeAfter = false, notificationFeedback = false, voiceEnabled = true } = {},
+  ) {
     stopRecognition()
     clearConversationTimers()
     setIsListening(false)
@@ -1065,28 +1112,34 @@ export function VoiceChatbot({
     setChatResponse((current) => ({
       title: current?.title || 'AI 챗봇',
       text,
+      notificationFeedback,
       quickReplies: current?.quickReplies || [],
     }))
 
-    speakText(text, {
-      onEnd: async () => {
-        setConversationState(CONVERSATION_STATE.AI_SPEECH_ENDED)
-        setVoiceStatus('AI 음성이 끝났어요.')
+    const handleSpeechEnd = async () => {
+      setConversationState(CONVERSATION_STATE.AI_SPEECH_ENDED)
+      setVoiceStatus('AI 음성이 끝났어요.')
 
-        if (!isOpenRef.current) {
-          return
-        }
+      if (!isOpenRef.current) {
+        return
+      }
 
-        if (closeAfter) {
-          closeChatbot()
-          return
-        }
+      if (closeAfter) {
+        closeChatbot()
+        return
+      }
 
-        if (isOpenRef.current) {
-          void beginUserListeningTurn()
-        }
-      },
-    })
+      if (isOpenRef.current) {
+        void beginUserListeningTurn()
+      }
+    }
+
+    if (!voiceEnabled) {
+      void handleSpeechEnd()
+      return
+    }
+
+    speakText(text, { onEnd: handleSpeechEnd })
   }
 
   function goBack() {
@@ -1513,6 +1566,7 @@ export function VoiceChatbot({
               onOpenApp={() => {
                 openInApp(selectedAnswer.appPayload)
               }}
+              voiceEnabled={!isNotificationAnswer(selectedAnswer) || voiceFeedbackEnabled}
             />
           ) : null}
 
@@ -1522,7 +1576,11 @@ export function VoiceChatbot({
               response={chatResponse}
               transcript={transcript}
               onListenAgain={startVoiceTurn}
-              onReplay={() => speakText(chatResponse?.text || '')}
+              onReplay={() => {
+                if (!chatResponse?.notificationFeedback || voiceFeedbackEnabled) {
+                  speakText(chatResponse?.text || '')
+                }
+              }}
             />
           ) : null}
         </section>
@@ -1704,7 +1762,7 @@ function WelfareSelectScreen({
   )
 }
 
-function AnswerScreen({ answer, onOpenApp }) {
+function AnswerScreen({ answer, onOpenApp, voiceEnabled = true }) {
   const hasAlertDetails = answer.detail?.length > 0
 
   return (
@@ -1735,8 +1793,10 @@ function AnswerScreen({ answer, onOpenApp }) {
         type="button"
         onClick={() => {
           const text = answer.lines.join(' ')
-          speakText(text)
-          requestAppTTS(text)
+          if (voiceEnabled) {
+            speakText(text)
+            requestAppTTS(text)
+          }
         }}
       >
         🔊 다시듣기

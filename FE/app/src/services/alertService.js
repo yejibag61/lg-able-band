@@ -1,4 +1,4 @@
-import { apiRequest } from './apiClient'
+import { ApiRequestError, apiRequest } from './apiClient'
 
 export async function getAlerts({ type, status, limit = 20 } = {}) {
   const params = new URLSearchParams()
@@ -31,9 +31,18 @@ export async function confirmAlert(alertId) {
 }
 
 export async function deleteAlert(alertId) {
-  return apiRequest(`/api/alerts/${alertId}`, {
+  const response = await apiRequest(`/api/alerts/${alertId}`, {
     method: 'DELETE',
   })
+
+  if (response?.deleted === false) {
+    throw new ApiRequestError('알림을 삭제하지 못했습니다.', {
+      code: 'ALERT_DELETE_FAILED',
+      details: response,
+    })
+  }
+
+  return response
 }
 
 export async function replayAlert(alertId) {

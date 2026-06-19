@@ -403,11 +403,18 @@ export function normalizeUwbSession(session) {
   }
 }
 
+function normalizeApplianceDisplayName(name) {
+  if (name === '안전 전기레인지') {
+    return '전기레인지'
+  }
+
+  return name
+}
 export function normalizeUwbTarget(target) {
   const connectionStatus = target.connectionStatus || 'CONNECTED'
   return {
     deviceId: target.deviceId,
-    name: target.name || '위치 안내 기기',
+    name: normalizeApplianceDisplayName(target.name) || '위치 안내 기기',
     type: target.type || target.deviceType || 'UWB_TAG',
     connectionStatus,
     locationSupported: target.locationSupported !== false,
@@ -426,7 +433,7 @@ export function normalizeAppliance(appliance) {
   return {
     applianceId: appliance.applianceId || appliance.deviceId || appliance.id,
     deviceId: appliance.deviceId || appliance.applianceId || appliance.id,
-    name: appliance.name || appliance.deviceName || '가전',
+    name: normalizeApplianceDisplayName(appliance.name || appliance.deviceName) || '가전',
     type,
     connectionStatus,
     locationName: appliance.locationName || appliance.location || appliance.roomName || '집 안',

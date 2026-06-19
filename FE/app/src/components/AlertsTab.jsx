@@ -104,6 +104,7 @@ const notificationStatsMock = {
 }
 
 export function AlertsTab({
+  accessibility = {},
   accessibilityType,
   alerts,
   alertView = 'list',
@@ -111,7 +112,7 @@ export function AlertsTab({
   onAlertRestore = () => {},
   onAlertStatusChange = () => {},
 }) {
-  const [alertItems, setAlertItems] = useState(() => alerts.filter((alert) => alert.status !== 'CONFIRMED'))
+  const [alertItems, setAlertItems] = useState(() => alerts)
   const [activeFilter, setActiveFilter] = useState('ALL')
   const [selectedAlertId, setSelectedAlertId] = useState(null)
   const [feedbackMessage, setFeedbackMessage] = useState('')
@@ -133,7 +134,7 @@ export function AlertsTab({
   )
 
   useEffect(() => {
-    const nextAlerts = alerts.filter((alert) => alert.status !== 'CONFIRMED')
+    const nextAlerts = alerts
     setAlertItems(nextAlerts)
     setSelectedAlertId((current) =>
       current !== null && !nextAlerts.some((alert) => alert.alertId === current) ? null : current,
@@ -194,40 +195,41 @@ export function AlertsTab({
   }
 
   async function handleConfirmAlert(alertId) {
-    const confirmedIndex = alertItems.findIndex((alert) => alert.alertId === alertId)
-    const confirmedAlert = alertItems[confirmedIndex]
+    const confirmedAlert = alertItems.find((alert) => alert.alertId === alertId)
 
     if (!confirmedAlert) {
       return
     }
 
     setInlineFeedback(null)
-    setAlertItems((currentAlerts) => currentAlerts.filter((alert) => alert.alertId !== alertId))
-    if (selectedAlertId === alertId) {
-      setSelectedAlertId(null)
-    }
     setFeedbackMessage('')
 
     try {
       await confirmAlert(alertId)
+      setAlertItems((currentAlerts) =>
+        currentAlerts.map((alert) =>
+          alert.alertId === alertId
+            ? {
+                ...alert,
+                status: 'CONFIRMED',
+              }
+            : alert,
+        ),
+      )
       onAlertStatusChange(alertId, 'CONFIRMED')
       setFeedbackMessage('알림을 확인 완료로 처리했습니다.')
     } catch (error) {
-      setAlertItems((currentAlerts) => {
-        if (currentAlerts.some((alert) => alert.alertId === alertId)) {
-          return currentAlerts
-        }
-
-        const nextAlerts = [...currentAlerts]
-        nextAlerts.splice(Math.max(confirmedIndex, 0), 0, confirmedAlert)
-        return nextAlerts
-      })
       setFeedbackMessage(error.message || '알림 확인 처리에 실패했습니다.')
     }
   }
 
   async function handleReplayAlert(alert) {
     setInlineFeedback(null)
+    if (accessibility.voiceGuide === false) {
+      setFeedbackMessage('음성 안내가 꺼져 있어 알림 안내를 재생하지 않았습니다.')
+      return
+    }
+
     const guide = createAlertGuide(alert)
     const speechStarted = speakAlert(guide)
 
@@ -357,6 +359,7 @@ export function AlertsTab({
                   className={[
                     'content-card alert-card',
                     isUrgentAlert(alert) ? 'urgent' : '',
+                    alert.status === 'CONFIRMED' ? 'confirmed' : '',
                     alert.status === 'UNREAD' ? 'unread' : '',
                   ]
                     .filter(Boolean)

@@ -13,24 +13,30 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Supplier;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 @Service
 public class AlertService {
 
 	private final ObjectProvider<JdbcTemplate> jdbcTemplateProvider;
+	private final ObjectProvider<PlatformTransactionManager> transactionManagerProvider;
 	private final MvpDataService dataService;
 	private final MockDataStore mockDataStore;
 
 	public AlertService(
 		ObjectProvider<JdbcTemplate> jdbcTemplateProvider,
+		ObjectProvider<PlatformTransactionManager> transactionManagerProvider,
 		MvpDataService dataService,
 		MockDataStore mockDataStore
 	) {
 		this.jdbcTemplateProvider = jdbcTemplateProvider;
+		this.transactionManagerProvider = transactionManagerProvider;
 		this.dataService = dataService;
 		this.mockDataStore = mockDataStore;
 	}
@@ -197,42 +203,48 @@ public class AlertService {
 
 	public StatusResponse confirm(String authorization, long alertId) {
 		JdbcTemplate jdbcTemplate = jdbcTemplate();
-		MvpDataService.CurrentUser user = this.dataService.currentUser(authorization);
+		AlertConfirmPrincipal principal = confirmPrincipal(authorization);
 		OffsetDateTime confirmedAt = OffsetDateTime.now();
 
 		if (jdbcTemplate == null) {
-			MockDataStore.Alert updated = this.mockDataStore.confirmAlert(user.userId(), alertId);
+			MockDataStore.Alert updated = this.mockDataStore.confirmAlert(principal.userId(), alertId);
 			return new StatusResponse(updated.alertId(), updated.status(), confirmedAt, null);
 		}
 
-		int updatedRows = jdbcTemplate.update(
-			"""
-			UPDATE alert
-			SET status = ?, updated_at = ?
-			WHERE alert_id = ? AND user_id = ?
-			""",
-			AlertStatus.CONFIRMED.name(),
-			Timestamp.valueOf(confirmedAt.toLocalDateTime()),
-			alertId,
-			user.userId()
-		);
+		return inTransaction(() -> {
+			int updatedRows = jdbcTemplate.update(
+				"""
+				UPDATE alert
+				SET status = ?, updated_at = ?
+				WHERE alert_id = ? AND user_id = ?
+				  AND (
+				    ? IS NULL
+				    OR EXISTS (
+				      SELECT 1
+				      FROM alert_delivery ad
+				      WHERE ad.alert_id = alert.alert_id
+				        AND ad.target_guardian_id = ?
+				    )
+				  )
+				""",
+				AlertStatus.CONFIRMED.name(),
+				Timestamp.valueOf(confirmedAt.toLocalDateTime()),
+				alertId,
+				principal.userId(),
+				principal.guardianId(),
+				principal.guardianId()
+			);
 
-		if (updatedRows == 0) {
-			throw new ApiException(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND", "알림을 찾을 수 없습니다.");
-		}
+			if (updatedRows == 0) {
+				throw new ApiException(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND", "알림을 찾을 수 없습니다.");
+			}
 
-		jdbcTemplate.update(
-			"""
-			UPDATE alert_delivery
-			SET delivery_status = 'CONFIRMED',
-			    confirmed_at = COALESCE(confirmed_at, ?)
-			WHERE alert_id = ?
-			""",
-			Timestamp.valueOf(confirmedAt.toLocalDateTime()),
-			alertId
-		);
+			confirmAlertDelivery(jdbcTemplate, alertId, principal.guardianId(), confirmedAt);
 
-		return new StatusResponse(alertId, AlertStatus.CONFIRMED, confirmedAt, null);
+			resolveLinkedEmergencyRequests(jdbcTemplate, principal.userId(), alertId);
+
+			return new StatusResponse(alertId, AlertStatus.CONFIRMED, confirmedAt, null);
+		});
 	}
 
 	public StatusResponse replay(String authorization, long alertId) {
@@ -281,19 +293,113 @@ public class AlertService {
 			return new DeleteResponse(alertId, true);
 		}
 
-		Integer ownedAlertCount = jdbcTemplate.queryForObject(
-			"SELECT COUNT(*) FROM alert WHERE alert_id = ? AND user_id = ?",
-			Integer.class,
-			alertId,
-			user.userId()
-		);
-		if (ownedAlertCount == null || ownedAlertCount == 0) {
-			throw new ApiException(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND", "알림을 찾을 수 없습니다.");
+		return inTransaction(() -> {
+			Integer ownedAlertCount = jdbcTemplate.queryForObject(
+				"SELECT COUNT(*) FROM alert WHERE alert_id = ? AND user_id = ?",
+				Integer.class,
+				alertId,
+				user.userId()
+			);
+			if (ownedAlertCount == null || ownedAlertCount == 0) {
+				throw new ApiException(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND", "알림을 찾을 수 없습니다.");
+			}
+
+			cancelLinkedEmergencyRequestsBeforeDelete(jdbcTemplate, user.userId(), alertId);
+			jdbcTemplate.update("DELETE FROM alert_delivery WHERE alert_id = ?", alertId);
+			int deletedRows = jdbcTemplate.update("DELETE FROM alert WHERE alert_id = ? AND user_id = ?", alertId, user.userId());
+			return new DeleteResponse(alertId, deletedRows > 0);
+		});
+	}
+
+	private <T> T inTransaction(Supplier<T> action) {
+		PlatformTransactionManager transactionManager = this.transactionManagerProvider.getIfAvailable();
+		if (transactionManager == null) {
+			return action.get();
+		}
+		return new TransactionTemplate(transactionManager).execute(status -> action.get());
+	}
+
+	private void confirmAlertDelivery(
+		JdbcTemplate jdbcTemplate,
+		long alertId,
+		Long guardianId,
+		OffsetDateTime confirmedAt
+	) {
+		Timestamp confirmedTimestamp = Timestamp.valueOf(confirmedAt.toLocalDateTime());
+		if (guardianId == null) {
+			jdbcTemplate.update(
+				"""
+				UPDATE alert_delivery
+				SET delivery_status = 'CONFIRMED',
+				    confirmed_at = COALESCE(confirmed_at, ?)
+				WHERE alert_id = ?
+				""",
+				confirmedTimestamp,
+				alertId
+			);
+			return;
 		}
 
-		jdbcTemplate.update("DELETE FROM alert_delivery WHERE alert_id = ?", alertId);
-		int deletedRows = jdbcTemplate.update("DELETE FROM alert WHERE alert_id = ? AND user_id = ?", alertId, user.userId());
-		return new DeleteResponse(alertId, deletedRows > 0);
+		jdbcTemplate.update(
+			"""
+			UPDATE alert_delivery
+			SET delivery_status = 'CONFIRMED',
+			    confirmed_at = COALESCE(confirmed_at, ?)
+			WHERE alert_id = ?
+			  AND target_guardian_id = ?
+			""",
+			confirmedTimestamp,
+			alertId,
+			guardianId
+		);
+	}
+
+	private AlertConfirmPrincipal confirmPrincipal(String authorization) {
+		try {
+			MvpDataService.CurrentUser user = this.dataService.currentUser(authorization);
+			return new AlertConfirmPrincipal(user.userId(), null);
+		}
+		catch (ApiException userException) {
+			if (userException.getStatus() != HttpStatus.FORBIDDEN && userException.getStatus() != HttpStatus.UNAUTHORIZED) {
+				throw userException;
+			}
+			MvpDataService.CurrentGuardian guardian = this.dataService.currentGuardian(authorization);
+			if (guardian.linkedUserId() == null) {
+				throw new ApiException(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND", "연결된 사용자를 찾을 수 없습니다.");
+			}
+			return new AlertConfirmPrincipal(guardian.linkedUserId(), guardian.guardianId());
+		}
+	}
+
+	private void resolveLinkedEmergencyRequests(JdbcTemplate jdbcTemplate, long userId, long alertId) {
+		jdbcTemplate.update(
+			"""
+			UPDATE emergency_request
+			SET status = 'RESOLVED'
+			WHERE user_id = ?
+			  AND alert_id = ?
+			  AND status NOT IN ('RESOLVED', 'CANCELED')
+			""",
+			userId,
+			alertId
+		);
+	}
+
+	private void cancelLinkedEmergencyRequestsBeforeDelete(JdbcTemplate jdbcTemplate, long userId, long alertId) {
+		jdbcTemplate.update(
+			"""
+			UPDATE emergency_request
+			SET status = CASE
+			    WHEN status IN ('RESOLVED', 'CANCELED') THEN status
+			    ELSE 'CANCELED'
+			  END,
+			  alert_id = NULL
+			WHERE user_id = ?
+			  AND alert_id = ?
+			""",
+			userId,
+			alertId
+		);
 	}
 
 	private AlertView fromMockAlert(MockDataStore.Alert alert) {
@@ -429,6 +535,9 @@ public class AlertService {
 	}
 
 	public record DeleteResponse(long alertId, boolean deleted) {
+	}
+
+	private record AlertConfirmPrincipal(long userId, Long guardianId) {
 	}
 
 	public record ReplayPayload(String voiceGuide, OffsetDateTime replayedAt) {

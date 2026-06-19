@@ -1,4 +1,4 @@
-package com.lgableband;
+﻿package com.lgableband;
 
 import static org.hamcrest.Matchers.blankOrNullString;
 import static org.hamcrest.Matchers.containsString;
@@ -112,6 +112,51 @@ class MvpApiControllerTests {
 	}
 
 	@Test
+	void deletedAlertDoesNotReappearAfterReloadOrRelogin() throws Exception {
+		String suffix = "alert-delete-" + System.nanoTime();
+		String token = signupUserAndToken(suffix);
+		String adminToken = loginToken("USER", "admin@example.com");
+
+		this.mockMvc.perform(post("/api/admin/alerts/broadcast")
+				.header("Authorization", "Bearer " + adminToken)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "templateId": "tv-power-status",
+					  "audience": "HEARING"
+					}
+					"""))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.dispatchedUserCount").value(greaterThanOrEqualTo(1)));
+
+		MvcResult alertsBeforeDelete = this.mockMvc.perform(get("/api/alerts").header("Authorization", "Bearer " + token))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.items[0].alertId").exists())
+			.andReturn();
+
+		String alertId = extractJsonNumber(alertsBeforeDelete.getResponse().getContentAsString(), "alertId");
+
+		this.mockMvc.perform(delete("/api/alerts/" + alertId).header("Authorization", "Bearer " + token))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.alertId").value(Integer.parseInt(alertId)))
+			.andExpect(jsonPath("$.deleted").value(true));
+
+		this.mockMvc.perform(get("/api/alerts").header("Authorization", "Bearer " + token))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.items[*].alertId").value(org.hamcrest.Matchers.not(org.hamcrest.Matchers.hasItem(Integer.parseInt(alertId)))));
+
+		this.mockMvc.perform(get("/api/app/home").header("Authorization", "Bearer " + token))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.recentAlerts[*].alertId").value(org.hamcrest.Matchers.not(org.hamcrest.Matchers.hasItem(Integer.parseInt(alertId)))));
+
+		String reloginToken = loginToken("USER", "codex-user-" + suffix + "@example.com");
+
+		this.mockMvc.perform(get("/api/alerts").header("Authorization", "Bearer " + reloginToken))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.items[*].alertId").value(org.hamcrest.Matchers.not(org.hamcrest.Matchers.hasItem(Integer.parseInt(alertId)))));
+	}
+
+	@Test
 	void adminCanBroadcastAlertToAllUsers() throws Exception {
 		String adminToken = loginToken("USER", "admin@example.com");
 		String userToken = loginToken("USER", "user@example.com");
@@ -133,11 +178,38 @@ class MvpApiControllerTests {
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.templateId").value("washer-complete"))
 			.andExpect(jsonPath("$.audience").value("ALL"))
-			.andExpect(jsonPath("$.dispatchedUserCount").value(greaterThanOrEqualTo(2)));
+			.andExpect(jsonPath("$.dispatchedUserCount").value(greaterThanOrEqualTo(2)))
+			.andExpect(jsonPath("$.occurredAt", containsString("+09:00")));
 
 		this.mockMvc.perform(get("/api/alerts").header("Authorization", "Bearer " + userToken))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.items[0].title").value("세탁 완료 알림"));
+	}
+
+	@Test
+	void adminBroadcastToAllAddsAlertToEachUsersOwnList() throws Exception {
+		String adminToken = loginToken("USER", "admin@example.com");
+		String userToken = loginToken("USER", "user@example.com");
+
+		this.mockMvc.perform(post("/api/admin/alerts/broadcast")
+				.header("Authorization", "Bearer " + adminToken)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "templateId": "washer-complete",
+					  "audience": "ALL"
+					}
+					"""))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.dispatchedUserCount").value(greaterThanOrEqualTo(2)));
+
+		this.mockMvc.perform(get("/api/alerts").header("Authorization", "Bearer " + userToken))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.items[0].title").exists());
+
+		this.mockMvc.perform(get("/api/alerts").header("Authorization", "Bearer " + adminToken))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.items[0].title").exists());
 	}
 
 	@Test
@@ -549,11 +621,12 @@ class MvpApiControllerTests {
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.title").value("우리 아파트 방송음 감지"))
 			.andExpect(jsonPath("$.message", containsString("우리 아파트 방송음")))
+			.andExpect(jsonPath("$.occurredAt", containsString("+09:00")))
 			.andExpect(jsonPath("$.status").value("UNREAD"));
 
 		this.mockMvc.perform(get("/api/alerts").header("Authorization", "Bearer " + token))
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.items[0].title").value("우리 아파트 방송음 감지"));
+			.andExpect(jsonPath("$.items[*].title").value(org.hamcrest.Matchers.hasItem("우리 아파트 방송음 감지")));
 	}
 
 	@Test

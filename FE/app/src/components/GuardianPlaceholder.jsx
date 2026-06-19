@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { getGuardianDashboard } from '../services/guardianDashboardService'
+import { confirmGuardianHistoryItem, getGuardianDashboard } from '../services/guardianDashboardService'
 import { formatStatusUpdatedAt, getSafetyStatusDisplay } from '../utils/homeSummaryUtils'
 
 const severityLabels = {
@@ -98,8 +98,8 @@ export function GuardianPlaceholder({ account, onLogout }) {
 
   const dashboard = dashboardState.data
   const allHistoryItems = createGuardianHistoryItems(dashboard)
-  const historyItems = createGuardianHistoryItems(dashboard).filter(
-    (item) => !confirmedHistoryKeys.includes(item.key),
+  const historyItems = allHistoryItems.filter(
+    (item) => item.alertId || !confirmedHistoryKeys.includes(item.key),
   )
   const visibleDangerAlertKeys = new Set(
     historyItems.filter((item) => item.kind === 'danger').map((item) => item.key),
@@ -117,14 +117,35 @@ export function GuardianPlaceholder({ account, onLogout }) {
     ? dashboard.summary?.safetyMessage || `${protectedUserName}님의 오늘 상태입니다.`
     : SAFE_GUARDIAN_MESSAGE
 
-  const confirmHistoryItem = useCallback((itemKey) => {
-    setConfirmedHistoryKeys((currentKeys) =>
-      persistConfirmedHistoryKeys(
-        confirmedHistoryStorageKey,
-        currentKeys.includes(itemKey) ? currentKeys : [...currentKeys, itemKey],
-      ),
-    )
-  }, [confirmedHistoryStorageKey])
+  const confirmHistoryItem = useCallback(async (item) => {
+    const itemKey = item.key
+
+    try {
+      await confirmGuardianHistoryItem(item)
+      if (!isMountedRef.current) {
+        return
+      }
+
+      if (!item.alertId) {
+        setConfirmedHistoryKeys((currentKeys) =>
+          persistConfirmedHistoryKeys(
+            confirmedHistoryStorageKey,
+            currentKeys.includes(itemKey) ? currentKeys : [...currentKeys, itemKey],
+          ),
+        )
+      }
+      await loadDashboard()
+    } catch (error) {
+      if (!isMountedRef.current) {
+        return
+      }
+
+      setDashboardState((current) => ({
+        ...current,
+        error: error.message || '알림 확인 상태를 저장하지 못했습니다.',
+      }))
+    }
+  }, [confirmedHistoryStorageKey, loadDashboard])
 
   if (dashboardState.loading) {
     return (
@@ -288,7 +309,7 @@ export function GuardianPlaceholder({ account, onLogout }) {
                       className="guardian-event-confirm-button"
                       type="button"
                       aria-label={`${item.title} 확인`}
-                      onClick={() => confirmHistoryItem(item.key)}
+                      onClick={() => confirmHistoryItem(item)}
                     >
                       확인
                     </button>
@@ -322,22 +343,29 @@ export function GuardianPlaceholder({ account, onLogout }) {
 }
 
 function createGuardianHistoryItems(dashboard) {
-  const dangerItems = (dashboard?.dangerAlerts || []).map((alert) => ({
-    kind: 'danger',
-    key: getDangerHistoryKey(alert),
-    title: alert.title,
-    message: alert.message,
-    occurredAt: alert.occurredAt,
-    meta: `${severityLabels[alert.severity] || alert.severity} · ${alert.deviceName || '연동 기기'} · ${formatGuardianTime(alert.occurredAt)}`,
-  }))
-  const emergencyItems = (dashboard?.emergencyRequests || []).map((request) => ({
-    kind: 'emergency',
-    key: getEmergencyHistoryKey(request),
-    title: '긴급 도움 요청',
-    message: request.message || '사용자가 긴급 도움을 요청했습니다.',
-    occurredAt: request.sentAt,
-    meta: `긴급 · ${sourceLabels[request.source] || request.source || '시스템'} · ${formatGuardianTime(request.sentAt)}`,
-  }))
+  const dangerItems = (dashboard?.dangerAlerts || [])
+    .filter(isActiveDangerAlert)
+    .map((alert) => ({
+      kind: 'danger',
+      key: getDangerHistoryKey(alert),
+      alertId: alert.alertId,
+      title: alert.title,
+      message: alert.message,
+      occurredAt: alert.occurredAt,
+      meta: `${severityLabels[alert.severity] || alert.severity} · ${alert.deviceName || '연동 기기'} · ${formatGuardianTime(alert.occurredAt)}`,
+    }))
+  const emergencyItems = (dashboard?.emergencyRequests || [])
+    .filter(isActiveEmergencyRequest)
+    .map((request) => ({
+      kind: 'emergency',
+      key: getEmergencyHistoryKey(request),
+      alertId: request.alertId,
+      emergencyRequestId: request.emergencyRequestId,
+      title: '긴급 도움 요청',
+      message: request.message || '사용자가 긴급 도움을 요청했습니다.',
+      occurredAt: request.sentAt,
+      meta: `긴급 · ${sourceLabels[request.source] || request.source || '시스템'} · ${formatGuardianTime(request.sentAt)}`,
+    }))
 
   return [...dangerItems, ...emergencyItems].sort((firstItem, secondItem) => {
     const firstTime = new Date(firstItem.occurredAt || 0).getTime()
@@ -345,6 +373,14 @@ function createGuardianHistoryItems(dashboard) {
 
     return secondTime - firstTime
   })
+}
+
+function isActiveDangerAlert(alert) {
+  return alert.status !== 'CONFIRMED'
+}
+
+function isActiveEmergencyRequest(request) {
+  return request.status !== 'RESOLVED' && request.status !== 'CANCELED'
 }
 
 function getDangerHistoryKey(alert) {

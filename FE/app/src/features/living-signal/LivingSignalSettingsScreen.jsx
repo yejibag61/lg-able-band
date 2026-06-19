@@ -62,7 +62,7 @@ export function LivingSignalSettingsScreen({
   dataHandlers = defaultDataHandlers,
 }) {
   const initialState = useMemo(() => createInitialState(livingSignals), [livingSignals])
-  const [sounds, setSounds] = useState(initialState.sounds)
+  const [sounds, setSounds] = useState([])
   const [threshold, setThreshold] = useState(initialState.threshold)
   const [editor, setEditor] = useState(buildInitialEditor())
   const [screenMode, setScreenMode] = useState('list')
@@ -74,6 +74,7 @@ export function LivingSignalSettingsScreen({
   })
   const [sampleSaveMode, setSampleSaveMode] = useState('append')
   const [syncError, setSyncError] = useState('')
+  const [isStateReady, setIsStateReady] = useState(false)
 
   const enrollmentSessionRef = useRef(null)
   const isHydratingRef = useRef(true)
@@ -84,26 +85,20 @@ export function LivingSignalSettingsScreen({
 
     async function loadState() {
       try {
-        const remoteState = await dataHandlers.loadState(initialState)
-
-        if (!isMounted) {
-          return
-        }
-
-        isHydratingRef.current = true
-        setSounds(remoteState.sounds)
-        setThreshold(remoteState.threshold)
-        setSyncError('')
+        await hydrateFromRemoteState({ isMounted })
       } catch (error) {
         if (!isMounted) {
           return
         }
 
         setSyncError(error.message || '생활 신호 설정을 불러오지 못했습니다.')
+        setSounds([])
+        setThreshold(initialState.threshold)
       } finally {
         if (isMounted) {
           isHydratingRef.current = false
           thresholdReadyRef.current = true
+          setIsStateReady(true)
         }
       }
     }
@@ -208,6 +203,20 @@ export function LivingSignalSettingsScreen({
         embedding: [...(recording.embedding || [])],
       })),
     }
+  }
+
+  async function hydrateFromRemoteState({ isMounted = true } = {}) {
+    const remoteState = await dataHandlers.loadState(initialState)
+
+    if (!isMounted) {
+      return remoteState
+    }
+
+    isHydratingRef.current = true
+    setSounds(remoteState.sounds)
+    setThreshold(remoteState.threshold)
+    setSyncError('')
+    return remoteState
   }
 
   async function startEnrollmentRecording() {
@@ -322,15 +331,12 @@ export function LivingSignalSettingsScreen({
 
     try {
       if (editor.mode === 'create') {
-        const createdSound = await dataHandlers.createSound(payload)
-        setSounds((current) => [normalizeSound(createdSound), ...current])
+        await dataHandlers.createSound(payload)
       } else {
-        const updatedSound = await dataHandlers.updateSound(editor.soundId, payload)
-        setSounds((current) =>
-          current.map((sound) => (sound.soundId === editor.soundId ? normalizeSound(updatedSound) : sound)),
-        )
+        await dataHandlers.updateSound(editor.soundId, payload)
       }
 
+      await hydrateFromRemoteState()
       setSyncError('')
       closeEditorPage()
     } catch (error) {
@@ -354,7 +360,7 @@ export function LivingSignalSettingsScreen({
 
     try {
       await dataHandlers.deleteSound(soundId)
-      setSounds((current) => current.filter((sound) => sound.soundId !== soundId))
+      await hydrateFromRemoteState()
       setSyncError('')
     } catch (error) {
       setSyncError(error.message || '생활 신호 삭제에 실패했습니다.')
@@ -508,6 +514,31 @@ export function LivingSignalSettingsScreen({
     )
   }
 
+  if (!isStateReady) {
+    return (
+      <section className="living-signal-screen" aria-labelledby="living-signal-list-title">
+        <section className="living-signal-list-section" aria-labelledby="living-signal-list-title">
+          <div className="living-signal-section-row">
+            <div className="device-add-hero">
+              {showBackButton ? (
+                <button
+                  className="text-button back-button alert-detail-back"
+                  type="button"
+                  aria-label="목록으로 돌아가기"
+                  onClick={onBack}
+                >
+                  <span aria-hidden="true">←</span>
+                </button>
+              ) : null}
+              <strong className="card-title" id="living-signal-list-title">등록된 알림음</strong>
+            </div>
+          </div>
+          <p className="living-signal-empty" role="status">등록된 알림음을 불러오는 중입니다.</p>
+        </section>
+      </section>
+    )
+  }
+
   return (
     <section className="living-signal-screen" aria-labelledby="living-signal-list-title">
       <section className="living-signal-list-section" aria-labelledby="living-signal-list-title">
@@ -582,7 +613,7 @@ export function LivingSignalSettingsScreen({
       <section className="living-signal-detect-section" aria-labelledby="living-signal-detect-title">
         <div className="living-signal-section-row">
           <h3 id="living-signal-detect-title">상시 감지</h3>
-          <span>웨어러블 전용</span>
+          <span>앱·웨어러블</span>
         </div>
 
         <label className="living-signal-threshold">
@@ -598,7 +629,7 @@ export function LivingSignalSettingsScreen({
         </label>
 
         <p className="living-signal-info">
-          앱에서는 계속 듣지 않습니다. 등록한 생활 알림음의 상시 감지와 즉시 알림은 웨어러블에서만 실행됩니다.
+          앱이 켜져 있으면 등록한 생활 알림음을 계속 감지합니다. 챗봇 사용 중이거나 직접 녹음하는 동안에는 잠시 멈춥니다.
         </p>
         {syncError ? <p className="living-signal-warning">{syncError}</p> : null}
       </section>
