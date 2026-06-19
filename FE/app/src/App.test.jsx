@@ -612,7 +612,7 @@ describe('App login to home flow', () => {
 
     expect(await screen.findByRole('heading', { name: '보호자 홈' })).toBeTruthy()
     expect(screen.getByText('오늘의 안전 상태')).toBeTruthy()
-    expect(screen.getByText('방금 업데이트')).toBeTruthy()
+    expect(screen.getByText('방금')).toBeTruthy()
     expect(screen.getByRole('button', { name: '홈 정보 새로고침' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: '사용자에게 연락' })).toBeNull()
     expect(screen.queryByText('빠른 보호자 대응')).toBeNull()
@@ -741,7 +741,7 @@ describe('App login to home flow', () => {
 
     expect(await screen.findByRole('heading', { name: '보호자 홈' })).toBeTruthy()
     expect(screen.getByText('긴급 도움 요청이 진행 중입니다.')).toBeTruthy()
-    expect(screen.getByText('방금 업데이트')).toBeTruthy()
+    expect(screen.getByText('방금')).toBeTruthy()
     expect(screen.queryByText(/위험 알림 \d+건/)).toBeNull()
     expect(screen.queryByText('빠른 보호자 대응')).toBeNull()
   })

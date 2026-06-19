@@ -31,18 +31,18 @@ export function formatStatusUpdatedAt(value, now = new Date()) {
 
   const elapsedMinutes = Math.floor((currentDate.getTime() - date.getTime()) / 60_000)
   if (elapsedMinutes < 1) {
-    return '방금 업데이트'
+    return '방금'
   }
 
   if (elapsedMinutes < 10) {
-    return `${elapsedMinutes}분 전 업데이트`
+    return `${elapsedMinutes}분 전`
   }
 
   if (elapsedMinutes < 60) {
-    return `${Math.floor(elapsedMinutes / 10) * 10}분 전 업데이트`
+    return `${Math.floor(elapsedMinutes / 10) * 10}분 전`
   }
 
-  return `${Math.floor(elapsedMinutes / 60)}시간 전 업데이트`
+  return `${Math.floor(elapsedMinutes / 60)}시간 전`
 }
 
 export function getActionableRecentAlerts(alerts, limit = ACTIONABLE_ALERT_LIMIT) {

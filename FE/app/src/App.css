@@ -454,7 +454,8 @@ button:disabled {
   display: inline-flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 6px;
+  flex-wrap: nowrap;
+  gap: 8px;
   flex: 0 0 auto;
   min-width: 0;
 }
@@ -463,28 +464,24 @@ button:disabled {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 5px;
-  min-height: 30px;
-  border: 1px solid rgba(148, 163, 184, 0.28);
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid #d1d5db;
   border-radius: 999px;
-  padding: 0 9px;
-  background: rgba(255, 255, 255, 0.82);
-  color: #334155;
+  background: #ffffff;
+  color: #9ca3af;
   font: inherit;
-  font-size: 0.7rem;
-  font-weight: 900;
-  line-height: 1;
-  letter-spacing: 0;
-  white-space: nowrap;
   box-shadow: none;
+  flex: 0 0 auto;
 }
 
 .status-refresh-button svg {
-  width: 15px;
-  height: 15px;
+  width: 18px;
+  height: 18px;
   fill: none;
   stroke: currentColor;
-  stroke-width: 2;
+  stroke-width: 2.2;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
@@ -518,9 +515,17 @@ button:disabled {
 }
 
 .home-metric-row {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  display: flex;
+  align-items: center;
   gap: 6px;
+}
+
+.home-metric-pills {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .home-metric-pill {
@@ -536,6 +541,10 @@ button:disabled {
 
 .home-metric-pill.danger {
   color: #be123c;
+}
+
+.home-metric-refresh-button {
+  flex: 0 0 auto;
 }
 
 .emergency-card {
@@ -6741,6 +6750,11 @@ h2 {
   animation: deviceToastFade 2.35s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 
+.device-toast-message-error {
+  background: rgba(255, 241, 242, 0.98);
+  color: #be123c;
+}
+
 .guardian-toast {
   bottom: 112px;
 }
@@ -7643,7 +7657,7 @@ h2 {
   top: 1px;
 }
 
-.phone-screen .home-safety-card .status-card-header > div,
+.phone-screen .home-safety-card .status-card-header > div:first-child,
 .phone-screen .emergency-card > div,
 .phone-screen .device-connected-card .section-title-row > div,
 .phone-screen .device-summary-card .section-title-row > div,
@@ -7667,16 +7681,25 @@ h2 {
 }
 
 .phone-screen .home-safety-card .status-refresh-control {
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 4px;
-  max-width: 148px;
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 8px;
+  max-width: none;
 }
 
 .phone-screen .home-safety-card .status-refresh-button {
-  min-height: 28px;
-  padding: 0 8px;
-  font-size: 0.68rem;
+  width: 32px;
+  height: 32px;
+}
+
+.phone-screen .home-safety-card .status-badge {
+  height: 32px !important;
+  min-height: 32px !important;
+  padding: 0 12px !important;
+  line-height: 1 !important;
+  white-space: nowrap !important;
 }
 
 .phone-screen .home-safety-card .status-card-header > div > .card-label,
@@ -7733,6 +7756,12 @@ h2 {
 
 .phone-screen .home-safety-card .home-metric-row {
   margin-top: 18px !important;
+  align-items: center !important;
+}
+
+.phone-screen .home-safety-card .home-metric-pills {
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
 }
 
 .phone-screen .emergency-card .sos-button {

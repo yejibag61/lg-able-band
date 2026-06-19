@@ -32,6 +32,7 @@ export function HomeTab({
   const updatedAtLabel = formatStatusUpdatedAt(summary.safetyStatus.lastCheckedAt, currentTime)
   const emergencyAvailability = getEmergencyAvailability(summary)
   const emergencyStatusMessage = emergencyMessage
+  const emergencyToastTone = getEmergencyToastTone(emergencyStatusMessage)
 
   useEffect(() => {
     const intervalId = window.setInterval(() => {
@@ -62,22 +63,6 @@ export function HomeTab({
           </div>
           <div className="status-refresh-control">
             {updatedAtLabel ? <span className="status-badge">{updatedAtLabel}</span> : null}
-            <button
-              className="status-refresh-button"
-              type="button"
-              aria-label="홈 정보 새로고침"
-              aria-busy={refreshing}
-              disabled={refreshing}
-              onClick={onRefreshHome}
-            >
-              <svg className={refreshing ? 'is-spinning' : undefined} viewBox="0 0 24 24" focusable="false">
-                <path d="M20 11a8 8 0 0 0-14.7-4.4L4 8" />
-                <path d="M4 4v4h4" />
-                <path d="M4 13a8 8 0 0 0 14.7 4.4L20 16" />
-                <path d="M20 20v-4h-4" />
-              </svg>
-              <span>{refreshing ? '동기화 중' : '새로고침'}</span>
-            </button>
           </div>
         </div>
         <p className="status-copy">{summary.safetyStatus.message}</p>
@@ -87,9 +72,26 @@ export function HomeTab({
           </p>
         ) : null}
         <div className="home-metric-row" aria-label="오늘 알림 요약">
-          <span className="home-metric-pill">최근 알림 {alertMetrics.total}건</span>
-          <span className="home-metric-pill">미확인 {alertMetrics.unread}건</span>
-          <span className="home-metric-pill danger">위험 {alertMetrics.danger}건</span>
+          <div className="home-metric-pills">
+            <span className="home-metric-pill">최근 알림 {alertMetrics.total}건</span>
+            <span className="home-metric-pill">미확인 {alertMetrics.unread}건</span>
+            <span className="home-metric-pill danger">위험 {alertMetrics.danger}건</span>
+          </div>
+          <button
+            className="status-refresh-button home-metric-refresh-button"
+            type="button"
+            aria-label="홈 정보 새로고침"
+            aria-busy={refreshing}
+            disabled={refreshing}
+            onClick={onRefreshHome}
+          >
+            <svg className={refreshing ? 'is-spinning' : undefined} viewBox="0 0 24 24" focusable="false">
+              <path d="M20 11a8 8 0 0 0-14.7-4.4L4 8" />
+              <path d="M4 4v4h4" />
+              <path d="M4 13a8 8 0 0 0 14.7 4.4L20 16" />
+              <path d="M20 20v-4h-4" />
+            </svg>
+          </button>
         </div>
       </section>
 
@@ -108,11 +110,6 @@ export function HomeTab({
         >
           {emergencySubmitting ? '요청 전송 중...' : '긴급 지원 요청'}
         </button>
-        {emergencyStatusMessage ? (
-          <p className="emergency-message" role="status">
-            {emergencyStatusMessage}
-          </p>
-        ) : null}
       </section>
 
       <section className="content-card alert-summary-card">
@@ -147,6 +144,34 @@ export function HomeTab({
           )}
         </div>
       </section>
+
+      {emergencyStatusMessage ? (
+        <div
+          className="device-toast"
+          role={emergencyToastTone === 'error' ? 'alert' : 'status'}
+          aria-live={emergencyToastTone === 'error' ? 'assertive' : 'polite'}
+        >
+          <p className="device-toast-message">{emergencyStatusMessage}</p>
+        </div>
+      ) : null}
     </>
   )
+}
+
+function getEmergencyToastTone(message) {
+  if (!message) {
+    return 'success'
+  }
+
+  if (
+    message.includes('등록한 뒤 사용할 수 있습니다') ||
+    message.includes('먼저 등록') ||
+    message.includes('실패') ||
+    message.includes('못했습니다') ||
+    message.includes('다시 시도')
+  ) {
+    return 'error'
+  }
+
+  return 'success'
 }

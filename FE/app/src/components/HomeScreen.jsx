@@ -205,6 +205,18 @@ export function HomeScreen({ session, onLogout }) {
     scrollAppContentToTop()
   }, [activeTab])
 
+  useEffect(() => {
+    if (!emergencyMessage) {
+      return undefined
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setEmergencyMessage('')
+    }, 2400)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [emergencyMessage])
+
   function handleTabChange(nextTab) {
     if (nextTab === 'admin' && !isAdminAccount) {
       return

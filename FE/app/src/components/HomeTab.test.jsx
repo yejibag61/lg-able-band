@@ -53,7 +53,7 @@ describe('HomeTab', () => {
 
     expect(screen.getByText('주의')).toBeTruthy()
     expect(screen.queryByText('방금 전')).toBeNull()
-    expect(screen.getByText(/업데이트/)).toBeTruthy()
+    expect(screen.getByText(/분 전|시간 전|방금/)).toBeTruthy()
     expect(screen.getByText('최근 알림 1건')).toBeTruthy()
     expect(screen.getByText('미확인 1건')).toBeTruthy()
     expect(screen.getByText('위험 1건')).toBeTruthy()
@@ -97,7 +97,6 @@ describe('HomeTab', () => {
 
     const refreshButton = screen.getByRole('button', { name: '홈 정보 새로고침' })
     expect(refreshButton.disabled).toBe(true)
-    expect(screen.getByText('동기화 중')).toBeTruthy()
   })
 
   it('sends the emergency request action when SOS is available', async () => {

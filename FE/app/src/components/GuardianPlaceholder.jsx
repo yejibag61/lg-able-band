@@ -216,7 +216,6 @@ export function GuardianPlaceholder({ account, onLogout }) {
                   <path d="M4 13a8 8 0 0 0 14.7 4.4L20 16" />
                   <path d="M20 20v-4h-4" />
                 </svg>
-                <span>{dashboardState.refreshing ? '동기화 중' : '새로고침'}</span>
               </button>
             </div>
           </div>
