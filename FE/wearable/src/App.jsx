@@ -15,6 +15,7 @@ import {
   createLivingSignalDetectionAlert,
   getWearableLivingSignalState,
 } from './services/livingSignalService'
+import { getWearableNotificationSettings } from './services/accessibilityPreferenceService'
 import { clearWearableAccessToken, getWearableAccessToken } from './services/wearableApiClient'
 import {
   confirmAlert,
@@ -41,7 +42,17 @@ const PAIRED_PAIRING_STORAGE_KEY = 'lg-able-band.pairingSession'
 const LIVING_SIGNAL_REPORT_COOLDOWN_MS = 15000
 const LIVING_SIGNAL_SYNC_INTERVAL_MS = 5000
 const ALERT_POLL_INTERVAL_MS = 3000
+const NOTIFICATION_SETTINGS_SYNC_INTERVAL_MS = 5000
 const BOTTOM_SHEET_COLLAPSED_PEEK = 34
+
+const DEFAULT_NOTIFICATION_SETTINGS = {
+  voiceGuide: true,
+  vibrationGuide: true,
+}
+const PENDING_NOTIFICATION_SETTINGS = {
+  voiceGuide: false,
+  vibrationGuide: false,
+}
 
 function App() {
   const initialPairing = getStoredPairedPairingSession()
@@ -70,6 +81,10 @@ function App() {
     threshold: 0.8,
     sounds: [],
   })
+  const [notificationSettings, setNotificationSettings] = useState(() =>
+    initialPairing ? PENDING_NOTIFICATION_SETTINGS : DEFAULT_NOTIFICATION_SETTINGS,
+  )
+  const [notificationSettingsReady, setNotificationSettingsReady] = useState(!initialPairing)
   const [, setLivingSignalState] = useState({
     isListening: false,
     threshold: 0.8,
@@ -111,6 +126,8 @@ function App() {
   const speakText = useCallback((text) => {
     if (
       !text ||
+      !notificationSettingsReady ||
+      !notificationSettings.voiceGuide ||
       isChatbotOpen ||
       isChatbotSpeaking ||
       typeof window === 'undefined' ||
@@ -124,7 +141,15 @@ function App() {
     const utterance = new SpeechSynthesisUtterance(text)
     utterance.lang = 'ko-KR'
     window.speechSynthesis.speak(utterance)
-  }, [isChatbotOpen, isChatbotSpeaking])
+  }, [isChatbotOpen, isChatbotSpeaking, notificationSettings.voiceGuide, notificationSettingsReady])
+
+  const notifyVibration = useCallback((pattern) => {
+    if (!notificationSettingsReady || !notificationSettings.vibrationGuide) {
+      return false
+    }
+
+    return triggerVibration(pattern)
+  }, [notificationSettings.vibrationGuide, notificationSettingsReady])
 
   const stopLivingSignalMonitoring = useCallback(async () => {
     const session = livingSignalSessionRef.current
@@ -176,6 +201,8 @@ function App() {
         threshold: 0.8,
         sounds: [],
       })
+      setNotificationSettings(PENDING_NOTIFICATION_SETTINGS)
+      setNotificationSettingsReady(false)
       livingSignalConfigKeyRef.current = ''
       microphonePreflightRequestedRef.current = false
       setStatusMessage(message)
@@ -193,6 +220,8 @@ function App() {
     storePairedPairingSession(pairedSession)
     setPairing((current) => mergePairingSession(current, pairedSession))
     setPairingStatus('success')
+    setNotificationSettings(PENDING_NOTIFICATION_SETTINGS)
+    setNotificationSettingsReady(false)
     window.clearTimeout(pairingPollTimerRef.current)
     window.clearTimeout(pairingCompleteTimerRef.current)
     pairingCompleteTimerRef.current = window.setTimeout(() => {
@@ -222,6 +251,35 @@ function App() {
       if (typeof globalThis !== 'undefined') {
         globalThis.__ABLE_BAND_VIBRATION_ENABLED__ = false
       }
+    }
+  }, [isPaired])
+
+  useEffect(() => {
+    if (!isPaired) {
+      setNotificationSettings(DEFAULT_NOTIFICATION_SETTINGS)
+      setNotificationSettingsReady(true)
+      return undefined
+    }
+
+    let isMounted = true
+
+    async function syncNotificationSettings() {
+      const settings = await getWearableNotificationSettings()
+      if (isMounted) {
+        setNotificationSettings(settings)
+        setNotificationSettingsReady(true)
+      }
+    }
+
+    syncNotificationSettings()
+    const intervalId = window.setInterval(
+      syncNotificationSettings,
+      NOTIFICATION_SETTINGS_SYNC_INTERVAL_MS,
+    )
+
+    return () => {
+      isMounted = false
+      window.clearInterval(intervalId)
     }
   }, [isPaired])
 
@@ -536,7 +594,6 @@ function App() {
                 return
               }
 
-              announcedAlertIdRef.current = createdAlert.alertId
               if (createdAlert.alertId) {
                 knownAlertIdsRef.current = new Set([
                   ...knownAlertIdsRef.current,
@@ -552,8 +609,6 @@ function App() {
               setAlertIndex(0)
               setMode('alert')
               setStatusMessage(`${match.registeredSoundName} 감지`)
-              triggerVibration(vibrationPatternForAlert(createdAlert))
-              speakText(createdAlert.voiceGuide || createdAlert.message)
             } catch (error) {
               if (!isMounted) {
                 return
@@ -599,12 +654,13 @@ function App() {
     isPaired,
     livingSignalConfig,
     mode,
+    notifyVibration,
     speakText,
     stopLivingSignalMonitoring,
   ])
 
   useEffect(() => {
-    if (!selectedAlert?.alertId) {
+    if (!notificationSettingsReady || !selectedAlert?.alertId) {
       return
     }
 
@@ -617,12 +673,12 @@ function App() {
     }
 
     announcedAlertIdRef.current = selectedAlert.alertId
-    triggerVibration(vibrationPatternForAlert(selectedAlert))
+    notifyVibration(vibrationPatternForAlert(selectedAlert))
     speakText(selectedAlert.voiceGuide || selectedAlert.message)
-  }, [mode, selectedAlert, speakText])
+  }, [mode, notificationSettingsReady, notifyVibration, selectedAlert, speakText])
 
   useEffect(() => {
-    if (mode !== 'uwb' || !activeUwbSession?.voiceGuide) {
+    if (!notificationSettingsReady || mode !== 'uwb' || !activeUwbSession?.voiceGuide) {
       return
     }
 
@@ -633,12 +689,18 @@ function App() {
 
     announcedUwbMessageRef.current = voiceKey
     speakText(activeUwbSession.voiceGuide)
-  }, [activeUwbSession, mode, speakText])
+  }, [activeUwbSession, mode, notificationSettingsReady, speakText])
 
   useEffect(() => {
     window.clearInterval(uwbVibrationIntervalRef.current)
 
-    if (!isPaired || mode !== 'uwb' || !activeUwbSession) {
+    if (
+      !isPaired ||
+      !notificationSettingsReady ||
+      mode !== 'uwb' ||
+      !activeUwbSession ||
+      !notificationSettings.vibrationGuide
+    ) {
       if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
         navigator.vibrate(0)
       }
@@ -650,19 +712,19 @@ function App() {
       return undefined
     }
 
-    triggerVibration(nextPattern)
+    notifyVibration(nextPattern)
     uwbVibrationIntervalRef.current = window.setInterval(() => {
-      triggerVibration(nextPattern)
+      notifyVibration(nextPattern)
     }, getRepeatingUwbVibrationIntervalMs(nextPattern))
 
     return () => window.clearInterval(uwbVibrationIntervalRef.current)
   }, [
-    activeUwbSession?.distanceM,
-    activeUwbSession?.navigationStatus,
-    activeUwbSession?.sessionId,
-    activeUwbSession?.vibrationPattern,
+    activeUwbSession,
     isPaired,
     mode,
+    notificationSettings.vibrationGuide,
+    notificationSettingsReady,
+    notifyVibration,
   ])
 
   useEffect(() => {
@@ -749,7 +811,7 @@ function App() {
     setIsBusy(true)
     try {
       const confirmed = await confirmAlert(selectedAlert.alertId)
-      triggerVibration('MEDIUM')
+      notifyVibration('MEDIUM')
       setAlertStatuses((currentStatuses) => ({
         ...currentStatuses,
         [selectedAlert.alertId]: confirmed.status,
@@ -794,7 +856,7 @@ function App() {
       isUwbPollingRef.current = false
       setIsUwbPolling(false)
       const stopped = await stopUwbSession(currentSessionId)
-      triggerVibration(stopped.vibrationPattern)
+      notifyVibration(stopped.vibrationPattern)
       setUwbSession(stopped)
       setMode('deviceSelect')
       setStatusMessage('위치 안내를 종료했습니다. 다른 가전을 선택할 수 있습니다.')
@@ -810,7 +872,7 @@ function App() {
     setStatusMessage('긴급 요청을 보내는 중입니다.')
     try {
       const response = await requestEmergencyHelp('웨어러블에서 긴급 요청')
-      triggerVibration('LONG_TWICE')
+      notifyVibration('LONG_TWICE')
       setStatusMessage(
         response.message
           ? `${response.message} 보호자에게도 확인 요청을 전달했습니다.`
@@ -918,6 +980,7 @@ function App() {
             onOpenChange={setIsChatbotOpen}
             onSpeakingChange={setIsChatbotSpeaking}
             onWakeListeningChange={setIsChatbotWakeListening}
+            notificationSettings={notificationSettings}
             showFab={false}
             statusMessage={inlineStatusMessage}
             uwbSession={uwbSession}
@@ -969,6 +1032,7 @@ function App() {
             onOpenChange={setIsChatbotOpen}
             onSpeakingChange={setIsChatbotSpeaking}
             onWakeListeningChange={setIsChatbotWakeListening}
+            notificationSettings={notificationSettings}
             showFab={false}
             statusMessage={inlineStatusMessage}
             uwbSession={uwbSession}

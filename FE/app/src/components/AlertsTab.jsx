@@ -104,6 +104,7 @@ const notificationStatsMock = {
 }
 
 export function AlertsTab({
+  accessibility = {},
   accessibilityType,
   alerts,
   alertView = 'list',
@@ -228,6 +229,11 @@ export function AlertsTab({
 
   async function handleReplayAlert(alert) {
     setInlineFeedback(null)
+    if (accessibility.voiceGuide === false) {
+      setFeedbackMessage('음성 안내가 꺼져 있어 알림 안내를 재생하지 않았습니다.')
+      return
+    }
+
     const guide = createAlertGuide(alert)
     const speechStarted = speakAlert(guide)
 
