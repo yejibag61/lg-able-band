@@ -2,6 +2,7 @@ import jsQR from 'jsqr'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { LivingSignalSettingsScreen } from '../features/living-signal'
 import { getAccessibilitySettings, updateAccessibilitySettings } from '../services/accessibilityService'
+import { startChatbotWakeService, stopChatbotWakeService } from '../services/chatbotWakeService'
 import { applyContextAiSafetyStatus, getAppPreview, getHomeSummary } from '../services/homeService'
 import { getDevices } from '../services/deviceService'
 import { createEmergencyRequest } from '../services/emergencyService'
@@ -142,6 +143,14 @@ export function HomeScreen({ session, onLogout }) {
       isMounted = false
     }
   }, [loadHomeView])
+
+  useEffect(() => {
+    startChatbotWakeService()
+
+    return () => {
+      stopChatbotWakeService()
+    }
+  }, [])
 
   useEffect(() => {
     let isMounted = true
