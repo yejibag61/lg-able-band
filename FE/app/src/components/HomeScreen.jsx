@@ -609,18 +609,6 @@ const accessibilityToggleItems = [
     icon: '진',
     description: '밴드와 앱 알림을 진동 중심으로 전달합니다.',
   },
-  {
-    key: 'largeText',
-    label: '큰 글씨',
-    icon: 'Aa',
-    description: '큰 글씨 안내 설정을 저장합니다.',
-  },
-  {
-    key: 'highContrast',
-    label: '고대비',
-    icon: '대',
-    description: '고대비 안내 설정을 저장합니다.',
-  },
 ]
 
 function MenuTab({

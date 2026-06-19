@@ -63,7 +63,8 @@ describe('HomeScreen accessibility settings', () => {
     await user.click(screen.getByRole('button', { name: '설정' }))
 
     expect(screen.getByText('접근성 설정')).toBeTruthy()
-    expect(screen.getByText('고대비 ON')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /큰 글씨/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: /고대비/ })).toBeNull()
     expect(app.className).not.toContain('high-contrast')
     expect(app.className).not.toContain('large-text')
 
@@ -83,12 +84,6 @@ describe('HomeScreen accessibility settings', () => {
       },
     })
     expect(screen.getByText('음성 안내 OFF')).toBeTruthy()
-
-    await user.click(screen.getByRole('button', { name: /고대비/ }))
-    await waitFor(() => {
-      expect(screen.getByText('고대비 OFF')).toBeTruthy()
-    })
-    expect(app.className).not.toContain('high-contrast')
   })
 })
 
