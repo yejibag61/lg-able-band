@@ -54,6 +54,7 @@ function App() {
     submitting: false,
     error: '',
     message: '',
+    messageTone: 'success',
   })
   const [signupForm, setSignupForm] = useState(createInitialSignupForm)
   const [signupState, setSignupState] = useState({
@@ -70,8 +71,9 @@ function App() {
       setLoginForm((current) => ({ ...current, password: '' }))
       setLoginState({
         submitting: false,
-        error: '로그인 세션이 만료되었습니다. 다시 로그인해주세요.',
-        message: '',
+        error: '',
+        message: '로그인 세션이 만료되었습니다. 다시 로그인해주세요.',
+        messageTone: 'notice',
       })
     }
 
@@ -112,11 +114,12 @@ function App() {
         submitting: false,
         error: '이메일과 비밀번호를 모두 입력해주세요.',
         message: '',
+        messageTone: 'success',
       })
       return
     }
 
-    setLoginState({ submitting: true, error: '', message: '' })
+    setLoginState({ submitting: true, error: '', message: '', messageTone: 'success' })
     if (loginForm.role === 'USER') {
       primeSpeechSynthesisForMobile()
       unlockTurnCueAudio()
@@ -126,12 +129,13 @@ function App() {
       const nextSession = await login(loginForm)
       setSession(nextSession)
       setScreen(nextSession.role === 'USER' ? 'userHome' : 'guardianHome')
-      setLoginState({ submitting: false, error: '', message: '' })
+      setLoginState({ submitting: false, error: '', message: '', messageTone: 'success' })
     } catch (error) {
       setLoginState({
         submitting: false,
         error: error.message || '로그인에 실패했습니다.',
         message: '',
+        messageTone: 'success',
       })
     }
   }
@@ -162,6 +166,7 @@ function App() {
         submitting: false,
         error: '',
         message: '회원가입이 완료되었습니다. 로그인해주세요.',
+        messageTone: 'success',
       })
       setSignupForm(createInitialSignupForm())
       setSignupState({ submitting: false, errors: [] })
@@ -225,6 +230,7 @@ function App() {
       password={loginForm.password}
       error={loginState.error}
       message={loginState.message}
+      messageTone={loginState.messageTone}
       isSubmitting={loginState.submitting}
       onRoleChange={(role) => setLoginForm((current) => ({ ...current, role }))}
       onEmailChange={(email) => setLoginForm((current) => ({ ...current, email }))}

@@ -9,7 +9,7 @@ export function SignupScreen({
   const isUser = form.role === 'USER'
 
   return (
-    <main className="phone-screen signup-screen" aria-labelledby="signup-title">
+    <main className="phone-screen signup-screen app-screen" aria-labelledby="signup-title">
       <section className="login-hero">
         <p className="eyebrow">LG Able Band</p>
         <h1 id="signup-title">Able Band 회원가입</h1>
