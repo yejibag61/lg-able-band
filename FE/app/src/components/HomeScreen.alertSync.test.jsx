@@ -99,6 +99,9 @@ describe('HomeScreen alert summary sync', () => {
       expect(screen.getByRole('status').textContent).toContain('알림을 확인 완료로 처리했습니다.')
     })
 
+    expect(screen.queryByText('전기레인지 과열 주의')).toBeNull()
+    expect(screen.getByText('조건에 맞는 알림이 없습니다.')).toBeTruthy()
+
     await user.click(screen.getByRole('button', { name: '홈' }))
 
     const homeContent = within(screen.getByText('실시간 알림 요약').closest('section'))
