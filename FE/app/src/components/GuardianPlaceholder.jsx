@@ -98,8 +98,8 @@ export function GuardianPlaceholder({ account, onLogout }) {
 
   const dashboard = dashboardState.data
   const allHistoryItems = createGuardianHistoryItems(dashboard)
-  const historyItems = createGuardianHistoryItems(dashboard).filter(
-    (item) => !confirmedHistoryKeys.includes(item.key),
+  const historyItems = allHistoryItems.filter(
+    (item) => item.alertId || !confirmedHistoryKeys.includes(item.key),
   )
   const visibleDangerAlertKeys = new Set(
     historyItems.filter((item) => item.kind === 'danger').map((item) => item.key),
@@ -126,12 +126,14 @@ export function GuardianPlaceholder({ account, onLogout }) {
         return
       }
 
-      setConfirmedHistoryKeys((currentKeys) =>
-        persistConfirmedHistoryKeys(
-          confirmedHistoryStorageKey,
-          currentKeys.includes(itemKey) ? currentKeys : [...currentKeys, itemKey],
-        ),
-      )
+      if (!item.alertId) {
+        setConfirmedHistoryKeys((currentKeys) =>
+          persistConfirmedHistoryKeys(
+            confirmedHistoryStorageKey,
+            currentKeys.includes(itemKey) ? currentKeys : [...currentKeys, itemKey],
+          ),
+        )
+      }
       await loadDashboard()
     } catch (error) {
       if (!isMountedRef.current) {
