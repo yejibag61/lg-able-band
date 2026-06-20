@@ -586,7 +586,7 @@ async function loadVoiceAlerts(context = {}) {
 
 function extractAlertFilter(text) {
   const value = normalize(text)
-  if (value.includes('미확인') || value.includes('안읽') || value.includes('안읽은')) return 'UNREAD'
+  if (value.includes('미확인') || value.includes('안읽') || value.includes('안읽은') || value.includes('읽지않은')) return 'UNREAD'
   if (value.includes('긴급도움') || value.includes('긴급')) return 'EMERGENCY'
   if (value.includes('위험한') || value.includes('위험')) return 'DANGER'
   if (value.includes('생활') || value.includes('세탁')) return 'LIFE'

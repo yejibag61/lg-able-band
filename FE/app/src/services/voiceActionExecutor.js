@@ -326,6 +326,10 @@ export async function checkEventHistory(date, context = {}) {
 }
 
 async function listAlertsByFilter(filter = 'ALL', context = {}) {
+  if (context.source === 'wearable') {
+    return filterAlertList(localAlertList(context), filter)
+  }
+
   try {
     return filterAlertList(await getAlertsApi({ limit: 50 }), filter)
   } catch {
