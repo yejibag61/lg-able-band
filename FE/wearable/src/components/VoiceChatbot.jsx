@@ -1713,7 +1713,6 @@ export function VoiceChatbot({
 
           {currentChatScreen === 'speak' ? (
             <PhraseListScreen
-              subtitle="원하는 문장을 선택하세요"
               title="대신 말하기"
               onSelect={selectPhrase}
               phrases={[...quickPhrases, ...morePhrases]}
@@ -1810,7 +1809,7 @@ export function VoiceChatbot({
 function StartScreen({ onAsk, onSpeak, onVoiceStart }) {
   return (
     <div className="wearable-chat-content wearable-chat-start">
-      <Header title="AI 챗봇" subtitle="어떤 도움이 필요하신가요?" />
+      <Header/>
       <div className="wearable-chat-menu">
         <button
           className="wearable-chat-choice wearable-chat-choice-primary"
@@ -1839,6 +1838,16 @@ function StartScreen({ onAsk, onSpeak, onVoiceStart }) {
             <strong>AI에게 묻기</strong>
             <small>정보를 찾아드려요</small>
           </span>
+        </button>
+      </div>
+      <div className="wearable-chat-start-wake">
+        <button
+          className="wearable-chat-mic wearable-chat-wake-button"
+          type="button"
+          aria-label="챗봇 음성 호출로 시작"
+          onClick={onVoiceStart}
+        >
+          <MicIcon />
         </button>
       </div>
       <div className="wearable-chat-wake">
@@ -1947,7 +1956,7 @@ function PhraseListScreen({ backLabel = '더보기', onBack, onMore, onSelect, p
 function SpeakingScreen({ icon, onBack, onReplay, phrase }) {
   return (
     <div className="wearable-chat-content wearable-chat-speaking">
-      <Header title="문장을 말하고 있어요" subtitle="상대방이 들을 수 있도록 가까이 있어요." />
+      <Header title="문장을 말하고 있어요" />
       <div className="wearable-chat-speaker" aria-hidden="true">
         {icon}
       </div>
