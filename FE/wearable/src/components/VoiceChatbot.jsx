@@ -27,7 +27,7 @@ const RECOGNITION_STUCK_RESTART_MS = 3500
 const MIN_USER_TRANSCRIPT_CHARS = 2
 const UWB_POLL_INTERVAL_MS = 2500
 const WAKE_RESTART_DELAY_MS = 100
-const WAKE_BLOCKED_RESTART_DELAY_MS = 1500
+const WAKE_BLOCKED_RESTART_DELAY_MS = 3000
 const WAKE_STUCK_RESTART_MS = 7000
 const USER_RESTART_DELAY_MS = 450
 const CONVERSATION_STATE = {
@@ -709,6 +709,13 @@ export function VoiceChatbot({
 
   async function startVoiceTurn() {
     const SpeechRecognition = getSpeechRecognitionConstructor()
+    console.log('[WearableVoice][user] startVoiceTurn requested', {
+      hasSpeechRecognition: Boolean(SpeechRecognition),
+      isOpen: isOpenRef.current,
+      microphoneReady: microphoneReadyRef.current,
+      currentScreen: currentChatScreen,
+      conversationState,
+    })
     if (!SpeechRecognition) {
       const message = '이 브라우저는 마이크 인식을 지원하지 않아요.'
       setVoiceStatus(message)
@@ -722,7 +729,7 @@ export function VoiceChatbot({
     if (!microphoneReadyRef.current) {
       const microphoneError = await checkMicrophoneAvailability()
       if (microphoneError) {
-        console.warn('마이크 준비 실패:', microphoneError)
+        console.warn('[WearableVoice][user] microphone unavailable:', microphoneError)
         setIsListening(false)
         setCurrentChatScreen('listening')
         setVoiceStatus(microphoneError)
@@ -747,6 +754,7 @@ export function VoiceChatbot({
       if (!isActiveRecognition(recognition, sessionId)) {
         return
       }
+      console.log('[WearableVoice][user] recognition onstart', { sessionId })
       setIsListening(true)
       setCurrentChatScreen('listening')
       setConversationState(CONVERSATION_STATE.WAITING_USER)
@@ -774,7 +782,13 @@ export function VoiceChatbot({
 
       setTranscript(nextTranscript)
       if (nextTranscript) {
-        console.log('STT 인식 결과:', nextTranscript, heardCandidates)
+        console.log('[WearableVoice][user] recognition onresult', {
+          sessionId,
+          transcript: nextTranscript,
+          heardCandidates,
+          isMeaningful: hasMeaningfulTranscript,
+          resultCount: event.results.length,
+        })
       }
 
       if (!hasMeaningfulTranscript) {
@@ -792,6 +806,7 @@ export function VoiceChatbot({
       if (!isActiveRecognition(recognition, sessionId)) {
         return
       }
+      console.log('[WearableVoice][user] onaudiostart', { sessionId })
       markRecognitionActivity()
     }
 
@@ -799,6 +814,7 @@ export function VoiceChatbot({
       if (!isActiveRecognition(recognition, sessionId)) {
         return
       }
+      console.log('[WearableVoice][user] onsoundstart', { sessionId })
       markRecognitionActivity()
     }
 
@@ -806,6 +822,7 @@ export function VoiceChatbot({
       if (!isActiveRecognition(recognition, sessionId)) {
         return
       }
+      console.log('[WearableVoice][user] onspeechstart', { sessionId })
       markRecognitionActivity()
       setConversationState(CONVERSATION_STATE.USER_SPEAKING)
       setVoiceStatus('사용자 발화 중...')
@@ -815,6 +832,10 @@ export function VoiceChatbot({
       if (!isActiveRecognition(recognition, sessionId)) {
         return
       }
+      console.log('[WearableVoice][user] onspeechend', {
+        sessionId,
+        latestTranscript: latestTranscriptRef.current,
+      })
       markRecognitionActivity()
       if (isMeaningfulTranscript(latestTranscriptRef.current)) {
         scheduleUserSpeechEnd(latestTranscriptRef.current)
@@ -831,7 +852,12 @@ export function VoiceChatbot({
         return
       }
 
-      console.warn('STT 오류:', event?.error || event)
+      console.warn('[WearableVoice][user] recognition error:', event?.error || event, {
+        sessionId,
+        latestTranscript: latestTranscriptRef.current,
+        isOpen: isOpenRef.current,
+        handled: userSpeechHandledRef.current,
+      })
       if (event?.error === 'no-speech') {
         if (isOpenRef.current && !userSpeechHandledRef.current) {
           setVoiceStatus('말씀해주세요.')
@@ -850,6 +876,12 @@ export function VoiceChatbot({
       if (!isActiveRecognition(recognition, sessionId)) {
         return
       }
+      console.log('[WearableVoice][user] recognition onend', {
+        sessionId,
+        latestTranscript: latestTranscriptRef.current,
+        isOpen: isOpenRef.current,
+        handled: userSpeechHandledRef.current,
+      })
       clearRecognitionWatchdog()
       setIsListening(false)
       if (isOpenRef.current && latestTranscriptRef.current && !userSpeechHandledRef.current) {
@@ -867,9 +899,10 @@ export function VoiceChatbot({
     }
 
     try {
+      console.log('[WearableVoice][user] recognition.start()', { sessionId })
       recognition.start()
     } catch (error) {
-      console.warn('STT 시작 실패:', error)
+      console.warn('[WearableVoice][user] recognition start failed:', error, { sessionId })
       setVoiceStatus('마이크를 다시 여는 중이에요.')
       window.setTimeout(() => {
         if (isOpenRef.current && !userSpeechHandledRef.current) {
@@ -1392,6 +1425,13 @@ export function VoiceChatbot({
 
   function startWakeListening() {
     const SpeechRecognition = getSpeechRecognitionConstructor()
+    console.log('[WearableVoice][wake] startWakeListening requested', {
+      hasSpeechRecognition: Boolean(SpeechRecognition),
+      isOpen: isOpenRef.current,
+      alreadyListening: Boolean(wakeRecognitionRef.current),
+      location: globalThis.location?.href,
+      isSecureContext: globalThis.isSecureContext,
+    })
     if (!SpeechRecognition || isOpenRef.current || wakeRecognitionRef.current) {
       return
     }
@@ -1407,6 +1447,7 @@ export function VoiceChatbot({
 
     recognition.onstart = () => {
       window.clearTimeout(wakeStartGuardTimerRef.current)
+      console.log('[WearableVoice][wake] recognition onstart')
       onWakeListeningChange?.(true)
       setVoiceStatus('챗봇 켜줘 라고 말하면 바로 시작해요.')
       wakeMatchedRef.current = false
@@ -1422,7 +1463,13 @@ export function VoiceChatbot({
       const heard = cleanupRecognizedSpeech(heardCandidates.join(' '))
 
       wakeTranscriptRef.current = `${wakeTranscriptRef.current} ${heard}`.slice(-160)
-      console.log('STT 인식 결과:', heard, heardCandidates)
+      console.log('[WearableVoice][wake] recognition onresult', {
+        heard,
+        heardCandidates,
+        wakeTranscript: wakeTranscriptRef.current,
+        shouldOpen: shouldOpenChatbot(`${heard} ${wakeTranscriptRef.current}`),
+        resultCount: event.results.length,
+      })
 
       if (shouldOpenChatbot(`${heard} ${wakeTranscriptRef.current}`)) {
         wakeMatchedRef.current = true
@@ -1448,7 +1495,10 @@ export function VoiceChatbot({
         return
       }
 
-      console.warn('Wake STT 오류:', event?.error || event)
+      console.warn('[WearableVoice][wake] recognition error:', event?.error || event, {
+        isOpen: isOpenRef.current,
+        wakeMatched: wakeMatchedRef.current,
+      })
       wakeRecognitionRef.current = null
       wakeTranscriptRef.current = ''
       wakeMatchedRef.current = false
@@ -1468,30 +1518,38 @@ export function VoiceChatbot({
       }
 
       onWakeListeningChange?.(true)
-      scheduleWakeRestart()
+      scheduleWakeRestart(WAKE_BLOCKED_RESTART_DELAY_MS)
     }
 
     recognition.onend = () => {
       window.clearTimeout(wakeStartGuardTimerRef.current)
       window.clearTimeout(wakeSilenceTimerRef.current)
+      console.log('[WearableVoice][wake] recognition onend', {
+        wakeMatched: wakeMatchedRef.current,
+        isOpen: isOpenRef.current,
+        wakeTranscript: wakeTranscriptRef.current,
+      })
       wakeRecognitionRef.current = null
       if (wakeMatchedRef.current) {
         finishWakeSpeech()
         return
       }
-      scheduleWakeRestart()
+      scheduleWakeRestart(WAKE_BLOCKED_RESTART_DELAY_MS)
     }
 
     recognition.onnomatch = () => {
+      console.log('[WearableVoice][wake] recognition onnomatch')
       wakeTranscriptRef.current = ''
     }
 
     try {
       onWakeListeningChange?.(true)
       scheduleWakeStartGuard(recognition)
+      console.log('[WearableVoice][wake] recognition.start()')
       recognition.start()
-    } catch {
+    } catch (error) {
       window.clearTimeout(wakeStartGuardTimerRef.current)
+      console.warn('[WearableVoice][wake] recognition start failed:', error)
       onWakeListeningChange?.(true)
       wakeRecognitionRef.current = null
       scheduleWakeRestart()
@@ -1518,7 +1576,7 @@ export function VoiceChatbot({
         return
       }
 
-      console.warn('Wake STT 입력 이벤트가 없어 대기 마이크를 다시 시작합니다.')
+      console.warn('[WearableVoice][wake] no input events; restarting wake recognition')
       try {
         wakeRecognitionRef.current?.abort?.()
       } catch {
@@ -1538,7 +1596,7 @@ export function VoiceChatbot({
         return
       }
 
-      console.warn('Wake STT 시작 이벤트가 없어 대기 마이크를 다시 시작합니다.')
+      console.warn('[WearableVoice][wake] no start event; restarting wake recognition')
       try {
         recognition.abort?.()
       } catch {
@@ -1624,7 +1682,7 @@ export function VoiceChatbot({
         return
       }
 
-      console.warn('STT 입력 이벤트가 없어 사용자 발화 인식을 다시 시작합니다.')
+      console.warn('[WearableVoice][user] no input events; restarting user recognition')
       setVoiceStatus('마이크 입력을 다시 여는 중...')
       stopRecognition()
       window.setTimeout(() => {
