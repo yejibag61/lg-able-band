@@ -41,7 +41,7 @@ export async function apiRequest(path, options = {}) {
 
   let response
   try {
-    response = await fetch(`${apiBaseUrl()}${path}`, {
+    response = await fetch(`${getApiBaseUrl()}${path}`, {
       ...fetchOptions,
       headers,
       body: body === undefined ? undefined : JSON.stringify(body),
@@ -69,7 +69,7 @@ export async function apiRequest(path, options = {}) {
   return data
 }
 
-function apiBaseUrl() {
+export function getApiBaseUrl() {
   const configuredBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim()
 
   if (configuredBaseUrl) {

@@ -10,3 +10,6 @@ INFO:     127.0.0.1:51825 - "POST /api/ai/voice-chat HTTP/1.1" 200 OK
 INFO:     127.0.0.1:51255 - "POST /api/ai/voice-chat HTTP/1.1" 200 OK
 INFO:     127.0.0.1:52272 - "POST /api/ai/voice-chat HTTP/1.1" 200 OK
 INFO:     127.0.0.1:53448 - "POST /api/ai/voice-chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54999 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59628 - "POST /api/ai/voice-chat HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62479 - "GET /health HTTP/1.1" 200 OK

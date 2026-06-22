@@ -2,6 +2,7 @@ package com.lgableband.emergency;
 
 import com.lgableband.auth.MvpDataService;
 import com.lgableband.common.ApiException;
+import com.lgableband.guardian.GuardianLiveAlertService;
 import com.lgableband.mock.MockDataStore;
 import java.sql.PreparedStatement;
 import java.sql.Statement;
@@ -30,6 +31,7 @@ public class EmergencyService {
 	private final ObjectProvider<PlatformTransactionManager> transactionManagerProvider;
 	private final MvpDataService dataService;
 	private final MockDataStore mockDataStore;
+	private final GuardianLiveAlertService guardianLiveAlertService;
 	private final Duration duplicateCooldown;
 	private final Clock clock;
 
@@ -38,6 +40,7 @@ public class EmergencyService {
 		ObjectProvider<PlatformTransactionManager> transactionManagerProvider,
 		MvpDataService dataService,
 		MockDataStore mockDataStore,
+		GuardianLiveAlertService guardianLiveAlertService,
 		@Value("${app.emergency.cooldown-seconds:10}") long duplicateCooldownSeconds,
 		ObjectProvider<Clock> clockProvider
 	) {
@@ -45,6 +48,7 @@ public class EmergencyService {
 		this.transactionManagerProvider = transactionManagerProvider;
 		this.dataService = dataService;
 		this.mockDataStore = mockDataStore;
+		this.guardianLiveAlertService = guardianLiveAlertService;
 		this.duplicateCooldown = Duration.ofSeconds(duplicateCooldownSeconds);
 		this.clock = clockProvider.getIfAvailable(() -> Clock.system(SERVICE_OFFSET));
 	}
@@ -54,7 +58,9 @@ public class EmergencyService {
 		JdbcTemplate jdbcTemplate = jdbcTemplate();
 		if (jdbcTemplate == null) {
 			rejectDuplicateMockEmergency(user.userId(), request.source());
-			return toSummary(this.mockDataStore.createEmergency(user.userId(), request.message(), request.source()));
+			EmergencyRequestSummary summary = toSummary(this.mockDataStore.createEmergency(user.userId(), request.message(), request.source()));
+			publishLiveEmergency(summary, null);
+			return summary;
 		}
 
 		rejectDuplicateDbEmergency(jdbcTemplate, user.userId(), request.source());
@@ -64,11 +70,16 @@ public class EmergencyService {
 		}
 
 		PlatformTransactionManager transactionManager = this.transactionManagerProvider.getIfAvailable();
+		EmergencyRequestSummary summary;
 		if (transactionManager == null) {
-			return createDbEmergency(jdbcTemplate, user.userId(), request, guardians);
+			summary = createDbEmergency(jdbcTemplate, user.userId(), request, guardians);
 		}
-		return new TransactionTemplate(transactionManager)
-			.execute(status -> createDbEmergency(jdbcTemplate, user.userId(), request, guardians));
+		else {
+			summary = new TransactionTemplate(transactionManager)
+				.execute(status -> createDbEmergency(jdbcTemplate, user.userId(), request, guardians));
+		}
+		publishLiveEmergency(summary, null);
+		return summary;
 	}
 
 	public EmergencyRequestListResponse list(String authorization) {
@@ -159,6 +170,17 @@ public class EmergencyService {
 			toOffsetDateTime(now),
 			true,
 			guardianTargets(jdbcTemplate, userId, alertId)
+		);
+	}
+
+	private void publishLiveEmergency(EmergencyRequestSummary summary, Long fallbackAlertId) {
+		this.guardianLiveAlertService.publishEmergency(
+			summary.guardianTargets(),
+			fallbackAlertId == null ? 0L : fallbackAlertId,
+			summary.emergencyRequestId(),
+			summary.message(),
+			summary.source(),
+			summary.sentAt()
 		);
 	}
 

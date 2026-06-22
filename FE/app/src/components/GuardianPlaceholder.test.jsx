@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { vi } from 'vitest'
 import { GuardianPlaceholder } from './GuardianPlaceholder'
@@ -18,9 +18,11 @@ describe('GuardianPlaceholder', () => {
       createGuardianDashboard(),
     )
     vi.spyOn(guardianDashboardService, 'confirmGuardianHistoryItem').mockResolvedValue({})
+    vi.spyOn(guardianDashboardService, 'subscribeGuardianDashboardEvents').mockReturnValue(() => {})
   })
 
   afterEach(() => {
+    delete window.__ABLE_BAND_GUARDIAN_DASHBOARD_POLL_MS
     vi.restoreAllMocks()
     window.localStorage.clear()
   })
@@ -53,16 +55,60 @@ describe('GuardianPlaceholder', () => {
     expect(window.localStorage.getItem(storageKey)).toBeNull()
     expect(screen.getAllByText('아직 처리되지 않은 긴급 요청입니다.')).toHaveLength(2)
   })
+
+  it('shows a live alert and vibrates when a new guardian alert arrives without refresh', async () => {
+    window.__ABLE_BAND_GUARDIAN_DASHBOARD_POLL_MS = 20
+    const vibrate = vi.fn()
+    Object.defineProperty(globalThis.navigator, 'vibrate', {
+      configurable: true,
+      value: vibrate,
+    })
+    guardianDashboardService.getGuardianDashboard.mockReset()
+    guardianDashboardService.getGuardianDashboard
+      .mockResolvedValueOnce(createGuardianDashboard({ dangerAlerts: [] }))
+      .mockResolvedValueOnce(createGuardianDashboard())
+
+    render(<GuardianPlaceholder account={account} onLogout={() => {}} />)
+
+    await screen.findByText('최근 위험 알림이 없습니다.')
+
+    await screen.findByRole('alert')
+    expect(screen.getAllByText('아직 처리되지 않은 긴급 요청입니다.').length).toBeGreaterThan(0)
+    expect(vibrate).toHaveBeenCalledWith([240, 100, 240, 100, 480])
+  })
+
+  it('reloads immediately when the guardian alert stream receives an event', async () => {
+    let streamHandler = null
+    guardianDashboardService.subscribeGuardianDashboardEvents.mockImplementation((handler) => {
+      streamHandler = handler
+      return () => {}
+    })
+    guardianDashboardService.getGuardianDashboard.mockReset()
+    guardianDashboardService.getGuardianDashboard
+      .mockResolvedValueOnce(createGuardianDashboard({ dangerAlerts: [] }))
+      .mockResolvedValueOnce(createGuardianDashboard())
+
+    render(<GuardianPlaceholder account={account} onLogout={() => {}} />)
+
+    await screen.findByText('최근 위험 알림이 없습니다.')
+
+    await act(async () => {
+      streamHandler({ type: 'guardian-alert', data: { alertId: 161 } })
+    })
+
+    await screen.findByRole('alert')
+    expect(screen.getAllByText('아직 처리되지 않은 긴급 요청입니다.').length).toBeGreaterThan(0)
+  })
 })
 
-function createGuardianDashboard() {
+function createGuardianDashboard(overrides = {}) {
   return {
     user: {
       userId: 6,
       name: '홍길덩',
       accessibilityType: 'VISUAL',
     },
-    dangerAlerts: [
+    dangerAlerts: overrides.dangerAlerts ?? [
       {
         alertId: 161,
         type: 'EMERGENCY',
@@ -74,7 +120,7 @@ function createGuardianDashboard() {
         status: 'ESCALATED',
       },
     ],
-    emergencyRequests: [],
+    emergencyRequests: overrides.emergencyRequests ?? [],
     summary: {
       unreadDangerAlertCount: 1,
       emergencyRequestCount: 1,

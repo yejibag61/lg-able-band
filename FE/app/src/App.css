@@ -9235,6 +9235,47 @@ h2 {
   color: #be123c !important;
 }
 
+.phone-screen.guardian-screen .guardian-live-alert {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 10px;
+  align-items: start;
+  padding: 12px 14px;
+  border: 1px solid #fecdd3;
+  border-radius: 8px;
+  background: #fff1f2;
+  color: #881337;
+  box-shadow: 0 10px 22px rgba(190, 18, 60, 0.12);
+}
+
+.phone-screen.guardian-screen .guardian-live-alert-badge {
+  display: inline-grid;
+  min-height: 26px;
+  place-items: center;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: #be123c;
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.phone-screen.guardian-screen .guardian-live-alert strong {
+  display: block;
+  color: #881337;
+  font-size: 14.4px;
+  font-weight: 800;
+  line-height: 1.32;
+}
+
+.phone-screen.guardian-screen .guardian-live-alert p {
+  margin-top: 3px;
+  color: #9f1239;
+  font-size: 13.2px;
+  line-height: 1.45;
+}
+
 .phone-screen.guardian-screen .guardian-home-contact-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;

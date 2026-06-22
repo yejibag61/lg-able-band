@@ -1,8 +1,10 @@
 package com.lgableband.guardian;
 
+import com.lgableband.auth.MvpDataService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import org.springframework.http.MediaType;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -14,15 +16,24 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 @RestController
 @RequestMapping("/api/guardians")
 public class GuardianController {
 
 	private final GuardianService guardianService;
+	private final GuardianLiveAlertService guardianLiveAlertService;
+	private final MvpDataService dataService;
 
-	public GuardianController(GuardianService guardianService) {
+	public GuardianController(
+		GuardianService guardianService,
+		GuardianLiveAlertService guardianLiveAlertService,
+		MvpDataService dataService
+	) {
 		this.guardianService = guardianService;
+		this.guardianLiveAlertService = guardianLiveAlertService;
+		this.dataService = dataService;
 	}
 
 	@GetMapping
@@ -33,6 +44,11 @@ public class GuardianController {
 	@GetMapping("/dashboard")
 	public GuardianService.GuardianDashboardResponse dashboard(@RequestHeader("Authorization") String authorization) {
 		return this.guardianService.dashboard(authorization);
+	}
+
+	@GetMapping(value = "/dashboard/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+	public SseEmitter dashboardStream(@RequestHeader("Authorization") String authorization) {
+		return this.guardianLiveAlertService.subscribe(this.dataService.currentGuardian(authorization).guardianId());
 	}
 
 	@PostMapping

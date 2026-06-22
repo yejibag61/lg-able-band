@@ -1,5 +1,5 @@
 import { mockAppPreview } from '../mocks/appPreviewMock'
-import { apiRequest } from './apiClient'
+import { apiRequest, getAccessToken, getApiBaseUrl } from './apiClient'
 
 export async function getGuardianDashboard() {
   try {
@@ -24,12 +24,94 @@ export async function confirmGuardianHistoryItem(item) {
   })
 }
 
+export function subscribeGuardianDashboardEvents(onEvent) {
+  const accessToken = getAccessToken()
+  if (!accessToken || typeof fetch !== 'function' || typeof AbortController === 'undefined') {
+    return () => {}
+  }
+
+  const controller = new AbortController()
+  let closed = false
+
+  readGuardianDashboardEventStream({
+    accessToken,
+    signal: controller.signal,
+    onEvent,
+  }).catch(() => {
+    // Polling remains as the fallback when the stream is unavailable.
+  })
+
+  return () => {
+    closed = true
+    controller.abort()
+  }
+
+  async function readGuardianDashboardEventStream({ accessToken, signal, onEvent }) {
+    const response = await fetch(`${getApiBaseUrl()}/api/guardians/dashboard/stream`, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+      signal,
+    })
+
+    if (!response.ok || !response.body) {
+      return
+    }
+
+    const reader = response.body.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ''
+
+    while (!closed) {
+      const { value, done } = await reader.read()
+      if (done) {
+        break
+      }
+
+      buffer += decoder.decode(value, { stream: true })
+      const chunks = buffer.split(/\r?\n\r?\n/)
+      buffer = chunks.pop() || ''
+      chunks.map(parseServerSentEvent).filter(Boolean).forEach(onEvent)
+    }
+  }
+}
+
 function isGuardianDashboardStrictMode() {
   return (
     parseOptionalBoolean(window.__ABLE_BAND_GUARDIAN_DASHBOARD_STRICT__) ??
     parseOptionalBoolean(import.meta.env.VITE_GUARDIAN_DASHBOARD_STRICT_MODE) ??
     false
   )
+}
+
+function parseServerSentEvent(chunk) {
+  const event = {
+    type: 'message',
+    data: null,
+  }
+  const dataLines = []
+
+  chunk.split(/\r?\n/).forEach((line) => {
+    if (line.startsWith('event:')) {
+      event.type = line.slice('event:'.length).trim()
+    }
+    if (line.startsWith('data:')) {
+      dataLines.push(line.slice('data:'.length).trim())
+    }
+  })
+
+  if (dataLines.length === 0) {
+    return event
+  }
+
+  const rawData = dataLines.join('\n')
+  try {
+    event.data = JSON.parse(rawData)
+  } catch {
+    event.data = rawData
+  }
+
+  return event
 }
 
 function parseOptionalBoolean(value) {

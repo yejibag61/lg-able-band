@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { confirmGuardianHistoryItem, getGuardianDashboard } from '../services/guardianDashboardService'
+import {
+  confirmGuardianHistoryItem,
+  getGuardianDashboard,
+  subscribeGuardianDashboardEvents,
+} from '../services/guardianDashboardService'
 import { formatStatusUpdatedAt, getSafetyStatusDisplay } from '../utils/homeSummaryUtils'
 
 const severityLabels = {
@@ -17,10 +21,17 @@ const sourceLabels = {
 
 const CONFIRMED_HISTORY_STORAGE_PREFIX = 'lg-able-band.guardianHistory.confirmed'
 const SAFE_GUARDIAN_MESSAGE = '오늘은 전달된 위험 알림이 없습니다.'
+const GUARDIAN_DASHBOARD_POLL_INTERVAL_MS = 3_000
+const GUARDIAN_ALERT_TOAST_DURATION_MS = 10_000
+const GUARDIAN_ALERT_VIBRATION_PATTERN = [240, 100, 240, 100, 480]
 
 export function GuardianPlaceholder({ account, onLogout }) {
   const isMountedRef = useRef(true)
+  const hasInitializedLiveAlertsRef = useRef(false)
+  const seenHistoryKeysRef = useRef(new Set())
+  const liveAlertTimerRef = useRef(null)
   const [currentTime, setCurrentTime] = useState(() => new Date())
+  const [liveAlert, setLiveAlert] = useState(null)
   const confirmedHistoryStorageKey = getConfirmedHistoryStorageKey(account)
   const [confirmedHistoryKeys, setConfirmedHistoryKeys] = useState(() =>
     readConfirmedHistoryKeys(confirmedHistoryStorageKey),
@@ -33,11 +44,11 @@ export function GuardianPlaceholder({ account, onLogout }) {
     lastUpdatedAt: null,
   })
 
-  const loadDashboard = useCallback(async () => {
+  const loadDashboard = useCallback(async ({ silent = false } = {}) => {
     setDashboardState((current) => ({
       ...current,
       error: '',
-      refreshing: Boolean(current.data),
+      refreshing: silent ? current.refreshing : Boolean(current.data),
     }))
 
     try {
@@ -93,6 +104,32 @@ export function GuardianPlaceholder({ account, onLogout }) {
   }, [loadDashboard])
 
   useEffect(() => {
+    if (dashboardState.loading) {
+      return undefined
+    }
+
+    const intervalId = window.setInterval(() => {
+      loadDashboard({ silent: true })
+    }, guardianDashboardPollInterval())
+
+    return () => {
+      window.clearInterval(intervalId)
+    }
+  }, [dashboardState.loading, loadDashboard])
+
+  useEffect(() => {
+    if (dashboardState.loading) {
+      return undefined
+    }
+
+    return subscribeGuardianDashboardEvents((event) => {
+      if (event.type === 'guardian-alert') {
+        loadDashboard({ silent: true })
+      }
+    })
+  }, [dashboardState.loading, loadDashboard])
+
+  useEffect(() => {
     setConfirmedHistoryKeys(readConfirmedHistoryKeys(confirmedHistoryStorageKey))
   }, [confirmedHistoryStorageKey])
 
@@ -116,6 +153,48 @@ export function GuardianPlaceholder({ account, onLogout }) {
   const safetyMessage = hasActiveHistory
     ? dashboard.summary?.safetyMessage || `${protectedUserName}님의 오늘 상태입니다.`
     : SAFE_GUARDIAN_MESSAGE
+  const historySignature = historyItems.map((item) => item.key).join('|')
+
+  useEffect(() => {
+    if (!dashboard) {
+      return
+    }
+
+    const currentHistoryKeys = historyItems.map((item) => item.key)
+    if (!hasInitializedLiveAlertsRef.current) {
+      seenHistoryKeysRef.current = new Set(currentHistoryKeys)
+      hasInitializedLiveAlertsRef.current = true
+      return
+    }
+
+    const newLiveAlert = historyItems.find((item) => !seenHistoryKeysRef.current.has(item.key))
+    seenHistoryKeysRef.current = new Set([
+      ...seenHistoryKeysRef.current,
+      ...currentHistoryKeys,
+    ])
+
+    if (!newLiveAlert) {
+      return
+    }
+
+    notifyGuardianLiveAlert(newLiveAlert, protectedUserName)
+    setLiveAlert(newLiveAlert)
+
+    if (liveAlertTimerRef.current) {
+      window.clearTimeout(liveAlertTimerRef.current)
+    }
+    liveAlertTimerRef.current = window.setTimeout(() => {
+      setLiveAlert(null)
+    }, GUARDIAN_ALERT_TOAST_DURATION_MS)
+  }, [dashboard, historyItems, historySignature, protectedUserName])
+
+  useEffect(() => {
+    return () => {
+      if (liveAlertTimerRef.current) {
+        window.clearTimeout(liveAlertTimerRef.current)
+      }
+    }
+  }, [])
 
   const confirmHistoryItem = useCallback(async (item) => {
     const itemKey = item.key
@@ -247,6 +326,16 @@ export function GuardianPlaceholder({ account, onLogout }) {
             </p>
           ) : null}
         </section>
+
+        {liveAlert ? (
+          <section className="guardian-live-alert" role="alert" aria-live="assertive">
+            <span className="guardian-live-alert-badge">긴급</span>
+            <div>
+              <strong>{liveAlert.title}</strong>
+              <p>{liveAlert.message}</p>
+            </div>
+          </section>
+        ) : null}
 
         <section className="content-card alert-summary-card guardian-home-alert-card" aria-labelledby="guardian-alert-title">
           <div className="section-title-row">
@@ -414,6 +503,56 @@ function persistConfirmedHistoryKeys(storageKey, historyKeys) {
   }
 
   return historyKeys
+}
+
+function notifyGuardianLiveAlert(item, protectedUserName) {
+  vibrateGuardianAlert()
+  showGuardianNotification(item, protectedUserName)
+}
+
+function guardianDashboardPollInterval() {
+  const configuredInterval = Number(window.__ABLE_BAND_GUARDIAN_DASHBOARD_POLL_MS)
+
+  return Number.isFinite(configuredInterval) && configuredInterval > 0
+    ? configuredInterval
+    : GUARDIAN_DASHBOARD_POLL_INTERVAL_MS
+}
+
+function vibrateGuardianAlert() {
+  if (typeof navigator === 'undefined' || typeof navigator.vibrate !== 'function') {
+    return false
+  }
+
+  return navigator.vibrate(GUARDIAN_ALERT_VIBRATION_PATTERN)
+}
+
+function showGuardianNotification(item, protectedUserName) {
+  if (typeof window === 'undefined' || !('Notification' in window)) {
+    return
+  }
+
+  const showNotification = () => {
+    if (window.Notification.permission !== 'granted') {
+      return
+    }
+
+    new window.Notification(item.title || '긴급 알림', {
+      body: item.message || `${protectedUserName}님의 긴급 알림이 도착했습니다.`,
+      tag: item.key,
+      renotify: true,
+    })
+  }
+
+  if (window.Notification.permission === 'default') {
+    window.Notification.requestPermission().then((permission) => {
+      if (permission === 'granted') {
+        showNotification()
+      }
+    })
+    return
+  }
+
+  showNotification()
 }
 
 function formatGuardianTime(value) {
