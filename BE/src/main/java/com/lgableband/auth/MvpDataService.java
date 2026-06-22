@@ -2,10 +2,13 @@ package com.lgableband.auth;
 
 import com.lgableband.common.AccessibilityType;
 import com.lgableband.common.AccountRole;
+import com.lgableband.common.AlertStatus;
+import com.lgableband.common.AlertType;
 import com.lgableband.common.ApiException;
 import com.lgableband.common.ConnectionStatus;
 import com.lgableband.common.NotificationChannel;
 import com.lgableband.common.SafetyStatusLevel;
+import com.lgableband.common.Severity;
 import com.lgableband.mock.MockDataStore;
 import com.lgableband.mock.MockDataStore.Alert;
 import com.lgableband.mock.MockDataStore.NotificationPrefs;
@@ -309,6 +312,7 @@ public class MvpDataService {
 			MockDataStore.UserProfile user = this.mockDataStore.requireUser(authorization);
 			List<MockDataStore.Device> devices = this.mockDataStore.devices(user.userId());
 			List<Alert> alerts = this.mockDataStore.alerts(user.userId(), null, null, 3);
+			List<Alert> safetyAlerts = this.mockDataStore.alerts(user.userId(), null, null, 100);
 			long connected = devices.stream().filter(device -> device.connectionStatus() == ConnectionStatus.CONNECTED).count();
 			long warning = devices.stream().filter(device -> device.connectionStatus() == ConnectionStatus.WARNING || device.connectionStatus() == ConnectionStatus.ERROR).count();
 			long uwb = devices.stream().filter(MockDataStore.Device::locationSupported).count();
@@ -316,7 +320,7 @@ public class MvpDataService {
 			String guardianName = hasGuardian ? this.mockDataStore.guardians(user.userId()).get(0).name() : null;
 			return new HomeData(
 				new HomeUser(user.userId(), this.mockDataStore.accountById(user.accountId()).name(), user.accessibilityType().name()),
-				new HomeSafetyStatus(SafetyStatusLevel.SAFE, "Able Band가 실시간 안전 상태를 확인 중입니다.", OffsetDateTime.now()),
+				homeSafetyStatus(safetyAlerts),
 				alerts,
 				new HomeDeviceSummary(devices.size(), connected, warning, uwb),
 				new HomeEmergency(hasGuardian, guardianName),
@@ -335,10 +339,11 @@ public class MvpDataService {
 		boolean hasGuardian = hasGuardian(jdbcTemplate, user.userId());
 		String guardianName = primaryGuardianName(jdbcTemplate, user.userId());
 		List<DbAlertSummary> alerts = recentAlerts(jdbcTemplate, user.userId());
+		List<DbAlertSummary> safetyAlerts = safetyAlerts(jdbcTemplate, user.userId());
 
 		return new HomeData(
 			new HomeUser(user.userId(), user.name(), user.accessibilityType().name()),
-			new HomeSafetyStatus(SafetyStatusLevel.SAFE, "Able Band가 실시간 안전 상태를 확인 중입니다.", OffsetDateTime.now()),
+			dbHomeSafetyStatus(safetyAlerts),
 			alerts,
 			new HomeDeviceSummary(total, connected, warning, uwb),
 			new HomeEmergency(hasGuardian, guardianName),
@@ -529,6 +534,100 @@ public class MvpDataService {
 		);
 	}
 
+	private List<DbAlertSummary> safetyAlerts(JdbcTemplate jdbcTemplate, long userId) {
+		return jdbcTemplate.query(
+			"""
+			SELECT a.alert_id, a.alert_type, a.severity, a.title, a.message, a.occurred_at, a.status,
+			       COALESCE(JSON_UNQUOTE(JSON_EXTRACT(de.payload_json, '$.deviceName')), d.name, '') AS device_name
+			FROM alert a
+			LEFT JOIN device_event de ON de.event_id = a.event_id
+			LEFT JOIN device d ON d.device_id = de.device_id
+			WHERE a.user_id = ?
+			  AND a.status <> 'CONFIRMED'
+			ORDER BY a.occurred_at DESC
+			LIMIT 100
+			""",
+			(rs, rowNum) -> new DbAlertSummary(
+				rs.getLong("alert_id"),
+				rs.getString("alert_type"),
+				rs.getString("severity"),
+				rs.getString("title"),
+				rs.getString("message"),
+				rs.getString("device_name"),
+				toOffsetDateTime(rs.getObject("occurred_at", LocalDateTime.class)),
+				rs.getString("status")
+			),
+			userId
+		);
+	}
+
+	private HomeSafetyStatus homeSafetyStatus(List<Alert> alerts) {
+		AlertSafetySummary summary = alerts.stream()
+			.filter(alert -> alert.status() != AlertStatus.CONFIRMED)
+			.map(alert -> new AlertSafetySummary(
+				safetyLevel(alert.type(), alert.severity()),
+				alert.title(),
+				alert.deviceName()
+			))
+			.max((left, right) -> Integer.compare(safetyRank(left.level()), safetyRank(right.level())))
+			.orElse(new AlertSafetySummary(SafetyStatusLevel.SAFE, null, null));
+
+		return new HomeSafetyStatus(summary.level(), safetyMessage(summary), OffsetDateTime.now());
+	}
+
+	private HomeSafetyStatus dbHomeSafetyStatus(List<DbAlertSummary> alerts) {
+		AlertSafetySummary summary = alerts.stream()
+			.filter(alert -> !"CONFIRMED".equals(alert.status()))
+			.map(alert -> new AlertSafetySummary(
+				safetyLevel(AlertType.valueOf(alert.type()), Severity.valueOf(alert.severity())),
+				alert.title(),
+				alert.deviceName()
+			))
+			.max((left, right) -> Integer.compare(safetyRank(left.level()), safetyRank(right.level())))
+			.orElse(new AlertSafetySummary(SafetyStatusLevel.SAFE, null, null));
+
+		return new HomeSafetyStatus(summary.level(), safetyMessage(summary), OffsetDateTime.now());
+	}
+
+	private SafetyStatusLevel safetyLevel(AlertType type, Severity severity) {
+		if (type == AlertType.EMERGENCY || severity == Severity.CRITICAL) {
+			return SafetyStatusLevel.EMERGENCY;
+		}
+		if (type == AlertType.DANGER || severity == Severity.HIGH) {
+			return SafetyStatusLevel.DANGER;
+		}
+		if (severity == Severity.MEDIUM) {
+			return SafetyStatusLevel.CAUTION;
+		}
+		return SafetyStatusLevel.SAFE;
+	}
+
+	private int safetyRank(SafetyStatusLevel level) {
+		return switch (level) {
+			case SAFE -> 0;
+			case CAUTION -> 1;
+			case DANGER -> 2;
+			case EMERGENCY -> 3;
+		};
+	}
+
+	private String safetyMessage(AlertSafetySummary summary) {
+		return switch (summary.level()) {
+			case SAFE -> "Able Band가 실시간 안전 상태를 확인 중입니다.";
+			case CAUTION -> "%s 상태를 확인해 주세요.".formatted(alertTitle(summary));
+			case DANGER -> "%s 위험 알림이 있습니다. %s 상태를 확인해 주세요.".formatted(alertTitle(summary), deviceName(summary));
+			case EMERGENCY -> "%s 긴급 알림이 있습니다. 즉시 %s 상태를 확인해 주세요.".formatted(alertTitle(summary), deviceName(summary));
+		};
+	}
+
+	private String alertTitle(AlertSafetySummary summary) {
+		return summary.title() == null || summary.title().isBlank() ? "안전 알림" : summary.title();
+	}
+
+	private String deviceName(AlertSafetySummary summary) {
+		return summary.deviceName() == null || summary.deviceName().isBlank() ? "기기" : summary.deviceName();
+	}
+
 	private OffsetDateTime toOffsetDateTime(LocalDateTime dateTime) {
 		return dateTime == null ? null : dateTime.atOffset(ZoneOffset.ofHours(9));
 	}
@@ -639,5 +738,8 @@ public class MvpDataService {
 	}
 
 	public record DbAlertSummary(long alertId, String type, String severity, String title, String message, String deviceName, OffsetDateTime occurredAt, String status) {
+	}
+
+	private record AlertSafetySummary(SafetyStatusLevel level, String title, String deviceName) {
 	}
 }

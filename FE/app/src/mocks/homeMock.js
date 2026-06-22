@@ -1,7 +1,7 @@
 export const mockHomeSummary = {
   user: {
     userId: 1,
-    name: '소희',
+    name: '엘지',
     accessibilityType: 'VISUAL',
   },
   safetyStatus: {

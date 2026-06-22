@@ -1719,23 +1719,23 @@ function GuardianInviteScreen({ guardians, guardianListState, onBack, onCreateGu
         </div>
 
         <label className="field">
-          <span>보호자 이름</span>
+          <span>보호자 ID</span>
           <input
             type="text"
             value={form.name}
             onChange={(event) => handleChange('name', event.target.value)}
-            placeholder="예: 김보호"
+            placeholder="보호자 ID를 입력해주세요"
             autoComplete="name"
           />
         </label>
 
         <label className="field">
-          <span>보호자 연락처</span>
+          <span>보호자와의 관계</span>
           <input
             type="tel"
             value={form.phone}
             onChange={(event) => handleChange('phone', event.target.value)}
-            placeholder="010-0000-0000"
+            placeholder=""
             autoComplete="tel"
           />
         </label>

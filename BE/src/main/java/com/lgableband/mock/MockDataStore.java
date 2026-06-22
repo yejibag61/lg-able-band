@@ -47,8 +47,8 @@ public class MockDataStore {
 	private final Map<String, Long> accountIdsByToken = new HashMap<>();
 
 	public MockDataStore() {
-		Account userAccount = new Account(1, AccountRole.USER, "user@example.com", "password1234", "홍길동");
-		Account guardianAccount = new Account(2, AccountRole.GUARDIAN, "guardian@example.com", "password1234", "김보호");
+		Account userAccount = new Account(1, AccountRole.USER, "lglg@lgableband.com", "password1234", "홍길동");
+		Account guardianAccount = new Account(2, AccountRole.GUARDIAN, "lgp@lgableband.com", "password1234", "김보호");
 		this.accounts.put(userAccount.accountId(), userAccount);
 		this.accounts.put(guardianAccount.accountId(), guardianAccount);
 		Account adminAccount = new Account(3, AccountRole.USER, "admin@example.com", "password1234", "관리자");
@@ -75,7 +75,8 @@ public class MockDataStore {
 			new Guardian(1, "김보호", "010-0000-0000", true, true, ConnectionStatus.CONNECTED)
 		)));
 		this.devicesByUserId.put(1L, new ArrayList<>(List.of(
-			new Device(10, "세탁기", DeviceType.WASHER, ConnectionStatus.CONNECTED, true, OffsetDateTime.now().minusMinutes(10), "세탁실")
+			new Device(10, "세탁기", DeviceType.WASHER, ConnectionStatus.CONNECTED, true, OffsetDateTime.now().minusMinutes(10), "세탁실"),
+			new Device(13, "도어센서", DeviceType.DOOR_SENSOR, ConnectionStatus.CONNECTED, true, OffsetDateTime.now().minusMinutes(4), "현관")
 		)));
 		this.alertsByUserId.put(1L, new ArrayList<>(List.of(
 			new Alert(101, AlertType.LIFE, Severity.LOW, "세탁 완료", "세탁이 완료되었습니다. 건조기로 옮겨주세요.", "세탁기", OffsetDateTime.now().minusMinutes(20), AlertStatus.UNREAD, "세탁기 완료 알림입니다."),

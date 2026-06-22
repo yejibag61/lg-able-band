@@ -1,4 +1,4 @@
-﻿package com.lgableband;
+package com.lgableband;
 
 import static org.hamcrest.Matchers.blankOrNullString;
 import static org.hamcrest.Matchers.containsString;
@@ -56,6 +56,7 @@ class MvpApiControllerTests {
 		this.mockMvc.perform(get("/api/app/home").header("Authorization", "Bearer " + token))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.user.name").value("홍길동"))
+			.andExpect(jsonPath("$.safetyStatus.level", not("SAFE")))
 			.andExpect(jsonPath("$.recentAlerts[0].alertId").exists())
 			.andExpect(jsonPath("$.quickActions.canRequestEmergency").value(true));
 	}
@@ -80,6 +81,30 @@ class MvpApiControllerTests {
 		this.mockMvc.perform(post("/api/alerts/101/confirm").header("Authorization", "Bearer " + token))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.status").value("CONFIRMED"));
+	}
+
+	@Test
+	void criticalRangeWarningUpdatesHomeSafetyStatusToEmergency() throws Exception {
+		String suffix = "range-home-safety-" + System.nanoTime();
+		String adminToken = loginToken("USER", "admin@example.com");
+		String userToken = signupUserAndToken(suffix);
+
+		this.mockMvc.perform(post("/api/admin/alerts/broadcast")
+				.header("Authorization", "Bearer " + adminToken)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "templateId": "range-heat-warning",
+					  "audience": "HEARING"
+					}
+					"""))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.templateId").value("range-heat-warning"));
+
+		this.mockMvc.perform(get("/api/app/home").header("Authorization", "Bearer " + userToken))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.safetyStatus.level").value("EMERGENCY"))
+			.andExpect(jsonPath("$.safetyStatus.message", containsString("잔열 또는 과열 경고")));
 	}
 
 	@Test

@@ -177,12 +177,15 @@ describe('VoiceChatbot info agent response', () => {
     render(<VoiceChatbot preview={{}} session={{}} summary={{}} />)
     await user.click(screen.getByRole('button', { name: '음성 챗봇 열기' }))
 
-    expect(screen.getByRole('button', { name: '대신 말하기 화면으로 이동' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: '챗봇과 대화하기 화면으로 이동' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '대신말하기 화면으로 이동' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'AI에게 묻기 화면으로 이동' })).toBeTruthy()
+    expect(screen.getByText('정보를 찾아드려요')).toBeTruthy()
+    expect(screen.getByRole('button', { name: '챗봇 음성 호출로 시작' })).toBeTruthy()
+    expect(screen.getByText('‘챗봇 켜줘’라고 말하면 바로 시작해요.')).toBeTruthy()
     expect(screen.queryByLabelText('인식된 문장')).toBeNull()
     expect(window.HTMLElement.prototype.scrollIntoView).not.toHaveBeenCalled()
 
-    await user.click(screen.getByRole('button', { name: '챗봇과 대화하기 화면으로 이동' }))
+    await user.click(screen.getByRole('button', { name: 'AI에게 묻기 화면으로 이동' }))
 
     expect(screen.getByLabelText('질문 카테고리')).toBeTruthy()
     expect(window.HTMLElement.prototype.scrollIntoView).not.toHaveBeenCalled()
@@ -620,7 +623,7 @@ describe('VoiceChatbot info agent response', () => {
 
 async function openTalkMode(user) {
   await user.click(screen.getByRole('button', { name: '음성 챗봇 열기' }))
-  const talkButton = await screen.findByRole('button', { name: '챗봇과 대화하기 화면으로 이동' })
+  const talkButton = await screen.findByRole('button', { name: 'AI에게 묻기 화면으로 이동' })
   await user.click(talkButton)
 }
 

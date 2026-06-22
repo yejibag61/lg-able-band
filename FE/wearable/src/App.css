@@ -592,7 +592,7 @@ h1 {
 .wearable-chat-header h2 {
   margin: 0;
   color: var(--wearable-text);
-  font-size: 1.18rem;
+  font-size: 0.88rem;
   font-weight: 540;
   line-height: 1.15;
   letter-spacing: 0;
@@ -630,10 +630,10 @@ h1 {
 
 .wearable-chat-choice {
   display: grid;
-  grid-template-columns: auto 1fr;
+  grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
   gap: 10px;
-  min-height: 64px;
+  min-height: 76px;
   padding: 10px 12px;
   text-align: left;
 }
@@ -655,6 +655,16 @@ h1 {
   border-radius: 999px;
   background: #ffffff;
   font-size: 1.18rem;
+}
+
+.wearable-chat-svg-icon {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
 }
 
 .wearable-chat-choice strong,
@@ -879,6 +889,658 @@ h1 {
   font-size: 0.7rem;
   font-weight: 430;
   line-height: 1.2;
+}
+
+.wearable-chat-wake {
+  display: grid;
+  justify-items: center;
+  gap: 7px;
+  width: 100%;
+  padding-top: 2px;
+}
+
+.wearable-chat-wake-button {
+  border: 1px solid var(--wearable-border);
+  background: var(--wearable-surface);
+  color: var(--wearable-text);
+}
+
+.wearable-chat-wake p {
+  margin: 0;
+  color: var(--wearable-text-soft);
+  font-size: 0.72rem;
+  font-weight: 430;
+  line-height: 1.35;
+}
+
+.wearable-ai-category-screen,
+.wearable-ai-recommend-screen,
+.wearable-ai-answer-screen {
+  align-content: start;
+  justify-items: stretch;
+  gap: 12px;
+  overflow-y: auto;
+  text-align: left;
+  scrollbar-width: none;
+}
+
+.wearable-ai-category-screen::-webkit-scrollbar,
+.wearable-ai-recommend-screen::-webkit-scrollbar,
+.wearable-ai-answer-screen::-webkit-scrollbar {
+  display: none;
+}
+
+.wearable-ai-category-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  width: 100%;
+}
+
+.wearable-ai-category-card {
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 8px;
+  min-width: 0;
+  min-height: 104px;
+  border: 1px solid var(--wearable-border);
+  border-radius: 16px;
+  padding: 12px 8px;
+  background: var(--wearable-surface);
+  color: var(--wearable-text);
+  box-shadow: var(--wearable-shadow-sm);
+  font: inherit;
+  text-align: center;
+}
+
+.wearable-ai-category-card:focus-visible,
+.wearable-ai-question-button:focus-visible,
+.wearable-ai-card-actions button:focus-visible,
+.wearable-ai-followups button:focus-visible {
+  outline: 3px solid rgba(225, 29, 72, 0.34);
+  outline-offset: 2px;
+}
+
+.wearable-ai-card-icon {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--wearable-primary-soft);
+  color: var(--wearable-primary-strong);
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.wearable-ai-category-card strong {
+  font-size: 0.96rem;
+  font-weight: 640;
+  line-height: 1.22;
+  word-break: keep-all;
+  overflow-wrap: break-word;
+}
+
+.wearable-ai-question-list {
+  display: grid;
+  gap: 8px;
+  width: 100%;
+}
+
+.wearable-ai-question-button {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  min-height: 50px;
+  border: 1px solid var(--wearable-border);
+  border-radius: 14px;
+  padding: 10px 14px;
+  background: var(--wearable-surface);
+  color: var(--wearable-text);
+  box-shadow: var(--wearable-shadow-sm);
+  font: inherit;
+  font-size: 0.94rem;
+  font-weight: 620;
+  line-height: 1.22;
+  text-align: left;
+  word-break: keep-all;
+  overflow-wrap: break-word;
+}
+
+.wearable-ai-question-button .wearable-question-icon {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--wearable-primary-soft);
+  color: var(--wearable-primary-strong);
+  font-size: 0.84rem;
+  font-weight: 800;
+}
+
+.wearable-ai-question-button .wearable-question-text {
+  min-width: 0;
+  font: inherit;
+  font-weight: 680;
+  white-space: normal;
+  word-break: keep-all;
+  overflow-wrap: break-word;
+}
+
+.wearable-device-question-button {
+  grid-template-columns: 36px minmax(0, 1fr) 24px;
+  column-gap: 8px;
+  background: #ffffff !important;
+}
+
+.wearable-question-chevron {
+  display: flex;
+  width: 24px;
+  min-width: 24px;
+  height: 28px;
+  align-items: center;
+  justify-content: flex-end;
+  background: transparent !important;
+  color: var(--wearable-text-muted);
+  font-size: 1.2rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.wearable-ai-answer-card {
+  display: grid;
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--wearable-border);
+  border-radius: 18px;
+  padding: 14px;
+  background: var(--wearable-surface);
+  box-shadow: var(--wearable-shadow-sm);
+}
+
+.wearable-ai-answer-screen.is-urgent .wearable-ai-answer-card {
+  border-color: rgba(225, 29, 72, 0.42);
+  box-shadow: 0 0 0 4px rgba(225, 29, 72, 0.08);
+}
+
+.wearable-ai-answer-topline {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.wearable-ai-answer-topline h2 {
+  margin: 0;
+  min-width: 0;
+  color: var(--wearable-text);
+  font-size: 1.06rem;
+  font-weight: 720;
+  line-height: 1.18;
+  word-break: keep-all;
+  overflow-wrap: break-word;
+}
+
+.wearable-ai-priority-badge {
+  flex: 0 0 auto;
+  min-height: 28px;
+  border-radius: 999px;
+  padding: 6px 10px;
+  background: var(--wearable-primary-soft);
+  color: var(--wearable-primary-strong);
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.wearable-ai-summary {
+  margin: 0;
+  color: var(--wearable-text);
+  white-space: pre-line;
+  font-size: 0.9rem;
+  font-weight: 520;
+  line-height: 1.4;
+  word-break: keep-all;
+  overflow-wrap: break-word;
+}
+
+.wearable-ai-action-block {
+  display: grid;
+  gap: 6px;
+  border-radius: 14px;
+  padding: 10px 12px;
+  background: var(--wearable-surface-soft);
+}
+
+.wearable-ai-action-block strong,
+.wearable-ai-source {
+  color: var(--wearable-text-soft);
+  font-size: 0.76rem;
+  font-weight: 720;
+}
+
+.wearable-ai-action-block ul {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding-left: 18px;
+}
+
+.wearable-ai-action-block li {
+  color: var(--wearable-text);
+  font-size: 0.84rem;
+  font-weight: 540;
+  line-height: 1.34;
+  word-break: keep-all;
+  overflow-wrap: break-word;
+}
+
+.wearable-ai-source {
+  margin: 0;
+  word-break: keep-all;
+  overflow-wrap: break-word;
+}
+
+.wearable-ai-card-actions,
+.wearable-ai-followups {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  width: 100%;
+}
+
+.wearable-ai-followups-title {
+  grid-column: 1 / -1;
+  color: var(--wearable-text);
+  font-size: 0.92rem;
+  font-weight: 700;
+  line-height: 1.2;
+  text-align: center;
+  word-break: keep-all;
+}
+
+.wearable-ai-card-actions button,
+.wearable-ai-followups button {
+  min-height: 42px;
+  border: 1px solid var(--wearable-border);
+  border-radius: 12px;
+  padding: 8px 10px;
+  background: var(--wearable-surface);
+  color: var(--wearable-text);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 680;
+  line-height: 1.18;
+  word-break: keep-all;
+}
+
+.wearable-ai-card-actions button:last-child {
+  grid-column: 1 / -1;
+  border: 0;
+  background: var(--wearable-text);
+  color: #ffffff;
+}
+
+.wearable-ai-card-actions.wearable-welfare-card-actions button:last-child {
+  grid-column: auto;
+  border: 1px solid var(--wearable-border);
+  background: var(--wearable-surface);
+  color: var(--wearable-text);
+}
+
+.wearable-welfare-detail-back {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.wearable-ai-followups button:nth-last-child(2),
+.wearable-ai-followups button:last-child {
+  background: var(--wearable-surface-soft);
+}
+
+/* ?�활/?�전 ?��??� 복�? 카드?� 같�? 밀?�의 카드�?보여주되, 복�? ?�용 ?�보???�함?��? ?�는?? */
+.wearable-safety-alert-card {
+  gap: 12px;
+  border-color: var(--wearable-border);
+  border-radius: 18px;
+  padding: 16px;
+  background: var(--wearable-surface);
+}
+
+.wearable-safety-alert-heading {
+  display: grid;
+  gap: 7px;
+}
+
+.wearable-safety-alert-label {
+  display: inline-flex;
+  align-items: center;
+  justify-self: start;
+  gap: 5px;
+  border-radius: 999px;
+  padding: 5px 9px;
+  background: var(--wearable-primary-soft);
+  color: var(--wearable-primary-strong);
+  font-size: 0.72rem;
+  font-weight: 760;
+  line-height: 1;
+}
+
+.wearable-safety-alert-card h2 {
+  margin: 0;
+  color: var(--wearable-text);
+  font-size: 1.06rem;
+  font-weight: 720;
+  line-height: 1.24;
+  word-break: keep-all;
+  overflow-wrap: break-word;
+}
+
+.wearable-safety-answer-copy {
+  padding: 12px;
+  border: 1px solid var(--wearable-border);
+  border-radius: 14px;
+  background: var(--wearable-surface-soft);
+}
+
+.wearable-safety-answer-copy .wearable-ai-summary {
+  line-height: 1.48;
+}
+
+.wearable-safety-card-actions {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.wearable-ai-card-actions.wearable-safety-card-actions button:last-child {
+  grid-column: auto;
+  border: 1px solid var(--wearable-border);
+  border-radius: 12px;
+  background: var(--wearable-surface);
+  color: var(--wearable-text);
+}
+
+.wearable-ai-card-actions.wearable-safety-card-actions button:hover:not(:disabled) {
+  background: var(--wearable-surface-soft);
+}
+
+/* 보호???�결?� ?�보 ?�내 ?�???�청 결과�?짧게 보여준?? */
+.wearable-guardian-request-card {
+  gap: 12px;
+  padding: 16px;
+}
+
+.wearable-guardian-request-heading {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.wearable-guardian-request-icon {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border-radius: 12px;
+  background: var(--wearable-primary-soft);
+  font-size: 1.1rem;
+}
+
+.wearable-guardian-request-heading h2 {
+  margin: 0;
+  color: var(--wearable-text);
+  font-size: 1.06rem;
+  font-weight: 720;
+  line-height: 1.24;
+  word-break: keep-all;
+  overflow-wrap: break-word;
+}
+
+.wearable-guardian-request-copy {
+  display: grid;
+  gap: 5px;
+  padding: 12px;
+  border: 1px solid var(--wearable-border);
+  border-radius: 14px;
+  background: var(--wearable-surface-soft);
+}
+
+.wearable-guardian-request-copy p {
+  margin: 0;
+  color: var(--wearable-text);
+  font-size: 0.88rem;
+  font-weight: 540;
+  line-height: 1.42;
+  word-break: keep-all;
+  overflow-wrap: break-word;
+}
+
+.wearable-guardian-request-copy .wearable-guardian-alert-preview {
+  margin-top: 3px;
+  color: var(--wearable-text-soft);
+  font-size: 0.8rem;
+}
+
+.wearable-guardian-card-actions {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.wearable-ai-card-actions.wearable-guardian-card-actions button:last-child {
+  grid-column: auto;
+  border: 1px solid var(--wearable-border);
+  border-radius: 12px;
+  background: var(--wearable-surface);
+  color: var(--wearable-text);
+}
+
+.wearable-ai-card-actions.wearable-guardian-card-actions button:hover:not(:disabled) {
+  background: var(--wearable-surface-soft);
+}
+
+.wearable-appliance-answer-screen {
+  padding-bottom: 10px;
+}
+
+.wearable-appliance-topline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.wearable-appliance-back {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border: 0;
+  border-radius: 999px;
+  padding: 0;
+  background: transparent;
+  color: var(--wearable-text);
+  font: inherit;
+  font-size: 1.9rem;
+  font-weight: 430;
+  line-height: 1;
+}
+
+.wearable-appliance-card-title {
+  width: 100%;
+  margin: 0;
+  color: var(--wearable-text);
+  font-size: 1rem;
+  font-weight: 760;
+  line-height: 1.18;
+  text-align: left;
+  word-break: keep-all;
+  overflow-wrap: break-word;
+}
+
+.wearable-appliance-status-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  border-radius: 999px;
+  padding: 5px 9px;
+  background: var(--wearable-primary-soft);
+  color: var(--wearable-primary-strong);
+  font-size: 0.72rem;
+  font-weight: 820;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.wearable-appliance-status-badge.status-normal {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.wearable-appliance-status-badge.status-warning {
+  background: #fff7ed;
+  color: #b45309;
+}
+
+.wearable-appliance-status-badge.status-danger {
+  background: #fff1f2;
+  color: #be123c;
+}
+
+.wearable-appliance-main-card {
+  justify-items: center;
+  gap: 6px;
+  text-align: center;
+}
+
+.wearable-appliance-main-icon {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--wearable-primary-soft);
+  color: var(--wearable-primary-strong);
+  font-size: 1.55rem;
+}
+
+.wearable-appliance-main-card strong {
+  color: var(--wearable-text);
+  font-size: 1rem;
+  font-weight: 760;
+  line-height: 1.24;
+  word-break: keep-all;
+  overflow-wrap: break-word;
+}
+
+.wearable-appliance-main-card p {
+  margin: 0;
+  color: var(--wearable-text-soft);
+  font-size: 0.84rem;
+  font-weight: 560;
+  line-height: 1.28;
+  word-break: keep-all;
+  overflow-wrap: break-word;
+}
+
+.wearable-appliance-section-title {
+  color: var(--wearable-text);
+  font-size: 0.86rem;
+  font-weight: 760;
+  line-height: 1.2;
+}
+
+.wearable-appliance-detail-card dl {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+}
+
+.wearable-appliance-detail-card dl {
+  padding: 0;
+}
+
+.wearable-appliance-detail-card div {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+}
+
+.wearable-appliance-detail-card dt {
+  color: var(--wearable-text-soft);
+  font-size: 0.76rem;
+  font-weight: 720;
+  white-space: nowrap;
+}
+
+.wearable-appliance-detail-card dd {
+  margin: 0;
+  color: var(--wearable-text);
+  font-size: 0.8rem;
+  font-weight: 620;
+  line-height: 1.25;
+  text-align: right;
+  word-break: keep-all;
+  overflow-wrap: break-word;
+}
+
+.wearable-appliance-quick-card {
+  gap: 8px;
+}
+
+.wearable-appliance-quick-card .wearable-ai-card-actions {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.wearable-appliance-quick-card .wearable-ai-card-actions button:last-child {
+  grid-column: auto;
+  border: 1px solid var(--wearable-border) !important;
+  background: var(--wearable-surface) !important;
+  color: var(--wearable-text) !important;
+}
+
+.wearable-appliance-followups {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.wearable-appliance-followups .wearable-ai-followups-title {
+  text-align: left;
+}
+
+.wearable-appliance-followups .wearable-device-followup-button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  max-width: 100%;
+  min-height: 40px;
+  padding: 7px 8px;
+  text-align: left;
+}
+
+.wearable-device-followup-button .wearable-question-icon {
+  display: flex;
+  flex: 0 0 24px;
+  width: 24px;
+  height: 24px;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.9rem;
+}
+
+.wearable-device-followup-button .wearable-question-text {
+  display: block;
+  flex: 1 1 auto;
+  overflow: hidden;
+  min-width: 0;
+  font: inherit;
+  font-weight: 680;
+  white-space: normal;
+  line-height: 1.18;
+  word-break: keep-all;
+  overflow-wrap: break-word;
 }
 
 .alert-pager {
@@ -1495,7 +2157,7 @@ button:focus-visible {
   --wearable-text-muted: #97a0ab;
   --wearable-primary: #e11d48;
   --wearable-primary-soft: #fff4f7;
-  --wearable-primary-strong: #b81b42;
+  --wearable-primary-strong: #be123c;
   --wearable-shadow-sm: 0 8px 18px rgba(17, 24, 39, 0.05);
   --wearable-shadow-md: 0 14px 28px rgba(17, 24, 39, 0.08);
 }
@@ -3760,6 +4422,56 @@ h1 {
 }
 
 @container wearable (max-width: 360px) {
+  .wearable-ai-category-screen,
+  .wearable-ai-recommend-screen,
+  .wearable-ai-answer-screen {
+    gap: 10px;
+  }
+
+  .wearable-ai-category-grid {
+    gap: 8px;
+  }
+
+  .wearable-ai-category-card {
+    min-height: 92px;
+    border-radius: 14px;
+  }
+
+  .wearable-ai-card-icon {
+    width: 38px;
+    height: 38px;
+  }
+
+  .wearable-ai-question-button {
+    min-height: 46px;
+    font-size: 0.86rem;
+  }
+
+  .wearable-ai-answer-card {
+    gap: 8px;
+    padding: 12px;
+    border-radius: 16px;
+  }
+
+  .wearable-ai-answer-topline h2 {
+    font-size: 0.98rem;
+  }
+
+  .wearable-ai-summary,
+  .wearable-ai-action-block li {
+    font-size: 0.8rem;
+  }
+
+  .wearable-ai-card-actions button,
+  .wearable-ai-followups button {
+    min-height: 38px;
+    font-size: 0.74rem;
+  }
+
+  .wearable-appliance-quick-card .wearable-ai-card-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .alert-screen {
     padding-bottom: 12px;
   }
@@ -4715,4 +5427,981 @@ h1 {
 
 .uwb-guide-distance {
   width: 100%;
+}
+
+/* Speak-for-me: compact selection and playback hierarchy for the wearable screen. */
+.wearable-chat-list {
+  align-content: start;
+  gap: 10px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+
+.wearable-chat-list::-webkit-scrollbar {
+  display: none;
+}
+
+.wearable-chat-list-label {
+  width: 100%;
+  margin: 0 0 -2px;
+  color: var(--wearable-text-soft);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  text-align: left;
+}
+
+.wearable-chat-list .wearable-chat-options {
+  gap: 9px;
+}
+
+.wearable-chat-list .wearable-chat-option {
+  grid-template-columns: 34px minmax(0, 1fr) 18px;
+  min-height: 54px;
+  padding: 9px 12px;
+  border-color: transparent;
+  background: var(--wearable-surface);
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
+  transition: box-shadow 160ms ease, transform 160ms ease, background 160ms ease;
+}
+
+.wearable-chat-option-arrow {
+  width: auto !important;
+  height: auto !important;
+  background: transparent !important;
+  color: var(--wearable-text-soft);
+  font-size: 1.25rem !important;
+  line-height: 1;
+  text-align: right;
+}
+
+.wearable-chat-list .wearable-chat-option:focus-visible {
+  border-color: color-mix(in srgb, var(--wearable-primary) 34%, transparent);
+  background: var(--wearable-primary-soft);
+  outline: none;
+}
+
+@media (hover: hover) {
+  .wearable-chat-list .wearable-chat-option:hover {
+    box-shadow: 0 6px 15px rgba(15, 23, 42, 0.11);
+  }
+}
+
+.wearable-chat-list .wearable-chat-option:active {
+  transform: scale(0.98);
+  box-shadow: 0 2px 7px rgba(15, 23, 42, 0.08);
+}
+
+.wearable-chat-list .wearable-chat-link {
+  min-height: 32px;
+  color: var(--wearable-primary-strong);
+  font-size: 0.78rem;
+}
+
+.wearable-chat-speaking {
+  gap: 13px;
+}
+
+.wearable-chat-phrase-card {
+  display: grid;
+  width: 100%;
+  gap: 5px;
+  padding: 13px 14px;
+  border: 1px solid #f0d7df;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: var(--wearable-shadow-sm);
+}
+
+.wearable-chat-phrase-card span {
+  color: var(--wearable-text-soft);
+  font-size: 0.68rem;
+  font-weight: 600;
+}
+
+.wearable-chat-phrase-card strong {
+  color: var(--wearable-primary-strong);
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.wearable-chat-speaking .wearable-chat-bottom-action {
+  border: 0;
+  background: var(--wearable-text);
+  color: #fff;
+}
+
+.wearable-chat-speaking .wearable-chat-speaker {
+  box-shadow: none;
+}
+
+.alert-screen.alert-screen-simple {
+  align-content: stretch;
+  grid-template-rows: 1fr auto auto;
+  gap: clamp(10px, 2.2vh, 16px);
+  padding: clamp(8px, 1.6vh, 14px) clamp(6px, 1.8vw, 12px) clamp(10px, 2.1vh, 16px);
+}
+
+.alert-watch-card {
+  display: grid;
+  align-content: start;
+  gap: clamp(12px, 2.4vh, 18px);
+  min-height: 0;
+  padding: clamp(14px, 2.8vh, 22px) clamp(14px, 3vw, 20px);
+  border-radius: 18px;
+  background: linear-gradient(180deg, #ffffff 0%, #fff6f8 100%);
+  border: 1px solid rgba(225, 29, 72, 0.14);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+}
+
+.alert-watch-time {
+  justify-self: end;
+  color: #475569;
+  font-size: clamp(0.9rem, 2.2vh, 1.08rem);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.alert-copy.alert-copy-simple {
+  gap: clamp(10px, 2.2vh, 16px);
+  align-content: start;
+}
+
+.alert-screen.alert-screen-simple h1 {
+  color: #111827;
+  font-size: clamp(1.38rem, 4.6vh, 2rem);
+  line-height: 1.08;
+  letter-spacing: -0.03em;
+}
+
+.alert-screen.alert-screen-simple .alert-copy p {
+  color: #334155;
+  font-size: clamp(1rem, 2.8vh, 1.28rem);
+  line-height: 1.42;
+}
+
+.alert-screen.alert-screen-simple .alert-action-row {
+  grid-template-columns: 1fr;
+  gap: 0;
+}
+
+.alert-screen.alert-screen-simple .primary-action {
+  min-height: clamp(48px, 8vh, 62px);
+  border-radius: 16px;
+  font-size: clamp(1.02rem, 2.8vh, 1.2rem);
+  font-weight: 800;
+}
+
+.alert-screen.alert-screen-simple .alert-pager {
+  justify-content: center;
+  padding-top: 2px;
+}
+
+.alert-screen.alert-screen-simple .alert-pager-dots-only {
+  display: flex;
+  justify-content: center;
+}
+
+.alert-screen.alert-screen-simple .pager-dots {
+  gap: 8px;
+}
+
+.alert-screen.alert-screen-simple .pager-dot {
+  width: 7px;
+  height: 7px;
+  background: rgba(148, 163, 184, 0.45);
+}
+
+.alert-screen.alert-screen-simple .pager-dot.active {
+  width: 22px;
+  border-radius: 999px;
+  background: #e11d48;
+}
+.alert-screen.alert-screen-simple {
+  align-content: stretch;
+  grid-template-rows: minmax(0, 1fr) auto auto;
+  gap: clamp(14px, 3vh, 22px);
+  height: 100%;
+  padding: clamp(6px, 1.1vh, 10px) clamp(4px, 1.2vw, 8px) clamp(12px, 2.6vh, 18px);
+}
+
+.alert-watch-card {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  align-content: stretch;
+  gap: clamp(18px, 3.4vh, 26px);
+  min-height: 100%;
+  padding: clamp(18px, 3.8vh, 28px) clamp(16px, 3.2vw, 22px);
+  border-radius: 22px;
+}
+
+.alert-watch-time {
+  font-size: clamp(1rem, 2.8vh, 1.22rem);
+}
+
+.alert-copy.alert-copy-simple {
+  display: grid;
+  align-content: center;
+  gap: clamp(14px, 3vh, 22px);
+  min-height: 0;
+}
+
+.alert-screen.alert-screen-simple h1 {
+  font-size: clamp(1.56rem, 5.6vh, 2.36rem);
+  line-height: 1.04;
+}
+
+.alert-screen.alert-screen-simple .alert-copy p {
+  font-size: clamp(1.08rem, 3.5vh, 1.46rem);
+  line-height: 1.48;
+}
+
+.alert-screen.alert-screen-simple .primary-action {
+  min-height: clamp(56px, 9.6vh, 72px);
+  border-radius: 18px;
+  font-size: clamp(1.12rem, 3.3vh, 1.34rem);
+}
+
+.alert-screen.alert-screen-simple .alert-pager {
+  padding-top: 4px;
+}
+
+.alert-screen.alert-screen-simple .pager-dots {
+  gap: 10px;
+}
+
+.alert-screen.alert-screen-simple .pager-dot {
+  width: 8px;
+  height: 8px;
+}
+
+.alert-screen.alert-screen-simple .pager-dot.active {
+  width: 26px;
+}
+.alert-screen.alert-screen-simple {
+  gap: clamp(12px, 2.7vh, 20px);
+  padding: clamp(6px, 1vh, 9px) clamp(4px, 1vw, 7px) clamp(11px, 2.3vh, 16px);
+}
+
+.alert-watch-card {
+  gap: clamp(16px, 3vh, 24px);
+  padding: clamp(16px, 3.3vh, 24px) clamp(15px, 3vw, 20px);
+}
+
+.alert-watch-time {
+  font-size: clamp(0.96rem, 2.5vh, 1.14rem);
+}
+
+.alert-copy.alert-copy-simple {
+  gap: clamp(12px, 2.6vh, 19px);
+}
+
+.alert-screen.alert-screen-simple h1 {
+  font-size: clamp(1.48rem, 5.15vh, 2.18rem);
+}
+
+.alert-screen.alert-screen-simple .alert-copy p {
+  font-size: clamp(1.02rem, 3.2vh, 1.34rem);
+  line-height: 1.45;
+}
+
+.alert-screen.alert-screen-simple .primary-action {
+  min-height: clamp(52px, 8.8vh, 66px);
+  font-size: clamp(1.06rem, 3.05vh, 1.26rem);
+}
+
+.alert-screen.alert-screen-simple .pager-dots {
+  gap: 9px;
+}
+
+.alert-screen.alert-screen-simple .pager-dot {
+  width: 7px;
+  height: 7px;
+}
+
+.alert-screen.alert-screen-simple .pager-dot.active {
+  width: 24px;
+}
+.alert-screen.alert-screen-simple {
+  gap: clamp(10px, 2.3vh, 17px);
+  padding: clamp(5px, 0.9vh, 8px) clamp(4px, 0.9vw, 6px) clamp(10px, 2vh, 14px);
+}
+
+.alert-watch-card {
+  gap: clamp(14px, 2.6vh, 20px);
+  padding: clamp(14px, 2.9vh, 21px) clamp(14px, 2.7vw, 18px);
+  border-radius: 20px;
+}
+
+.alert-watch-time {
+  font-size: clamp(0.92rem, 2.2vh, 1.06rem);
+}
+
+.alert-copy.alert-copy-simple {
+  gap: clamp(10px, 2.2vh, 16px);
+}
+
+.alert-screen.alert-screen-simple h1 {
+  font-size: clamp(1.36rem, 4.65vh, 1.96rem);
+}
+
+.alert-screen.alert-screen-simple .alert-copy p {
+  font-size: clamp(0.96rem, 2.85vh, 1.2rem);
+  line-height: 1.42;
+}
+
+.alert-screen.alert-screen-simple .primary-action {
+  min-height: clamp(48px, 8vh, 60px);
+  border-radius: 16px;
+  font-size: clamp(1rem, 2.8vh, 1.16rem);
+}
+
+.alert-screen.alert-screen-simple .pager-dots {
+  gap: 8px;
+}
+
+.alert-screen.alert-screen-simple .pager-dot {
+  width: 6px;
+  height: 6px;
+}
+
+.alert-screen.alert-screen-simple .pager-dot.active {
+  width: 20px;
+}
+.alert-watch-card {
+  gap: clamp(10px, 2vh, 15px);
+  padding: clamp(11px, 2.2vh, 16px) clamp(14px, 2.7vw, 18px);
+  align-content: start;
+}
+
+.alert-watch-time {
+  font-size: clamp(0.88rem, 2vh, 1rem);
+  line-height: 1;
+}
+
+.alert-copy.alert-copy-simple {
+  gap: clamp(7px, 1.6vh, 12px);
+  align-content: start;
+}
+
+.alert-screen.alert-screen-simple h1 {
+  font-size: clamp(1.28rem, 4.2vh, 1.82rem);
+  line-height: 1.02;
+}
+
+.alert-screen.alert-screen-simple .alert-copy p {
+  font-size: clamp(0.92rem, 2.55vh, 1.12rem);
+  line-height: 1.34;
+}
+.alert-watch-card {
+  min-height: auto;
+  height: auto;
+  align-self: start;
+  gap: clamp(10px, 2vh, 15px);
+  padding: clamp(10px, 2vh, 15px) clamp(14px, 2.7vw, 18px);
+}
+
+.alert-watch-time {
+  font-size: clamp(0.92rem, 2.2vh, 1.06rem);
+}
+
+.alert-copy.alert-copy-simple {
+  gap: clamp(10px, 2.2vh, 16px);
+  align-content: start;
+}
+
+.alert-screen.alert-screen-simple h1 {
+  font-size: clamp(1.36rem, 4.65vh, 1.96rem);
+  line-height: 1.04;
+}
+
+.alert-screen.alert-screen-simple .alert-copy p {
+  font-size: clamp(0.96rem, 2.85vh, 1.2rem);
+  line-height: 1.42;
+}
+.alert-watch-card {
+  min-height: auto;
+  height: auto;
+  align-self: start;
+  gap: clamp(12px, 2.3vh, 17px);
+  padding: clamp(12px, 2.4vh, 18px) clamp(14px, 2.7vw, 18px);
+}
+.alert-watch-card {
+  gap: clamp(18px, 3.6vh, 26px);
+  padding: clamp(20px, 4vh, 30px) clamp(14px, 2.7vw, 18px);
+}
+.alert-watch-card {
+  align-self: stretch;
+  min-height: clamp(220px, 48vh, 320px);
+  gap: clamp(18px, 3.6vh, 26px);
+  padding: clamp(20px, 4vh, 30px) clamp(14px, 2.7vw, 18px);
+}
+.alert-watch-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+}
+
+.alert-watch-time {
+  align-self: center;
+  justify-self: center;
+  font-size: clamp(1.08rem, 2.8vh, 1.28rem);
+  line-height: 1;
+}
+
+.alert-copy.alert-copy-simple {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  text-align: center;
+  gap: clamp(14px, 2.8vh, 20px);
+}
+
+.alert-screen.alert-screen-simple h1 {
+  font-size: clamp(1.58rem, 5.1vh, 2.24rem);
+  line-height: 1.06;
+  text-align: center;
+}
+
+.alert-screen.alert-screen-simple .alert-copy p {
+  font-size: clamp(1.08rem, 3.3vh, 1.34rem);
+  line-height: 1.42;
+  text-align: center;
+}
+.device-select-icon {
+  width: 52px;
+  height: 52px;
+}
+
+.device-select-icon.is-svg-icon {
+  display: grid;
+  place-items: center;
+}
+
+.device-select-icon.is-svg-icon svg {
+  width: 30px;
+  height: 30px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.device-select-copy {
+  gap: 0;
+}
+
+.device-select-name {
+  font-size: 1.14rem;
+  font-weight: 900;
+  line-height: 1.18;
+}
+
+.device-select-status {
+  display: none;
+}
+.device-select-card {
+  padding-top: 12px;
+  padding-bottom: 14px;
+}
+
+.device-select-copy {
+  gap: 2px;
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+
+.device-select-name {
+  font-size: 1.24rem;
+  line-height: 1.16;
+}
+.device-select-name {
+  font-size: 1.34rem;
+  line-height: 1.12;
+}
+.wearable-chat-start {
+  align-content: center;
+  justify-items: stretch;
+  gap: clamp(18px, 3.8vh, 28px);
+  padding: clamp(10px, 2vh, 18px) clamp(6px, 1.4vw, 12px);
+}
+
+.wearable-chat-start-header {
+  gap: 0;
+  padding-inline: 8px;
+}
+
+.wearable-chat-start-header h2 {
+  color: var(--wearable-text);
+  font-size: clamp(1.54rem, 5.1vh, 2.3rem);
+  font-weight: 600;
+  line-height: 1.1;
+  text-align: center;
+  letter-spacing: -0.03em;
+}
+
+.wearable-chat-start .wearable-chat-menu {
+  gap: clamp(12px, 2.6vh, 18px);
+}
+
+.wearable-chat-start .wearable-chat-choice {
+  grid-template-columns: 56px minmax(0, 1fr);
+  gap: 14px;
+  min-height: clamp(92px, 15vh, 122px);
+  padding: clamp(14px, 2.8vh, 20px) clamp(16px, 3vw, 22px);
+  border-radius: 22px;
+}
+
+.wearable-chat-start .wearable-chat-choice-icon {
+  width: 56px;
+  height: 56px;
+  font-size: 1.5rem;
+}
+
+.wearable-chat-start .wearable-chat-svg-icon {
+  width: 28px;
+  height: 28px;
+  stroke-width: 2.2;
+}
+
+.wearable-chat-start .wearable-chat-choice strong {
+  font-size: clamp(1.18rem, 3.7vh, 1.52rem);
+  font-weight: 600;
+  line-height: 1.18;
+}
+
+.wearable-chat-start .wearable-chat-choice small,
+.wearable-chat-start .wearable-chat-wake,
+.wearable-chat-start .wearable-chat-footnote,
+.wearable-chat-start .wearable-chat-link,
+.wearable-chat-start .wearable-chat-app-action,
+.wearable-chat-start .wearable-chat-bottom-action {
+  display: none !important;
+}
+.wearable-chat-start-header h2 {
+  font-size: clamp(1.34rem, 4.4vh, 2.02rem);
+}
+
+.wearable-chat-start-wake {
+  display: grid !important;
+  justify-items: center;
+  width: 100%;
+  margin-top: clamp(4px, 1.2vh, 10px);
+}
+
+.wearable-chat-start .wearable-chat-wake-button {
+  display: grid !important;
+  width: 76px;
+  height: 76px;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--wearable-text);
+  color: #ffffff;
+  box-shadow: 0 14px 28px rgba(17, 24, 39, 0.18);
+  font-size: 1.9rem;
+}
+
+.wearable-chat-start .wearable-chat-wake-button .wearable-chat-svg-icon {
+  width: 30px;
+  height: 30px;
+}
+
+.wearable-chat-start .wearable-chat-wake p {
+  display: none !important;
+}
+.wearable-chat-start .wearable-chat-start-wake {
+  display: grid !important;
+  justify-items: center;
+  width: 100%;
+  margin-top: clamp(4px, 1.2vh, 10px);
+}
+
+.wearable-chat-start .wearable-chat-start-wake .wearable-chat-wake-button {
+  display: grid !important;
+}
+
+.wearable-chat-start-header h2 {
+  font-size: clamp(1.18rem, 3.8vh, 1.78rem);
+  line-height: 1.12;
+}
+.wearable-chat-list {
+  align-content: stretch;
+  justify-items: stretch;
+  gap: clamp(14px, 3vh, 22px);
+  padding: clamp(8px, 1.5vh, 14px) clamp(4px, 1vw, 8px) clamp(10px, 2vh, 16px);
+}
+
+.wearable-chat-list .wearable-chat-header {
+  padding-inline: 8px;
+}
+
+.wearable-chat-list .wearable-chat-header h2 {
+  font-size: clamp(1.5rem, 5vh, 2.16rem);
+  line-height: 1.08;
+}
+
+.wearable-chat-list .wearable-chat-options {
+  gap: clamp(10px, 2.2vh, 16px);
+}
+
+.wearable-chat-list .wearable-chat-option {
+  grid-template-columns: 46px minmax(0, 1fr) 22px;
+  min-height: clamp(72px, 11.5vh, 94px);
+  gap: 12px;
+  padding: clamp(12px, 2.4vh, 18px) clamp(14px, 2.8vw, 18px);
+  border-radius: 18px;
+}
+
+.wearable-chat-list .wearable-chat-option span:first-child {
+  width: 40px;
+  height: 40px;
+  font-size: 1.35rem;
+}
+
+.wearable-chat-list .wearable-chat-option strong {
+  font-size: clamp(1.06rem, 3.2vh, 1.28rem);
+  line-height: 1.2;
+}
+
+.wearable-chat-list .wearable-chat-option-arrow {
+  font-size: 1.45rem !important;
+}
+
+.wearable-chat-list .wearable-chat-link {
+  min-height: 42px;
+  font-size: 0.92rem;
+}
+
+.wearable-chat-list .wearable-chat-list-label {
+  display: none !important;
+}
+.wearable-chat-speaking {
+  align-content: center;
+  justify-items: center;
+  gap: clamp(18px, 3.6vh, 28px);
+  padding: clamp(8px, 1.6vh, 14px) clamp(6px, 1.4vw, 12px);
+}
+
+.wearable-chat-speaking .wearable-chat-header {
+  padding-inline: 8px;
+}
+
+.wearable-chat-speaking .wearable-chat-header h2 {
+  font-size: clamp(1.12rem, 3.4vh, 1.6rem);
+  line-height: 1.08;
+}
+
+.wearable-chat-speaking .wearable-chat-speaker {
+  width: 108px;
+  height: 108px;
+  font-size: 3rem;
+  box-shadow: 0 0 0 16px rgba(225, 29, 72, 0.06);
+}
+
+.wearable-chat-speaking .wearable-chat-phrase-card {
+  width: 100%;
+  gap: 8px;
+  padding: 18px 18px 20px;
+  border-radius: 22px;
+}
+
+.wearable-chat-speaking .wearable-chat-phrase-card span {
+  font-size: 0.82rem;
+}
+
+.wearable-chat-speaking .wearable-chat-phrase-card strong {
+  font-size: clamp(1.3rem, 4.1vh, 1.7rem);
+  line-height: 1.32;
+}
+
+.wearable-chat-speaking .wearable-chat-bottom-action {
+  width: 100%;
+  min-height: clamp(52px, 8.8vh, 66px);
+  border-radius: 18px;
+  font-size: clamp(1rem, 2.9vh, 1.2rem);
+}
+
+.wearable-chat-speaking .wearable-chat-link {
+  display: none !important;
+}
+.wearable-chat-speaking {
+  align-content: start;
+  padding-top: clamp(38px, 7vh, 56px);
+}
+
+.wearable-chat-speaking .wearable-chat-header {
+  align-self: stretch;
+  padding: 0 10px 0 44px;
+  min-height: 30px;
+  display: grid;
+  align-items: center;
+}
+
+.wearable-chat-speaking .wearable-chat-header h2 {
+  font-size: clamp(1.12rem, 3.4vh, 1.6rem);
+  line-height: 1.08;
+}
+.wearable-chat-speaking .wearable-chat-header {
+  justify-items: center;
+  padding: 0 44px;
+  text-align: center;
+}
+
+.wearable-chat-speaking .wearable-chat-header h2 {
+  justify-self: center;
+  text-align: center;
+}
+.wearable-ai-category-screen,
+.wearable-ai-recommend-screen,
+.wearable-ai-answer-screen {
+  align-content: start;
+  justify-items: stretch;
+  gap: clamp(14px, 3vh, 24px);
+  padding: clamp(8px, 1.6vh, 14px) clamp(4px, 1vw, 8px) clamp(12px, 2.2vh, 18px);
+}
+
+.wearable-ai-category-screen .wearable-chat-header,
+.wearable-ai-recommend-screen .wearable-chat-header,
+.wearable-ai-answer-screen .wearable-chat-header {
+  padding-inline: 8px;
+}
+
+.wearable-ai-category-screen .wearable-chat-header h2,
+.wearable-ai-recommend-screen .wearable-chat-header h2,
+.wearable-ai-answer-screen .wearable-chat-header h2 {
+  font-size: clamp(1.44rem, 4.8vh, 2.1rem);
+  line-height: 1.08;
+}
+
+.wearable-ai-category-screen .wearable-chat-header p,
+.wearable-ai-recommend-screen .wearable-chat-header p,
+.wearable-ai-answer-screen .wearable-chat-header p {
+  display: none !important;
+}
+
+.wearable-ai-category-grid {
+  gap: clamp(12px, 2.4vh, 18px);
+}
+
+.wearable-ai-category-card {
+  min-height: clamp(128px, 20vh, 160px);
+  gap: 12px;
+  padding: clamp(16px, 3vh, 22px) 10px;
+  border-radius: 20px;
+}
+
+.wearable-ai-card-icon {
+  width: 56px;
+  height: 56px;
+  font-size: 1.38rem;
+}
+
+.wearable-ai-category-card strong {
+  font-size: clamp(1.08rem, 3.3vh, 1.34rem);
+  line-height: 1.2;
+}
+
+.wearable-ai-question-list {
+  gap: clamp(10px, 2vh, 16px);
+}
+
+.wearable-ai-question-button {
+  grid-template-columns: 34px minmax(0, 1fr);
+  min-height: clamp(62px, 9.8vh, 82px);
+  gap: 12px;
+  padding: clamp(13px, 2.4vh, 18px) clamp(14px, 2.8vw, 18px);
+  border-radius: 18px;
+}
+
+.wearable-ai-question-button .wearable-question-icon {
+  width: 34px;
+  height: 34px;
+  font-size: 1rem;
+}
+
+.wearable-ai-question-button .wearable-question-text {
+  font-size: clamp(1rem, 3vh, 1.22rem);
+  line-height: 1.22;
+}
+
+.wearable-device-question-button {
+  grid-template-columns: 40px minmax(0, 1fr) 26px;
+}
+
+.wearable-question-chevron {
+  font-size: 1.4rem;
+}
+
+.wearable-ai-answer-card {
+  gap: clamp(12px, 2.4vh, 18px);
+  padding: clamp(16px, 3vh, 22px);
+  border-radius: 22px;
+}
+
+.wearable-ai-answer-topline h2,
+.wearable-guardian-request-heading h2,
+.wearable-safety-alert-card h2,
+.wearable-appliance-card-title {
+  font-size: clamp(1.22rem, 3.9vh, 1.56rem);
+  line-height: 1.18;
+}
+
+.wearable-ai-summary,
+.wearable-guardian-request-copy p,
+.wearable-safety-answer-copy .wearable-ai-summary,
+.wearable-appliance-main-card p,
+.wearable-appliance-main-card strong,
+.wearable-chat-answer-lines,
+.wearable-chat-guide {
+  font-size: clamp(1rem, 3vh, 1.22rem);
+  line-height: 1.44;
+}
+
+.wearable-ai-action-block {
+  gap: 8px;
+  padding: 14px 14px;
+  border-radius: 16px;
+}
+
+.wearable-ai-action-block strong,
+.wearable-ai-source,
+.wearable-ai-followups-title,
+.wearable-appliance-section-title {
+  font-size: 0.9rem;
+}
+
+.wearable-ai-action-block li {
+  font-size: 0.96rem;
+  line-height: 1.4;
+}
+
+.wearable-ai-card-actions,
+.wearable-ai-followups {
+  gap: 10px;
+}
+
+.wearable-ai-card-actions button,
+.wearable-ai-followups button,
+.wearable-appliance-quick-card .wearable-ai-card-actions button {
+  min-height: clamp(46px, 7.5vh, 58px);
+  border-radius: 16px;
+  font-size: clamp(0.96rem, 2.8vh, 1.12rem);
+}
+
+.wearable-appliance-main-icon,
+.wearable-guardian-request-icon {
+  width: 64px;
+  height: 64px;
+  font-size: 1.7rem;
+}
+
+.wearable-ai-followups-title {
+  margin-bottom: 2px;
+}
+.wearable-chat-listening {
+  align-content: center;
+  justify-items: center;
+  gap: clamp(20px, 4vh, 30px);
+  padding: clamp(10px, 2vh, 16px) clamp(6px, 1.4vw, 12px);
+}
+
+.wearable-chat-listening .wearable-chat-header {
+  padding-inline: 8px;
+  justify-items: center;
+  text-align: center;
+}
+
+.wearable-chat-listening .wearable-chat-header h2 {
+  font-size: clamp(1.56rem, 5.2vh, 2.28rem);
+  line-height: 1.08;
+}
+
+.wearable-chat-listening .wearable-chat-header p {
+  font-size: clamp(1rem, 3vh, 1.2rem);
+  line-height: 1.36;
+}
+
+.wearable-chat-listening .wearable-chat-mic-large {
+  width: 112px;
+  height: 112px;
+  font-size: 3rem;
+  box-shadow: 0 0 0 18px rgba(225, 29, 72, 0.08);
+}
+
+.wearable-chat-listening .wearable-chat-quote {
+  width: 100%;
+  min-height: clamp(96px, 16vh, 132px);
+  padding: clamp(18px, 3.2vh, 24px) clamp(16px, 3vw, 22px);
+  border: 1px solid rgba(225, 29, 72, 0.14);
+  border-radius: 22px;
+  background: linear-gradient(180deg, #ffffff 0%, #fff6f8 100%);
+  color: #111827;
+  font-size: clamp(1.26rem, 4vh, 1.72rem);
+  font-weight: 600;
+  line-height: 1.34;
+  text-align: center;
+  box-sizing: border-box;
+}
+.wearable-chat-speaking .wearable-chat-speaker {
+  width: 92px;
+  height: 92px;
+  font-size: 2.5rem;
+  box-shadow: 0 0 0 14px rgba(225, 29, 72, 0.06);
+}
+.wearable-chat-start-header h2 {
+  font-size: clamp(1.58rem, 5.1vh, 2.26rem);
+  line-height: 1.08;
+}
+
+.wearable-chat-start .wearable-chat-start-wake {
+  display: grid !important;
+  justify-items: center;
+  width: 100%;
+  margin-top: clamp(6px, 1.6vh, 12px);
+}
+
+.wearable-chat-start .wearable-chat-wake-button {
+  display: grid !important;
+}
+.wearable-chat-start-header h2 {
+  font-size: clamp(1.84rem, 5.9vh, 2.64rem);
+  line-height: 1.04;
+}
+
+.wearable-chat-start-header h2 {
+  font-size: clamp(1.9rem, 5.8vh, 2.7rem) !important;
+  line-height: 1.02 !important;
+}
+
+.wearable-chat-start .wearable-chat-start-wake {
+  display: grid !important;
+  justify-items: center;
+  width: 100%;
+  margin-top: clamp(10px, 2vh, 18px);
+}
+
+.wearable-chat-start .wearable-chat-wake-button {
+  display: grid !important;
+  width: 84px;
+  height: 84px;
+  place-items: center;
+}
+
+
+.wearable-chat-speaking .wearable-chat-speaker {
+  width: 88px;
+  height: 88px;
+  font-size: 2.3rem;
+}
+
+
+.wearable-appliance-status-badge,
+.wearable-appliance-quick-card {
+  display: none !important;
 }

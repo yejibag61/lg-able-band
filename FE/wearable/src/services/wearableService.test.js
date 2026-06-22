@@ -464,6 +464,37 @@ describe('wearableService', () => {
     expect(alert.alertId).toBe(201)
   })
 
+  it('loads wearable appliances from the shared device API', async () => {
+    const apiFetch = vi.fn(async () => jsonResponse({
+      items: [{
+        deviceId: 10,
+        name: '세탁기',
+        type: 'WASHER',
+        connectionStatus: 'CONNECTED',
+        room: '세탁실',
+        runtime: { statusCode: 'RUNNING', remainingMinutes: 12 },
+      }],
+    }))
+    const service = createWearableService({
+      baseUrl: 'http://api.test',
+      fetchImpl: apiFetch,
+      fallbackEnabled: false,
+    })
+
+    const appliances = await service.getWearableAppliances()
+
+    expect(apiFetch).toHaveBeenCalledWith(
+      'http://api.test/api/devices',
+      expect.objectContaining({ method: 'GET' }),
+    )
+    expect(appliances[0]).toMatchObject({
+      deviceId: 10,
+      name: '세탁기',
+      locationName: '세탁실',
+      runtime: { statusCode: 'RUNNING', remainingMinutes: 12 },
+    })
+  })
+
   it('surfaces alert network failures when wearable api is configured', async () => {
     const service = createWearableService({
       baseUrl: 'http://api.test',

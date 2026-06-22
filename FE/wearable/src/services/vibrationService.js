@@ -13,12 +13,13 @@ export function triggerVibration(pattern = 'NONE') {
     !sequence.length ||
     typeof navigator === 'undefined' ||
     !navigator.vibrate ||
-    globalThis.__ABLE_BAND_VIBRATION_ENABLED__ !== true
+    globalThis.__ABLE_BAND_VIBRATION_ENABLED__ !== true ||
+    !canUseVibration()
   ) {
     return false
   }
 
-  return navigator.vibrate(sequence)
+  return safeVibrate(sequence)
 }
 
 export function vibrationPatternForAlert(alert) {
@@ -56,4 +57,33 @@ export function vibrationLabelForAlert(alert) {
   }
 
   return labels[pattern] || labels.NONE
+}
+
+export function stopVibration() {
+  if (
+    typeof navigator === 'undefined' ||
+    typeof navigator.vibrate !== 'function' ||
+    !canUseVibration()
+  ) {
+    return false
+  }
+
+  return safeVibrate(0)
+}
+
+function canUseVibration() {
+  const activation = globalThis.navigator?.userActivation || globalThis.userActivation
+  if (!activation) {
+    return true
+  }
+
+  return activation.isActive === true || activation.hasBeenActive === true
+}
+
+function safeVibrate(sequence) {
+  try {
+    return navigator.vibrate(sequence)
+  } catch {
+    return false
+  }
 }

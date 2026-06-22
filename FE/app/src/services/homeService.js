@@ -5,6 +5,13 @@ import { getAlerts } from './alertService'
 import { getContextSafetyStatus } from './contextAiService'
 import { getDevices } from './deviceService'
 
+const safetyStatusRank = {
+  SAFE: 1,
+  CAUTION: 2,
+  DANGER: 3,
+  EMERGENCY: 4,
+}
+
 export async function getHomeSummary() {
   try {
     return normalizeHomeSummary(await apiRequest('/api/app/home'))
@@ -59,6 +66,10 @@ export async function applyContextAiSafetyStatus(summary, alerts = []) {
     return summary
   }
 
+  if (!shouldApplyContextAiSafetyStatus(summary.safetyStatus?.level, aiSafetyStatus.level)) {
+    return summary
+  }
+
   return {
     ...summary,
     safetyStatus: {
@@ -69,6 +80,10 @@ export async function applyContextAiSafetyStatus(summary, alerts = []) {
       ai: aiSafetyStatus.ai,
     },
   }
+}
+
+function shouldApplyContextAiSafetyStatus(currentLevel, nextLevel) {
+  return (safetyStatusRank[nextLevel] || 0) >= (safetyStatusRank[currentLevel] || 0)
 }
 
 function normalizeAlert(alert, fixtures) {

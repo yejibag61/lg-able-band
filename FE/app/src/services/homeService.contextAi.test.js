@@ -79,6 +79,33 @@ describe('applyContextAiSafetyStatus', () => {
     await expect(applyContextAiSafetyStatus(summary, alerts)).resolves.toBe(summary)
   })
 
+  it('does not downgrade a backend emergency status with a lower context AI judgment', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse({
+        safetyStatusLevel: 'SAFE',
+        message: 'Living room event is unsupported or missing context.',
+        riskScore: 10,
+        alertType: 'LIFE',
+      }),
+    )
+
+    const emergencySummary = {
+      ...summary,
+      safetyStatus: {
+        level: 'EMERGENCY',
+        message: 'Range heat warning needs immediate attention.',
+        lastCheckedAt: '2026-06-19T17:23:59+09:00',
+      },
+    }
+
+    const nextSummary = await applyContextAiSafetyStatus(emergencySummary, alerts)
+
+    expect(nextSummary.safetyStatus).toMatchObject({
+      level: 'EMERGENCY',
+      message: 'Range heat warning needs immediate attention.',
+    })
+  })
+
   it('does not let the user SOS receipt override home safety status', async () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       jsonResponse({

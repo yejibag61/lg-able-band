@@ -139,7 +139,7 @@ export function createWearableService({
         apiEnabled: isApiEnabled(),
         fallbackEnabled,
         fallback: getMockAppliances,
-        request: async () => normalizeListResponse(await request('/api/wearable/appliances', { method: 'GET' })).map(normalizeAppliance),
+        request: async () => normalizeListResponse(await request('/api/devices', { method: 'GET' })).map(normalizeAppliance),
       })
     },
     async confirmAlert(alertId) {
@@ -436,9 +436,10 @@ export function normalizeAppliance(appliance) {
     name: normalizeApplianceDisplayName(appliance.name || appliance.deviceName) || '가전',
     type,
     connectionStatus,
-    locationName: appliance.locationName || appliance.location || appliance.roomName || '집 안',
+    locationName: appliance.locationName || appliance.location || appliance.roomName || appliance.room || '집 안',
     uwbSupported: appliance.uwbSupported !== false,
     status: connectionStatus,
+    runtime: appliance.runtime || appliance.state || {},
   }
 }
 
@@ -630,8 +631,23 @@ function getMockCurrentAlerts() {
 
 function getMockAppliances() {
   return [
-    normalizeAppliance({ deviceId: 10, name: '세탁기', type: 'WASHER', connectionStatus: 'CONNECTED', locationName: '세탁실' }),
+    normalizeAppliance({
+      deviceId: 10,
+      name: '세탁기',
+      type: 'WASHER',
+      connectionStatus: 'CONNECTED',
+      locationName: '세탁실',
+      runtime: { statusCode: 'RUNNING', remainingMinutes: 12 },
+    }),
     normalizeAppliance({ deviceId: 14, name: '냉장고', type: 'FRIDGE', connectionStatus: 'CONNECTED', locationName: '주방' }),
+    normalizeAppliance({
+      deviceId: 13,
+      name: '도어센서',
+      type: 'DOOR_SENSOR',
+      connectionStatus: 'CONNECTED',
+      locationName: '현관',
+      runtime: { doorOpen: false, securityEvent: false },
+    }),
   ]
 }
 
@@ -757,7 +773,7 @@ async function withFallback({ apiEnabled, fallbackEnabled, fallback, request }) 
   try {
     return await request()
   } catch (error) {
-    if (!fallbackEnabled || shouldSurfaceApiError(error) || !allowsApiFailureFallback()) {
+    if (!fallbackEnabled || shouldSurfaceApiError(error) || !allowsApiFailureFallback(error)) {
       throw error
     }
 
@@ -765,8 +781,12 @@ async function withFallback({ apiEnabled, fallbackEnabled, fallback, request }) 
   }
 }
 
-function allowsApiFailureFallback() {
-  return globalThis.__ABLE_BAND_ALLOW_API_FAILURE_FALLBACK__ === true
+function allowsApiFailureFallback(error) {
+  if (globalThis.__ABLE_BAND_ALLOW_API_FAILURE_FALLBACK__ === true) {
+    return true
+  }
+
+  return Number(error?.status) >= 500
 }
 
 function shouldSurfaceApiError(error) {

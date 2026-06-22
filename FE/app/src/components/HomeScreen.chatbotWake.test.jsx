@@ -17,7 +17,7 @@ vi.mock('../services/homeService', () => ({
   })),
   getHomeSummary: vi.fn(() => Promise.resolve({
     user: {
-      name: '소희',
+      name: '엘지',
       accessibilityType: 'VISUAL',
     },
     safetyStatus: {
@@ -67,7 +67,7 @@ vi.mock('../services/wearablePairingService', () => ({
 const session = {
   account: {
     email: 'user@example.com',
-    name: '소희',
+    name: '엘지',
   },
   userProfile: {
     accessibilityType: 'VISUAL',

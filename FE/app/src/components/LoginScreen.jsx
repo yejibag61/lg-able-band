@@ -67,7 +67,7 @@ export function LoginScreen({
             type="email"
             value={email}
             onChange={(event) => onEmailChange(event.target.value)}
-            placeholder="user@example.com"
+            placeholder="이메일을 입력해주세요"
             autoComplete="email"
           />
         </label>
@@ -78,7 +78,7 @@ export function LoginScreen({
             type="password"
             value={password}
             onChange={(event) => onPasswordChange(event.target.value)}
-            placeholder="password1234"
+            placeholder="비밀번호를 입력해주세요"
             autoComplete="current-password"
           />
         </label>

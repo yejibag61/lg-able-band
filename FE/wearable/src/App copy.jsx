@@ -29,7 +29,7 @@ import {
   stopUwbSession,
   unpairWearable,
 } from './services/wearableService'
-import { stopVibration, triggerVibration, vibrationPatternForAlert } from './services/vibrationService'
+import { triggerVibration, vibrationPatternForAlert } from './services/vibrationService'
 import {
   getPairingPollIntervalMs,
   getPairingSuccessTransitionMs,
@@ -315,8 +315,8 @@ function App() {
       globalThis.__ABLE_BAND_VIBRATION_ENABLED__ = isPaired
     }
 
-    if (!isPaired) {
-      stopVibration()
+    if (!isPaired && typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
+      navigator.vibrate(0)
     }
 
     return () => {
@@ -643,7 +643,9 @@ function App() {
     window.clearInterval(uwbVibrationIntervalRef.current)
 
     if (!isPaired || mode !== 'uwb' || !activeUwbSession) {
-      stopVibration()
+      if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
+        navigator.vibrate(0)
+      }
       return undefined
     }
 

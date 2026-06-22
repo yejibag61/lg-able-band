@@ -159,7 +159,7 @@ describe('App login to home flow', () => {
     await user.type(screen.getByLabelText('비밀번호'), 'password1234')
     await user.click(screen.getByRole('button', { name: '로그인' }))
 
-    expect(await screen.findByRole('heading', { name: /소희 홈/i })).toBeTruthy()
+    expect(await screen.findByRole('heading', { name: /엘지 홈/i })).toBeTruthy()
     expect(screen.getByText('Able Band가 안전 상태를 확인하고 있습니다.')).toBeTruthy()
     expect(screen.getByText('오늘의 안전 상태')).toBeTruthy()
     expect(screen.getByRole('button', { name: '긴급 지원 요청' })).toBeTruthy()
@@ -234,7 +234,7 @@ describe('App login to home flow', () => {
     await user.type(screen.getByLabelText('비밀번호'), 'password1234')
     await user.click(screen.getByRole('button', { name: '로그인' }))
 
-    await screen.findByRole('heading', { name: /소희 홈/i })
+    await screen.findByRole('heading', { name: /엘지 홈/i })
     await user.click(screen.getByRole('button', { name: '긴급 지원 요청' }))
 
     await waitFor(() => {
@@ -303,7 +303,7 @@ describe('App login to home flow', () => {
     await user.type(screen.getByLabelText('비밀번호'), 'password1234')
     await user.click(screen.getByRole('button', { name: '로그인' }))
 
-    await screen.findByRole('heading', { name: /소희 홈/i })
+    await screen.findByRole('heading', { name: /엘지 홈/i })
     await user.click(screen.getByRole('button', { name: '긴급 지원 요청' }))
 
     await waitFor(() => {
@@ -330,7 +330,7 @@ describe('App login to home flow', () => {
     await user.type(screen.getByLabelText('비밀번호'), 'password1234')
     await user.click(screen.getByRole('button', { name: '로그인' }))
 
-    await screen.findByRole('heading', { name: /소희 홈/i })
+    await screen.findByRole('heading', { name: /엘지 홈/i })
 
     await user.click(screen.getByRole('button', { name: '기기' }))
     expect(screen.getByRole('heading', { name: '기기와 UWB' })).toBeTruthy()
@@ -388,7 +388,7 @@ describe('App login to home flow', () => {
     await user.type(screen.getByLabelText('비밀번호'), 'password1234')
     await user.click(screen.getByRole('button', { name: '로그인' }))
 
-    await screen.findByRole('heading', { name: /소희 홈/i })
+    await screen.findByRole('heading', { name: /엘지 홈/i })
     await user.click(screen.getByRole('button', { name: '설정' }))
     installQrScannerMock(rawValue)
     await user.click(screen.getByRole('button', { name: /카메라로 밴드 QR코드 스캔/ }))
@@ -478,7 +478,7 @@ describe('App login to home flow', () => {
     await user.type(screen.getByLabelText('비밀번호'), 'password1234')
     await user.click(screen.getByRole('button', { name: '로그인' }))
 
-    await screen.findByRole('heading', { name: /소희 홈/i })
+    await screen.findByRole('heading', { name: /엘지 홈/i })
     await user.click(screen.getByRole('button', { name: '설정' }))
     installQrScannerMock(rawValue)
     await user.click(screen.getByRole('button', { name: /카메라로 밴드 QR코드 스캔/ }))
@@ -576,12 +576,12 @@ describe('App login to home flow', () => {
         role: 'USER',
         account: {
           accountId: 1,
-          name: '소희',
+          name: '엘지',
           email: 'user@example.com',
         },
         userProfile: {
           userId: 1,
-          name: '소희',
+          name: '엘지',
           accessibilityType: 'VISUAL',
         },
       }),
@@ -590,7 +590,7 @@ describe('App login to home flow', () => {
     const user = userEvent.setup()
     render(<App />)
 
-    expect(await screen.findByRole('heading', { name: /소희 홈/i })).toBeTruthy()
+    expect(await screen.findByRole('heading', { name: /엘지 홈/i })).toBeTruthy()
     expect(screen.queryByRole('heading', { name: /able band 로그인/i })).toBeNull()
     await user.click(screen.getByRole('button', { name: '설정' }))
     expect(screen.getByRole('button', { name: '로그아웃' })).toBeTruthy()
@@ -800,7 +800,7 @@ describe('App login to home flow', () => {
     await user.type(screen.getByLabelText('비밀번호'), 'password1234')
     await user.click(screen.getByRole('button', { name: '로그인' }))
 
-    await screen.findByRole('heading', { name: /소희 홈/i })
+    await screen.findByRole('heading', { name: /엘지 홈/i })
     await user.click(screen.getByRole('button', { name: '설정' }))
     installQrScannerMock(rawValue, { detector: false })
     await user.click(screen.getByRole('button', { name: /카메라로 밴드 QR코드 스캔/ }))
@@ -869,7 +869,7 @@ describe('App login to home flow', () => {
     await user.type(screen.getByLabelText('비밀번호'), 'password1234')
     await user.click(screen.getByRole('button', { name: '로그인' }))
 
-    await screen.findByRole('heading', { name: /소희 홈/i })
+    await screen.findByRole('heading', { name: /엘지 홈/i })
     await user.click(screen.getByRole('button', { name: '설정' }))
     await user.click(screen.getByRole('button', { name: /카메라로 밴드 QR코드 스캔/ }))
     await user.click(screen.getByRole('button', { name: '카메라 켜기' }))
@@ -942,7 +942,7 @@ describe('App login to home flow', () => {
     await user.type(screen.getByLabelText('비밀번호'), 'password1234')
     await user.click(screen.getByRole('button', { name: '로그인' }))
 
-    await screen.findByRole('heading', { name: /소희 홈/i })
+    await screen.findByRole('heading', { name: /엘지 홈/i })
     await user.click(screen.getByRole('button', { name: '설정' }))
     await user.click(screen.getByRole('button', { name: /카메라로 밴드 QR코드 스캔/ }))
     await user.click(screen.getByRole('button', { name: '카메라 켜기' }))
@@ -1019,7 +1019,7 @@ describe('App login to home flow', () => {
     await user.type(screen.getByLabelText('비밀번호'), 'password1234')
     await user.click(screen.getByRole('button', { name: '로그인' }))
 
-    await screen.findByRole('heading', { name: /소희 홈/i })
+    await screen.findByRole('heading', { name: /엘지 홈/i })
     await user.click(screen.getByRole('button', { name: '설정' }))
     await user.click(screen.getByRole('button', { name: /카메라로 밴드 QR코드 스캔/ }))
     await user.click(screen.getByRole('button', { name: '카메라 켜기' }))
@@ -1111,7 +1111,7 @@ describe('App login to home flow', () => {
     await user.type(screen.getByLabelText('비밀번호'), 'password1234')
     await user.click(screen.getByRole('button', { name: '로그인' }))
 
-    await screen.findByRole('heading', { name: /소희 홈/i })
+    await screen.findByRole('heading', { name: /엘지 홈/i })
     await user.click(screen.getByRole('button', { name: '설정' }))
     await user.click(screen.getByRole('button', { name: /카메라로 밴드 QR코드 스캔/ }))
     await user.click(screen.getByRole('button', { name: '카메라 켜기' }))
@@ -1163,7 +1163,7 @@ describe('App login to home flow', () => {
     await user.type(screen.getByLabelText('비밀번호'), 'password1234')
     await user.click(screen.getByRole('button', { name: '로그인' }))
 
-    await screen.findByRole('heading', { name: /소희 홈/i })
+    await screen.findByRole('heading', { name: /엘지 홈/i })
     await user.click(screen.getByRole('button', { name: '설정' }))
     await user.click(screen.getByRole('button', { name: /카메라로 밴드 QR코드 스캔/ }))
     await user.click(screen.getByRole('button', { name: '카메라 켜기' }))
@@ -1210,7 +1210,7 @@ function installMockBackend() {
         email: 'user@example.com',
         password: 'password1234',
         accountId: 1,
-        name: '소희',
+        name: '엘지',
         userId: 1,
         accessibilityType: 'VISUAL',
         accessToken: 'api-user-token',
@@ -1513,7 +1513,7 @@ function installMockBackend() {
       return jsonResponse({
         user: {
           userId: 1,
-          name: '소희',
+          name: '엘지',
           accessibilityType: 'VISUAL',
         },
         dangerAlerts: guardianDangerAlerts,
@@ -1648,7 +1648,7 @@ async function loginAsUser(user) {
   await user.type(screen.getByLabelText('이메일'), 'user@example.com')
   await user.type(screen.getByLabelText('비밀번호'), 'password1234')
   await user.click(screen.getByRole('button', { name: '로그인' }))
-  await screen.findByRole('heading', { name: /소희 홈/i })
+  await screen.findByRole('heading', { name: /엘지 홈/i })
 }
 
 function findFetchCall(path, method = 'GET') {

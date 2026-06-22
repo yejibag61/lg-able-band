@@ -75,7 +75,7 @@ function createMockGuardianDashboard() {
   return {
     user: {
       userId: 1,
-      name: '소희',
+      name: '엘지',
       accessibilityType: mockAppPreview.accessibility.disabilityType,
     },
     dangerAlerts,

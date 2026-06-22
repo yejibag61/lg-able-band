@@ -11,9 +11,12 @@ export function SignupScreen({
   return (
     <main className="phone-screen signup-screen app-screen" aria-labelledby="signup-title">
       <section className="login-hero">
-        <p className="eyebrow">LG Able Band</p>
-        <h1 id="signup-title">Able Band 회원가입</h1>
-        <p className="hero-copy">역할에 맞는 기본 정보를 입력해 주세요.</p>
+        <img
+          className="signup-brand-logo"
+          src="/LG_Able_Band_wordmark_transparent.png"
+          alt="LG Able Band"
+        />
+        <h1 id="signup-title">Sign up</h1>
       </section>
 
       <form className="login-panel signup-panel" onSubmit={onSubmit} noValidate>
@@ -47,7 +50,7 @@ export function SignupScreen({
             type="text"
             value={form.name}
             onChange={(event) => onChange('name', event.target.value)}
-            placeholder="홍길동"
+            placeholder="이름을 입력해주세요"
             autoComplete="name"
           />
         </label>
@@ -128,22 +131,7 @@ export function SignupScreen({
                 />
                 진동 안내
               </label>
-              <label>
-                <input
-                  type="checkbox"
-                  checked={form.highContrast}
-                  onChange={(event) => onChange('highContrast', event.target.checked)}
-                />
-                고대비
-              </label>
-              <label>
-                <input
-                  type="checkbox"
-                  checked={form.largeText}
-                  onChange={(event) => onChange('largeText', event.target.checked)}
-                />
-                큰 글씨
-              </label>
+            
             </div>
           </>
         ) : (

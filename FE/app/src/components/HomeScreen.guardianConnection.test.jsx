@@ -7,7 +7,7 @@ const API_BASE_URL = 'http://localhost:8080'
 
 const session = {
   account: {
-    name: '소희',
+    name: '엘지',
     email: 'user@example.com',
   },
   userProfile: {
@@ -17,7 +17,7 @@ const session = {
 
 const homeSummary = {
   user: {
-    name: '소희',
+    name: '엘지',
     accessibilityType: 'VISUAL',
   },
   safetyStatus: {
@@ -70,7 +70,7 @@ describe('HomeScreen guardian invite and management', () => {
     const user = userEvent.setup()
     render(<HomeScreen session={session} onLogout={() => {}} />)
 
-    await screen.findByRole('heading', { name: '소희 홈' })
+    await screen.findByRole('heading', { name: '엘지 홈' })
     await user.click(screen.getByRole('button', { name: '설정' }))
     await user.click(screen.getByRole('button', { name: '멤버 초대' }))
 
@@ -111,7 +111,7 @@ describe('HomeScreen guardian invite and management', () => {
     const user = userEvent.setup()
     render(<HomeScreen session={session} onLogout={() => {}} />)
 
-    await screen.findByRole('heading', { name: '소희 홈' })
+    await screen.findByRole('heading', { name: '엘지 홈' })
     await user.click(screen.getByRole('button', { name: '설정' }))
     await user.click(screen.getByRole('button', { name: '홈 멤버 관리' }))
 
@@ -165,7 +165,7 @@ async function mockFetch(input, init = {}) {
     return jsonResponse({
       role: 'USER',
       userId: 1,
-      name: '소희',
+      name: '엘지',
       email: 'user@example.com',
       accessibilityType: 'VISUAL',
       notificationPrefs: {

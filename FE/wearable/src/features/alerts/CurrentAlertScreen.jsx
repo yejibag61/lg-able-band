@@ -1,8 +1,5 @@
 import { useRef } from 'react'
-import { StatusBadge } from '../../components/StatusBadge'
-import { vibrationLabelForAlert } from '../../services/vibrationService'
 import { formatWearableTime } from '../../utils/formatWearableTime'
-import { alertTypeLabels, severityLabels } from './alertLabels'
 
 export function CurrentAlertScreen({
   alert,
@@ -51,12 +48,9 @@ export function CurrentAlertScreen({
     )
   }
 
-  const typeLabel = alertTypeLabels[alert.type] || alert.type
-  const guardianDeliveryLabel = getGuardianDeliveryLabel(alert)
-  const severityLabel = severityLabels[alert.severity] || alert.severity
-  const tone = alert.severity === 'CRITICAL' || alert.severity === 'HIGH' ? 'danger' : 'default'
-  const vibrationLabel = vibrationLabelForAlert(alert)
   const canSwipe = alertTotal > 1
+  const occurredTimeLabel = formatAlertDateTime(alert.occurredAt || syncedTime)
+  const pagerCount = Math.max(alertTotal, 1)
 
   function handleSwipeStart(event) {
     if (!canSwipe) {
@@ -94,94 +88,41 @@ export function CurrentAlertScreen({
 
   return (
     <section
-      className="alert-screen"
+      className="alert-screen alert-screen-simple"
       aria-labelledby="alert-title"
       onMouseDown={handleSwipeStart}
       onMouseUp={handleSwipeEnd}
       onTouchEnd={handleSwipeEnd}
       onTouchStart={handleSwipeStart}
     >
-      <div className="screen-topline">
-        <StatusBadge tone={tone}>{typeLabel}</StatusBadge>
-        <span>{severityLabel}</span>
-        <span>{syncedTimeLabel}</span>
-      </div>
+      <div className="alert-watch-card">
+        <div className="alert-watch-time" aria-label="알림 시간">
+          {occurredTimeLabel || syncedTimeLabel}
+        </div>
 
-      <div className="alert-copy">
-        <h1 id="alert-title">{alert.title}</h1>
-        <p>{alert.message}</p>
-      </div>
-
-      <dl className="compact-meta">
-        <div>
-          <dt>기기</dt>
-          <dd>{alert.deviceName}</dd>
-        </div>
-        <div>
-          <dt>위치</dt>
-          <dd>{alert.locationName}</dd>
-        </div>
-        <div>
-          <dt>보호자</dt>
-          <dd>{guardianDeliveryLabel}</dd>
-        </div>
-        <div>
-          <dt>발생</dt>
-          <dd>{formatWearableTime(alert.occurredAt)}</dd>
-        </div>
-      </dl>
-
-      <div className={`vibration-feedback vibration-${tone}`} aria-label="진동 피드백">
-        <span className="vibration-pulse" aria-hidden="true" />
-        <div>
-          <span>진동</span>
-          <strong>{vibrationLabel}</strong>
+        <div className="alert-copy alert-copy-simple">
+          <h1 id="alert-title">{alert.title}</h1>
+          <p>{alert.message}</p>
         </div>
       </div>
 
-      <div className="action-row">
+      <div className="action-row alert-action-row">
         <button className="primary-action" type="button" disabled={isBusy} onClick={onConfirm}>
           확인
         </button>
       </div>
 
-      {alertTotal > 1 ? (
-        <div className="alert-pager" aria-label="알림 페이지">
-          <button
-            className="pager-arrow"
-            type="button"
-            aria-label="이전 알림"
-            disabled={alertPage <= 1}
-            onClick={onPreviousAlert}
-          >
-            &lt;
-          </button>
-          <div className="pager-dots" aria-label={`${alertPage}/${alertTotal}`}>
-            {Array.from({ length: alertTotal }, (_, index) => (
-              <span
-                className={index + 1 === alertPage ? 'pager-dot active' : 'pager-dot'}
-                key={`alert-page-${index + 1}`}
-                aria-hidden="true"
-              />
-            ))}
-          </div>
-          <button
-            className="pager-arrow"
-            type="button"
-            aria-label="다음 알림"
-            disabled={alertPage >= alertTotal}
-            onClick={onNextAlert}
-          >
-            &gt;
-          </button>
+      <div className="alert-pager alert-pager-dots-only" aria-label="알림 페이지">
+        <div className="pager-dots" aria-label={`${Math.max(alertPage, 1)}/${pagerCount}`}>
+          {Array.from({ length: pagerCount }, (_, index) => (
+            <span
+              className={index + 1 === Math.max(alertPage, 1) ? 'pager-dot active' : 'pager-dot'}
+              key={`alert-page-${index + 1}`}
+              aria-hidden="true"
+            />
+          ))}
         </div>
-      ) : null}
-
-      {actionMessage ? (
-        <p className="live-message" role="status">
-          {actionMessage}
-        </p>
-      ) : null}
+      </div>
     </section>
   )
 }
@@ -193,6 +134,22 @@ function formatSyncedTime(value) {
     hour: '2-digit',
     minute: '2-digit',
   })
+}
+
+function formatAlertDateTime(value) {
+  const date = new Date(value)
+
+  if (Number.isNaN(date.getTime())) {
+    return formatWearableTime(value)
+  }
+
+  const dateLabel = new Intl.DateTimeFormat('ko-KR', {
+    month: 'numeric',
+    day: 'numeric',
+    timeZone: 'Asia/Seoul',
+  }).format(date)
+
+  return `${dateLabel} ${formatWearableTime(date)}`
 }
 
 function getSwipePoint(event) {
@@ -209,16 +166,4 @@ function getSwipePoint(event) {
     x: event.clientX,
     y: event.clientY,
   }
-}
-
-function getGuardianDeliveryLabel(alert) {
-  if (alert.guardianNotified || alert.requiresGuardianNotify) {
-    return '전달됨'
-  }
-
-  if (alert.type === 'EMERGENCY' || alert.type === 'DANGER' || ['HIGH', 'CRITICAL'].includes(alert.severity)) {
-    return '자동 전달'
-  }
-
-  return '전달 안 함'
 }

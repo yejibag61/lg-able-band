@@ -6,10 +6,31 @@ const vibrationPatterns = {
 }
 
 export function triggerAppAlertVibration(alert) {
-  if (typeof navigator === 'undefined' || typeof navigator.vibrate !== 'function') {
+  if (
+    typeof navigator === 'undefined' ||
+    typeof navigator.vibrate !== 'function' ||
+    !canUseVibration()
+  ) {
     return false
   }
 
   const pattern = vibrationPatterns[alert?.severity] || vibrationPatterns.MEDIUM
-  return navigator.vibrate(pattern)
+  return safeVibrate(pattern)
+}
+
+function canUseVibration() {
+  const activation = globalThis.navigator?.userActivation || globalThis.userActivation
+  if (!activation) {
+    return true
+  }
+
+  return activation.isActive === true || activation.hasBeenActive === true
+}
+
+function safeVibrate(pattern) {
+  try {
+    return navigator.vibrate(pattern)
+  } catch {
+    return false
+  }
 }

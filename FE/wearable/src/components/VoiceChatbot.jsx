@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
+  getCurrentAlerts,
   getUnreadWearableAlerts,
   getWearableUwbSession,
   getUwbTargets,
@@ -10,6 +11,8 @@ import {
   stopWearableUwbSession,
 } from '../services/wearableService'
 import { triggerVibration, vibrationPatternForAlert } from '../services/vibrationService'
+import { requestVoiceChat } from '../services/voiceChatbotService'
+import { handleStructuredVoiceCommand } from '../../../app/src/services/voiceIntentEngine'
 
 const CHATBOT_INTRO =
   'AI 챗봇 실행 완료. 현재 알림 가전 상태 위치 안내 보호자 연결을 도와드려요. 삐 소리 뒤에 기능을 말해주세요.'
@@ -170,11 +173,50 @@ const morePhrases = [
   { id: 'repeat', icon: '🔊', text: '다시 말해주세요' },
 ]
 
-const quickQuestions = [
-  { id: 'alert', icon: '🔔', label: '현재 알림' },
-  { id: 'deviceStatus', icon: '🏠', label: '가전 상태' },
-  { id: 'welfare', icon: '🧾', label: '복지 정보' },
+const wearableAiCategories = [
+  { id: 'welfare', icon: '❤️', label: '복지 정보' },
+  { id: 'safety', icon: '🛡️', label: '생활/안전' },
+  { id: 'devices', icon: '🏠', label: '가전 상태' },
   { id: 'guardian', icon: '📞', label: '보호자 연결' },
+]
+
+const wearableAiQuestions = {
+  welfare: [
+    { id: 'medical', icon: '🏥', label: '의료비 지원', query: '장애인 의료비 지원 알려줘' },
+    { id: 'transport', icon: '🚌', label: '교통비 지원', query: '장애인 교통비 지원 신청 방법 알려줘' },
+    { id: 'assistiveDevice', icon: '🦾', label: '보조기기 지원', query: '보조기기 지원 받을 수 있어?' },
+    { id: 'activitySupport', icon: '🤝', label: '활동지원 서비스', query: '장애인 활동지원 서비스 알려줘' },
+    { id: 'direct', icon: '✍️', label: '직접 질문하기', direct: true },
+  ],
+  safety: [
+    { id: 'recentAlerts', icon: '🔔', label: '최근 알림 확인', query: '최근 알림 알려줘' },
+    { id: 'riskAlerts', icon: '⚠️', label: '위험 알림 확인', query: '위험 알림 확인해줘' },
+    { id: 'unreadAlerts', icon: '📬', label: '읽지 않은 알림 확인', query: '읽지 않은 알림 알려줘' },
+    { id: 'direct', icon: '✍️', label: '직접 질문하기', direct: true },
+  ],
+  devices: [
+    { id: 'washer', icon: '🫧', label: '세탁기 상태 알려줘', query: '세탁기 상태 알려줘' },
+    { id: 'fridgeDoor', icon: '❄️', label: '냉장고 문 열려 있어?', query: '냉장고 문 열려 있어?' },
+    { id: 'airQuality', icon: '💨', label: '공기질 상태 확인해줘', query: '공기질 상태 확인해줘' },
+    { id: 'deviceLocation', icon: '📍', label: '가전 위치 안내해줘', query: '가전 위치 안내해줘' },
+    { id: 'stoveStatus', icon: '🔥', label: '전기레인지 상태 확인해줘', query: '전기레인지 상태 확인해줘' },
+    { id: 'doorSensor', icon: '🚪', label: '도어센서 상태 확인해줘', query: '도어센서 상태 확인해줘' },
+    { id: 'connectedDevices', icon: '🔗', label: '연결된 기기 상태 알려줘', query: '연결된 기기 상태 알려줘' },
+    { id: 'direct', icon: '✍️', label: '직접 질문하기', direct: true },
+  ],
+  guardian: [
+    { id: 'connect', icon: '📞', label: '보호자에게 연결 요청', query: '보호자에게 연결 요청해줘' },
+    { id: 'emergency', icon: '🚨', label: '긴급 도움 요청', query: '긴급 도움 요청해줘' },
+    { id: 'guardianAlerts', icon: '👥', label: '최근 보호자 알림 확인', query: '최근 보호자 알림 확인해줘' },
+    { id: 'direct', icon: '✍️', label: '직접 질문하기', direct: true },
+  ],
+}
+
+const wearableAiFollowups = [
+  { id: 'apply', label: '신청 방법', query: '신청 방법 알려줘' },
+  { id: 'target', label: '지원 대상', query: '지원 대상 알려줘' },
+  { id: 'contact', label: '문의처', query: '문의처 알려줘' },
+  { id: 'other', label: '다른 질문 보기', query: '' },
 ]
 
 const welfareCategories = [
@@ -251,12 +293,17 @@ export function VoiceChatbot({
   const [isOpen, setIsOpen] = useState(false)
   const [currentChatScreen, setCurrentChatScreen] = useState('start')
   const [selectedPhrase, setSelectedPhrase] = useState('')
+  const [selectedPhraseIcon, setSelectedPhraseIcon] = useState('')
   const [selectedQuestion, setSelectedQuestion] = useState('alert')
   const [selectedWelfareType, setSelectedWelfareType] = useState('')
+  const [selectedAiCategory, setSelectedAiCategory] = useState('welfare')
+  const [selectedAiQuestion, setSelectedAiQuestion] = useState(null)
+  const [welfareBaseCard, setWelfareBaseCard] = useState(null)
+  const [lastAiContext, setLastAiContext] = useState(null)
   const [voiceStatus, setVoiceStatus] = useState('챗봇 켜줘 라고 말하면 시작해요.')
   const [transcript, setTranscript] = useState('')
   const [chatResponse, setChatResponse] = useState(null)
-  const [isListening, setIsListening] = useState(false)
+  const [, setIsListening] = useState(false)
   const [isRequesting, setIsRequesting] = useState(false)
   const [conversationState, setConversationState] = useState(CONVERSATION_STATE.IDLE)
 
@@ -381,6 +428,7 @@ export function VoiceChatbot({
     setIsOpen(true)
     setCurrentChatScreen('start')
     setSelectedPhrase('')
+    setSelectedPhraseIcon('')
     setSelectedQuestion('alert')
     setSelectedWelfareType('')
     setTranscript('')
@@ -417,6 +465,7 @@ export function VoiceChatbot({
     setVoiceStatus('챗봇을 종료했어요.')
     setCurrentChatScreen('start')
     setSelectedPhrase('')
+    setSelectedPhraseIcon('')
     setSelectedQuestion('alert')
     setSelectedWelfareType('')
     setTranscript('')
@@ -450,25 +499,12 @@ export function VoiceChatbot({
   }
 
   function selectPhrase(phrase) {
-    setSelectedPhrase(phrase)
+    setSelectedPhrase(phrase.text)
+    setSelectedPhraseIcon(phrase.icon)
     setCurrentChatScreen('speaking')
-    sendPhraseToApp(phrase)
-    speakText(phrase)
-    requestAppTTS(phrase)
-  }
-
-  function selectQuestion(questionId) {
-    if (questionId === 'welfare') {
-      setSelectedQuestion('welfare')
-      setCurrentChatScreen('welfareSelect')
-      speakText('어떤 복지 정보가 필요하세요?')
-      return
-    }
-
-    setSelectedQuestion(questionId)
-    setSelectedWelfareType('')
-    setCurrentChatScreen('answer')
-    speakAnswer(answers[questionId] || answers.alert)
+    sendPhraseToApp(phrase.text)
+    speakText(phrase.text)
+    requestAppTTS(phrase.text)
   }
 
   function selectWelfareType(welfareType) {
@@ -478,12 +514,193 @@ export function VoiceChatbot({
     speakText(createWelfareAnswer(welfareType).lines.join(' '))
   }
 
-  function speakAnswer(answer) {
-    if (isNotificationAnswer(answer) && !voiceFeedbackEnabled) {
+  function selectAiCategory(categoryId) {
+    stopChatbotSpeech()
+    setSelectedAiCategory(categoryId)
+    setSelectedAiQuestion(null)
+    setWelfareBaseCard(null)
+    setLastAiContext(null)
+    setChatResponse(null)
+    setCurrentChatScreen('recommendations')
+    setVoiceStatus('추천 질문을 선택하세요.')
+  }
+
+  async function selectRecommendedQuestion(question) {
+    if (question?.direct) {
+      startVoiceFromInitialScreen()
       return
     }
 
-    speakText(answer.lines.join(' '))
+    await requestWearableAiQuestion({
+      categoryId: selectedAiCategory,
+      question,
+      query: question?.query || question?.label || '',
+    })
+  }
+
+  async function selectFollowup(followup) {
+    if (followup?.id === 'other') {
+      setCurrentChatScreen('recommendations')
+      return
+    }
+
+    const baseQuery =
+      lastAiContext?.lastInfoAgent?.query ||
+      selectedAiQuestion?.query ||
+      selectedAiQuestion?.label ||
+      ''
+    const query = [baseQuery, followup?.query].filter(Boolean).join(' ').trim()
+
+    if (
+      selectedAiCategory === 'welfare' &&
+      ['apply', 'contact', 'target'].includes(followup?.id) &&
+      !['apply', 'contact', 'target'].includes(selectedAiQuestion?.id) &&
+      chatResponse
+    ) {
+      setWelfareBaseCard({
+        question: selectedAiQuestion,
+        response: chatResponse,
+        context: lastAiContext,
+      })
+    }
+
+    await requestWearableAiQuestion({
+      categoryId: selectedAiCategory,
+      question: {
+        id: followup?.id || 'followup',
+        label: followup?.label || '후속 질문',
+        query,
+      },
+      query,
+      isFollowup: true,
+    })
+  }
+
+  function returnToWelfareBaseCard() {
+    if (!welfareBaseCard) {
+      return
+    }
+
+    stopChatbotSpeech()
+    setSelectedAiCategory('welfare')
+    setSelectedAiQuestion(welfareBaseCard.question)
+    setChatResponse(welfareBaseCard.response)
+    setLastAiContext(welfareBaseCard.context)
+    setCurrentChatScreen('aiCard')
+  }
+
+  async function requestWearableAiQuestion({
+    categoryId = selectedAiCategory,
+    question,
+    query,
+    isFollowup = false,
+  }) {
+    const requestText = String(query || question?.query || question?.label || '').trim()
+    if (!requestText || isRequesting) {
+      return
+    }
+
+    stopChatbotSpeech()
+    setSelectedAiCategory(categoryId)
+    setSelectedAiQuestion(question)
+    setIsRequesting(true)
+    setCurrentChatScreen('aiCard')
+    setVoiceStatus('AI 답변을 준비 중이에요.')
+    setChatResponse(createWearableAiLoadingResponse(question, requestText))
+
+    let deviceContext = null
+
+    try {
+      if (categoryId === 'safety') {
+        const currentAlerts = await getCurrentAlerts().catch(() => [alert, ...alertQueue].filter(Boolean))
+        const structuredResult = await handleStructuredVoiceCommand({
+          currentTask: null,
+          text: requestText,
+          context: {
+            source: 'wearable',
+            summary: {
+              recentAlerts: currentAlerts,
+              unreadAlerts: getUnreadAlerts(currentAlerts),
+            },
+          },
+        })
+
+        if (structuredResult.handled) {
+          const data = {
+            answerText: structuredResult.responseText,
+            voiceText: structuredResult.responseText,
+            alerts: structuredResult.result?.data?.alerts || [],
+            intent: 'READ_ALERTS',
+            action: 'READ_ALERTS',
+          }
+          const normalized = normalizeWearableAiResponse(data, {
+            categoryId,
+            question,
+            query: requestText,
+            context: lastAiContext || {},
+          })
+          setChatResponse(normalized)
+          setLastAiContext(normalized.context)
+          setVoiceStatus('답변을 불러왔어요.')
+          speakText(normalized.voiceMessage || normalized.summary)
+          return
+        }
+      }
+
+      deviceContext = categoryId === 'devices'
+        ? createWearableDeviceContext(await loadWearableAppliances())
+        : null
+      const chatbotResponse = await requestVoiceChat({
+        sessionId: 'wearable-demo',
+        text: requestText,
+        language: 'ko-KR',
+        user: {
+          userId: 1,
+          accessibilityType: 'VISUAL',
+          guardianLinked: true,
+        },
+        context: {
+          source: 'wearable',
+          categoryId,
+          ...(deviceContext ? { devices: deviceContext } : {}),
+          ...(lastAiContext ? { lastInfoAgent: lastAiContext.lastInfoAgent } : {}),
+          ...(isFollowup && lastAiContext?.selectedDocument
+            ? { selectedDocument: lastAiContext.selectedDocument }
+            : {}),
+        },
+      })
+      const data = {
+        ...chatbotResponse,
+        ...(deviceContext ? { wearableDeviceContext: deviceContext } : {}),
+      }
+      const normalized = applyWearableDeviceSummary(normalizeWearableAiResponse(data, {
+        categoryId,
+        question,
+        query: requestText,
+        context: lastAiContext || {},
+      }), deviceContext, question)
+      setChatResponse(normalized)
+      setLastAiContext(normalized.context)
+      setVoiceStatus('답변을 불러왔어요.')
+      speakText(normalized.voiceMessage || normalized.summary)
+    } catch {
+      const fallback = createWearableAiFallbackResponse({
+        categoryId,
+        question,
+        query: requestText,
+        context: lastAiContext || {},
+      })
+      const fallbackWithDeviceContext = applyWearableDeviceSummary({
+        ...fallback,
+        ...(deviceContext ? { wearableDeviceContext: deviceContext } : {}),
+      }, deviceContext, question)
+      setChatResponse(fallbackWithDeviceContext)
+      setLastAiContext(fallbackWithDeviceContext.context)
+      setVoiceStatus('기본 안내를 보여드릴게요.')
+      speakText(fallbackWithDeviceContext.voiceMessage || fallbackWithDeviceContext.summary)
+    } finally {
+      setIsRequesting(false)
+    }
   }
 
   function isNotificationAnswer(answer) {
@@ -1156,6 +1373,8 @@ export function VoiceChatbot({
       speakMore: 'speak',
       speaking: 'speak',
       ask: 'start',
+      recommendations: 'ask',
+      aiCard: 'recommendations',
       welfareSelect: 'ask',
       welfareMore: 'welfareSelect',
       answer: 'ask',
@@ -1490,18 +1709,17 @@ export function VoiceChatbot({
           aria-label="AI 챗봇"
           data-voice-state={conversationState}
         >
-          <button className="wearable-chat-back" type="button" aria-label="이전으로" onClick={goBack}>
-            ‹
-          </button>
+          {!(currentChatScreen === 'aiCard' && selectedAiCategory === 'devices') ? (
+            <button className="wearable-chat-back" type="button" aria-label="이전으로" onClick={goBack}>
+              ‹
+            </button>
+          ) : null}
 
           {currentChatScreen === 'start' ? (
             <StartScreen
-              isListening={isListening}
               onAsk={() => setCurrentChatScreen('ask')}
               onSpeak={() => setCurrentChatScreen('speak')}
-              onVoiceQuestion={startVoiceFromInitialScreen}
-              supportsSpeechRecognition={supportsSpeechRecognition}
-              voiceStatus={voiceStatus}
+              onVoiceStart={startVoiceFromInitialScreen}
             />
           ) : null}
 
@@ -1510,26 +1728,15 @@ export function VoiceChatbot({
 
           {currentChatScreen === 'speak' ? (
             <PhraseListScreen
-              subtitle="원하는 문장을 선택하세요"
               title="대신 말하기"
-              onMore={() => setCurrentChatScreen('speakMore')}
               onSelect={selectPhrase}
-              phrases={quickPhrases}
-            />
-          ) : null}
-
-          {currentChatScreen === 'speakMore' ? (
-            <PhraseListScreen
-              title="더 많은 문장"
-              backLabel="이전으로"
-              onBack={() => setCurrentChatScreen('speak')}
-              onSelect={selectPhrase}
-              phrases={morePhrases}
+              phrases={[...quickPhrases, ...morePhrases]}
             />
           ) : null}
 
           {currentChatScreen === 'speaking' ? (
             <SpeakingScreen
+              icon={selectedPhraseIcon}
               phrase={selectedPhrase}
               onBack={() => setCurrentChatScreen('speak')}
               onReplay={() => {
@@ -1539,7 +1746,31 @@ export function VoiceChatbot({
             />
           ) : null}
 
-          {currentChatScreen === 'ask' ? <AskScreen onSelect={selectQuestion} /> : null}
+          {currentChatScreen === 'ask' ? <AiCategoryScreen onSelect={selectAiCategory} /> : null}
+
+          {currentChatScreen === 'recommendations' ? (
+            <RecommendationScreen categoryId={selectedAiCategory} isRequesting={isRequesting} onSelect={selectRecommendedQuestion} />
+          ) : null}
+
+          {currentChatScreen === 'aiCard' ? (
+            <WearableAiAnswerCard
+              categoryId={selectedAiCategory}
+              isRequesting={isRequesting}
+              response={chatResponse}
+              selectedQuestion={selectedAiQuestion}
+              onAppDetail={() => openInApp({ type: 'aiDetail', category: selectedAiCategory })}
+              onCloseFollowups={() => setCurrentChatScreen('recommendations')}
+              onDeviceQuestion={(question) => requestWearableAiQuestion({
+                categoryId: 'devices',
+                question,
+                query: question?.query || question?.label || '',
+              })}
+              onFollowup={selectFollowup}
+              onReturnToWelfareBaseCard={returnToWelfareBaseCard}
+              onRepeatQuestion={() => selectedAiQuestion ? selectRecommendedQuestion(selectedAiQuestion) : undefined}
+              onBack={goBack}
+            />
+          ) : null}
 
           {currentChatScreen === 'welfareSelect' ? (
             <WelfareSelectScreen
@@ -1590,30 +1821,33 @@ export function VoiceChatbot({
   )
 }
 
-function StartScreen({
-  isListening,
-  onAsk,
-  onSpeak,
-  onVoiceQuestion,
-  supportsSpeechRecognition,
-  voiceStatus,
-}) {
+function StartScreen({ onAsk, onSpeak, onVoiceStart }) {
   return (
     <div className="wearable-chat-content wearable-chat-start">
-      <Header title="AI 챗봇" subtitle="말로 바로 사용할 수 있어요" />
+      <Header/>
       <div className="wearable-chat-menu">
-        <button className="wearable-chat-choice wearable-chat-choice-primary" type="button" onClick={onSpeak}>
+        <button
+          className="wearable-chat-choice wearable-chat-choice-primary"
+          type="button"
+          aria-label="대신말하기"
+          onClick={onSpeak}
+        >
           <span className="wearable-chat-choice-icon" aria-hidden="true">
-            🗣️
+            <SpeakerIcon />
           </span>
           <span>
-            <strong>대신 말하기</strong>
+            <strong>대신말하기</strong>
             <small>내 말을 대신 전해주세요</small>
           </span>
         </button>
-        <button className="wearable-chat-choice wearable-chat-choice-secondary" type="button" onClick={onAsk}>
+        <button
+          className="wearable-chat-choice wearable-chat-choice-secondary"
+          type="button"
+          aria-label="AI에게 묻기"
+          onClick={onAsk}
+        >
           <span className="wearable-chat-choice-icon" aria-hidden="true">
-            💬
+            <SearchIcon />
           </span>
           <span>
             <strong>AI에게 묻기</strong>
@@ -1621,19 +1855,58 @@ function StartScreen({
           </span>
         </button>
       </div>
-      <button
-        className={`wearable-chat-mic ${isListening ? 'is-listening' : ''}`}
-        type="button"
-        aria-label="말로 질문하기"
-        disabled={!supportsSpeechRecognition}
-        onClick={onVoiceQuestion}
-      >
-        🎙
-      </button>
-      <span className="wearable-chat-footnote">
-        {supportsSpeechRecognition ? voiceStatus : '이 브라우저는 마이크 인식을 지원하지 않아요.'}
-      </span>
+      <div className="wearable-chat-start-wake">
+        <button
+          className="wearable-chat-mic wearable-chat-wake-button"
+          type="button"
+          aria-label="챗봇 음성 호출로 시작"
+          onClick={onVoiceStart}
+        >
+          <MicIcon />
+        </button>
+      </div>
+      <div className="wearable-chat-wake">
+        <button
+          className="wearable-chat-mic wearable-chat-wake-button"
+          type="button"
+          aria-label="챗봇 음성 호출로 시작"
+          onClick={onVoiceStart}
+        >
+          <MicIcon />
+        </button>
+        <p>‘챗봇 켜줘’라고 말하면 바로 시작해요.</p>
+      </div>
     </div>
+  )
+}
+
+function SpeakerIcon() {
+  return (
+    <svg className="wearable-chat-svg-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path d="M4 10v4h4l5 4V6l-5 4H4Z" />
+      <path d="M16 9.5c.8.7 1.3 1.5 1.3 2.5s-.5 1.8-1.3 2.5" />
+      <path d="M18.6 7c1.4 1.3 2.3 3 2.3 5s-.9 3.7-2.3 5" />
+    </svg>
+  )
+}
+
+function MicIcon() {
+  return (
+    <svg className="wearable-chat-svg-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path d="M12 14c1.7 0 3-1.3 3-3V6c0-1.7-1.3-3-3-3S9 4.3 9 6v5c0 1.7 1.3 3 3 3Z" />
+      <path d="M5 10.5c0 3.9 3.1 7 7 7s7-3.1 7-7" />
+      <path d="M12 17.5V21" />
+      <path d="M8.5 21h7" />
+    </svg>
+  )
+}
+
+function SearchIcon() {
+  return (
+    <svg className="wearable-chat-svg-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path d="M10.5 17a6.5 6.5 0 1 1 0-13 6.5 6.5 0 0 1 0 13Z" />
+      <path d="m15.2 15.2 4.3 4.3" />
+    </svg>
   )
 }
 
@@ -1665,38 +1938,49 @@ function PhraseListScreen({ backLabel = '더보기', onBack, onMore, onSelect, p
   return (
     <div className="wearable-chat-content wearable-chat-list">
       <Header title={title} subtitle={subtitle} />
-      <div className="wearable-chat-options">
+      <p className="wearable-chat-list-label">자주 쓰는 문장</p>
+      <div className="wearable-chat-options" aria-label="자주 쓰는 문장 목록">
         {phrases.map((phrase) => (
-          <button className="wearable-chat-option" key={phrase.id} type="button" onClick={() => onSelect(phrase.text)}>
+          <button
+            className="wearable-chat-option"
+            key={phrase.id}
+            type="button"
+            aria-label={`${phrase.text} 말하기`}
+            onClick={() => onSelect(phrase)}
+          >
             <span aria-hidden="true">{phrase.icon}</span>
             <strong>{phrase.text}</strong>
+            <span className="wearable-chat-option-arrow" aria-hidden="true">›</span>
           </button>
         ))}
       </div>
       {onMore ? (
         <button className="wearable-chat-link" type="button" onClick={onMore}>
-          {backLabel}⌄
+          {backLabel}에서 더 많은 문장 보기
         </button>
       ) : null}
       {onBack ? (
         <button className="wearable-chat-link" type="button" onClick={onBack}>
-          {backLabel}⌃
+          ← {backLabel}
         </button>
       ) : null}
     </div>
   )
 }
 
-function SpeakingScreen({ onBack, onReplay, phrase }) {
+function SpeakingScreen({ icon, onBack, onReplay, phrase }) {
   return (
     <div className="wearable-chat-content wearable-chat-speaking">
-      <Header title="음성 출력 중" />
+      <Header title="문장을 말하고 있어요" />
       <div className="wearable-chat-speaker" aria-hidden="true">
-        🔊
+        {icon}
       </div>
-      <strong className="wearable-chat-quote">“{phrase}”</strong>
+      <div className="wearable-chat-phrase-card" aria-live="polite">
+        <span>선택한 문장</span>
+        <strong>“{phrase}”</strong>
+      </div>
       <button className="wearable-chat-bottom-action" type="button" onClick={onReplay}>
-        🔊 다시 말하기
+        🔊 한 번 더 말하기
       </button>
       <button className="wearable-chat-link" type="button" onClick={onBack}>
         ← 이전으로
@@ -1705,18 +1989,363 @@ function SpeakingScreen({ onBack, onReplay, phrase }) {
   )
 }
 
-function AskScreen({ onSelect }) {
+function AiCategoryScreen({ onSelect }) {
   return (
-    <div className="wearable-chat-content wearable-chat-list">
-      <Header title="AI에게 묻기" subtitle="무엇을 궁금하세요?" />
-      <div className="wearable-chat-options">
-        {quickQuestions.map((question) => (
-          <button className="wearable-chat-option" key={question.id} type="button" onClick={() => onSelect(question.id)}>
-            <span aria-hidden="true">{question.icon}</span>
-            <strong>{question.label}</strong>
+    <div className="wearable-chat-content wearable-ai-category-screen" role="region" aria-labelledby="wearable-ai-category-title">
+      <Header title="AI에게 묻기" subtitle="어떤 정보를 알려드릴까요?" titleId="wearable-ai-category-title" />
+      <div className="wearable-ai-category-grid" role="list">
+        {wearableAiCategories.map((category) => (
+          <button
+            className="wearable-ai-category-card"
+            key={category.id}
+            type="button"
+            aria-label={category.label}
+            onClick={() => onSelect(category.id)}
+          >
+            <span className="wearable-ai-card-icon" aria-hidden="true">
+              {category.icon}
+            </span>
+            <strong>{category.label}</strong>
           </button>
         ))}
       </div>
+    </div>
+  )
+}
+
+function RecommendationScreen({ categoryId, isRequesting, onSelect }) {
+  const category = wearableAiCategories.find((item) => item.id === categoryId) || wearableAiCategories[0]
+  const questions = wearableAiQuestions[category.id] || []
+
+  return (
+    <div className="wearable-chat-content wearable-ai-recommend-screen" role="region" aria-labelledby="wearable-ai-recommend-title">
+      <Header title={category.label} subtitle="추천 질문을 선택하세요" titleId="wearable-ai-recommend-title" />
+      <div className="wearable-ai-question-list">
+        {questions.map((question) => (
+          <button
+            className={`wearable-ai-question-button${category.id === 'devices' ? ' wearable-device-question-button' : ''}`}
+            key={question.id}
+            type="button"
+            aria-label={category.label + ' 질문: ' + question.label}
+            disabled={isRequesting}
+            onClick={() => onSelect(question)}
+          >
+            <span className="wearable-question-icon" aria-hidden="true">{question.icon || '•'}</span>
+            <strong className="wearable-question-text">{question.label}</strong>
+            {category.id === 'devices' ? <span className="wearable-question-chevron" aria-hidden="true">›</span> : null}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function WearableAiAnswerCard({
+  categoryId,
+  isRequesting,
+  onAppDetail,
+  onBack,
+  onCloseFollowups,
+  onDeviceQuestion,
+  onFollowup,
+  onReturnToWelfareBaseCard,
+  onRepeatQuestion,
+  response,
+  selectedQuestion,
+}) {
+  const card = normalizeWearableAiResponse(response, { categoryId })
+  const isUrgent = ['URGENT', 'CRITICAL', 'HIGH', 'DANGER', 'EMERGENCY'].includes(card.priority)
+  const welfareDetailId = categoryId === 'welfare' && ['apply', 'contact', 'target'].includes(selectedQuestion?.id)
+    ? selectedQuestion.id
+    : ''
+  const cardTitle = welfareDetailId ? selectedQuestion.label : card.title
+  const cardSummary = welfareDetailId ? welfareDetailContent(card, welfareDetailId) : card.summary
+  const followupQuestions = categoryId === 'welfare'
+    ? wearableAiFollowups.filter((followup) => !['apply', 'target', 'contact'].includes(followup.id))
+    : wearableAiFollowups
+
+  if (categoryId === 'devices') {
+    return (
+      <ApplianceStatusAnswerCard
+        card={card}
+        isRequesting={isRequesting}
+        onAppDetail={onAppDetail}
+        onBack={onBack}
+        onClose={onCloseFollowups}
+        onDeviceQuestion={onDeviceQuestion}
+        onRepeatQuestion={onRepeatQuestion}
+        response={response}
+        selectedQuestion={selectedQuestion}
+      />
+    )
+  }
+
+  if (categoryId === 'safety') {
+    return (
+      <SafetyAlertAnswerCard
+        card={card}
+        isRequesting={isRequesting}
+        onClose={onCloseFollowups}
+        selectedQuestion={selectedQuestion}
+      />
+    )
+  }
+
+  if (categoryId === 'guardian') {
+    return (
+      <GuardianRequestAnswerCard
+        isRequesting={isRequesting}
+        onClose={onCloseFollowups}
+        response={response}
+        selectedQuestion={selectedQuestion}
+      />
+    )
+  }
+
+  return (
+    <div
+      className={`wearable-chat-content wearable-ai-answer-screen ${isUrgent ? 'is-urgent' : ''}`}
+      role="region"
+      aria-labelledby="wearable-ai-answer-title"
+    >
+      <Header title="AI 답변" subtitle="핵심만 먼저 확인하세요" titleId="wearable-ai-answer-title" />
+      <article className="wearable-ai-answer-card" aria-live="polite">
+        <div className="wearable-ai-answer-topline">
+          <h2>{cardTitle}</h2>
+          {categoryId !== 'welfare' ? (
+            <span className="wearable-ai-priority-badge" aria-label={'중요도 ' + card.priority}>
+              {card.priority}
+            </span>
+          ) : null}
+        </div>
+        <p className="wearable-ai-summary">{cardSummary}</p>
+        {!welfareDetailId ? (
+          <div className="wearable-ai-action-block">
+            <strong>해야 할 일</strong>
+            <ul>
+              {card.actionItems.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+        {categoryId !== 'welfare' ? <p className="wearable-ai-source">출처: {card.source}</p> : null}
+        {!welfareDetailId ? (
+          <div className={`wearable-ai-card-actions${categoryId === 'welfare' ? ' wearable-welfare-card-actions' : ''}`} aria-label="답변 관련 기능">
+            <button type="button" disabled={isRequesting} onClick={() => onFollowup(wearableAiFollowups[0])}>
+              신청 방법
+            </button>
+            <button type="button" disabled={isRequesting} onClick={() => onFollowup(wearableAiFollowups[2])}>
+              문의처
+            </button>
+            {categoryId === 'welfare' ? (
+              <button type="button" disabled={isRequesting} onClick={() => onFollowup(wearableAiFollowups[1])}>
+                지원 대상
+              </button>
+            ) : null}
+            <button type="button" disabled={isRequesting} onClick={onAppDetail}>
+              앱에서 자세히
+            </button>
+          </div>
+        ) : null}
+        {welfareDetailId ? (
+          <div className="wearable-ai-card-actions wearable-welfare-card-actions wearable-welfare-detail-back">
+            <button type="button" disabled={isRequesting} onClick={onReturnToWelfareBaseCard}>
+              기본 정보카드로 돌아가기
+            </button>
+          </div>
+        ) : null}
+      </article>
+      <div className="wearable-ai-followups" aria-label="후속 질문">
+        <strong className="wearable-ai-followups-title">더 궁금한 것이 있나요?</strong>
+        {followupQuestions.map((followup) => (
+          <button
+            key={followup.id}
+            type="button"
+            disabled={isRequesting}
+            aria-label={followup.label}
+            onClick={() => onFollowup(followup)}
+          >
+            {followup.label}
+          </button>
+        ))}
+        <button type="button" disabled={isRequesting} aria-label="닫기" onClick={onCloseFollowups}>
+          닫기
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function GuardianRequestAnswerCard({ isRequesting, onClose, response, selectedQuestion }) {
+  const contentByQuestion = {
+    connect: {
+      title: '보호자 연결 요청',
+      icon: '📞',
+      lines: ['보호자에게 연결 요청을 보냈어요.', '곧 확인할 수 있도록 알림을 전달했어요.'],
+    },
+    emergency: {
+      title: '긴급 도움 요청',
+      icon: '🚨',
+      lines: ['긴급 도움 요청을 보냈어요.', '보호자에게 즉시 알림을 전달했어요.'],
+    },
+    guardianAlerts: {
+      title: '최근 보호자 알림 확인',
+      icon: '👥',
+      lines: ['최근 보호자 알림을 확인했어요.'],
+    },
+  }
+  const content = contentByQuestion[selectedQuestion?.id] || contentByQuestion.connect
+  const alertPreview = selectedQuestion?.id === 'guardianAlerts' ? guardianAlertPreview(response) : ''
+
+  return (
+    <div
+      className="wearable-chat-content wearable-ai-answer-screen wearable-guardian-answer-screen"
+      role="region"
+      aria-labelledby="wearable-guardian-answer-title"
+    >
+      <Header title="AI 답변" subtitle="요청 결과를 확인하세요." titleId="wearable-guardian-answer-title" />
+      <article className="wearable-ai-answer-card wearable-guardian-request-card" aria-live="polite">
+        <div className="wearable-guardian-request-heading">
+          <span className="wearable-guardian-request-icon" aria-hidden="true">{content.icon}</span>
+          <h2>{content.title}</h2>
+        </div>
+        <div className="wearable-guardian-request-copy">
+          {content.lines.map((line) => <p key={line}>{line}</p>)}
+          {alertPreview ? <p className="wearable-guardian-alert-preview">{alertPreview}</p> : null}
+        </div>
+        <div className="wearable-ai-card-actions wearable-guardian-card-actions" aria-label="답변 기능">
+          <button type="button" disabled={isRequesting} onClick={onClose}>
+            닫기
+          </button>
+        </div>
+      </article>
+    </div>
+  )
+}
+
+function SafetyAlertAnswerCard({ card, isRequesting, onClose, selectedQuestion }) {
+  return (
+    <div
+      className="wearable-chat-content wearable-ai-answer-screen wearable-safety-answer-screen"
+      role="region"
+      aria-labelledby="wearable-safety-answer-title"
+    >
+      <Header title="AI 답변" subtitle="알림 내용을 확인하세요." titleId="wearable-safety-answer-title" />
+      <article className="wearable-ai-answer-card wearable-safety-alert-card" aria-live="polite">
+        <div className="wearable-safety-alert-heading">
+          <span className="wearable-safety-alert-label">
+            <span aria-hidden="true">{selectedQuestion?.icon || '🛡️'}</span>
+            생활/안전
+          </span>
+          <h2>{selectedQuestion?.label || card.title}</h2>
+        </div>
+        <div className="wearable-safety-answer-copy">
+          <p className="wearable-ai-summary">{card.summary}</p>
+        </div>
+        <div className="wearable-ai-card-actions wearable-safety-card-actions" aria-label="답변 기능">
+          <button type="button" disabled={isRequesting} onClick={onClose}>
+            닫기
+          </button>
+        </div>
+      </article>
+    </div>
+  )
+}
+
+function ApplianceStatusAnswerCard({
+  card,
+  isRequesting,
+  onAppDetail,
+  onBack,
+  onClose,
+  onDeviceQuestion,
+  onRepeatQuestion,
+  response,
+  selectedQuestion,
+}) {
+  const resolvedStatusCard = createApplianceStatusCard(card, response, selectedQuestion)
+  const statusCard = isRequesting
+    ? { ...resolvedStatusCard, statusLabel: '확인 중', tone: 'checking' }
+    : resolvedStatusCard
+  const statusBadgeStyle = statusCard.tone === 'unavailable'
+    ? { background: '#f3e8ff', color: '#7e22ce' }
+    : undefined
+  const followupQuestions = wearableAiQuestions.devices
+    .filter((question) => !question.direct && question.id !== selectedQuestion?.id)
+    .slice(0, 2)
+    .map((question) => ({ ...question, displayLabel: applianceDisplayTitle(question, question.label) }))
+  const answerScreenRef = useRef(null)
+
+  useEffect(() => {
+    answerScreenRef.current?.scrollTo?.({ top: 0 })
+  }, [card.summary, card.title])
+
+  return (
+    <div
+      ref={answerScreenRef}
+      className={`wearable-chat-content wearable-ai-answer-screen wearable-appliance-answer-screen status-${statusCard.tone}`}
+      role="region"
+      aria-labelledby="wearable-appliance-answer-title"
+    >
+      <div className="wearable-appliance-topline">
+        <button className="wearable-appliance-back" type="button" aria-label="이전으로" onClick={onBack}>
+          ‹
+        </button>
+        <span className={`wearable-appliance-status-badge status-${statusCard.tone}`} style={statusBadgeStyle}>
+          {statusCard.statusLabel}
+        </span>
+      </div>
+
+      <article className="wearable-ai-answer-card wearable-appliance-main-card" aria-live="polite">
+        <h2 id="wearable-appliance-answer-title" className="wearable-appliance-card-title">
+          {selectedQuestion?.label || statusCard.title}
+        </h2>
+        <span className="wearable-appliance-main-icon" aria-hidden="true">{statusCard.icon}</span>
+        <strong>{statusCard.mainText}</strong>
+        {statusCard.subText ? <p>{statusCard.subText}</p> : null}
+      </article>
+
+      <section className="wearable-ai-answer-card wearable-appliance-quick-card" aria-label="빠른 액션">
+        <strong className="wearable-appliance-section-title">빠른 액션</strong>
+        <div className="wearable-ai-card-actions">
+          {selectedQuestion ? (
+            <button type="button" disabled={isRequesting} onClick={onRepeatQuestion}>
+              다시 확인
+            </button>
+          ) : null}
+          <button type="button" disabled={isRequesting} onClick={onAppDetail}>
+            앱에서 자세히
+          </button>
+          <button type="button" disabled={isRequesting} onClick={onClose}>
+            닫기
+          </button>
+        </div>
+      </section>
+
+      <section className="wearable-ai-answer-card wearable-ai-followups wearable-appliance-followups" aria-label="후속 질문">
+        <strong className="wearable-ai-followups-title">후속 질문</strong>
+        {followupQuestions.map((question) => (
+          <button
+            className="wearable-device-followup-button"
+            key={question.id}
+            type="button"
+            disabled={isRequesting}
+            onClick={() => onDeviceQuestion(question)}
+          >
+            <span className="wearable-question-icon" aria-hidden="true">{question.icon}</span>
+            <strong className="wearable-question-text">{question.displayLabel}</strong>
+          </button>
+        ))}
+        <button className="wearable-device-followup-button" type="button" disabled={isRequesting} onClick={onClose}>
+          <span className="wearable-question-icon" aria-hidden="true">🗂️</span>
+          <strong className="wearable-question-text">다른 가전 보기</strong>
+        </button>
+        <button className="wearable-device-followup-button" type="button" disabled={isRequesting} onClick={onClose}>
+          <span className="wearable-question-icon" aria-hidden="true">✕</span>
+          <strong className="wearable-question-text">닫기</strong>
+        </button>
+      </section>
     </div>
   )
 }
@@ -2171,6 +2800,385 @@ function requestAppTTS(text) {
   console.log('앱에서 TTS 출력 요청:', text)
 }
 
+function createWearableDeviceContext(appliances = []) {
+  const findByType = (...types) => appliances.find((appliance) => types.includes(appliance?.type))
+  const deviceValue = (appliance, key) => appliance?.runtime?.[key] ?? appliance?.state?.[key] ?? appliance?.[key]
+  const normalizedStatus = (appliance) => {
+    if (appliance?.connectionStatus === 'CONNECTED') return 'NORMAL'
+    if (appliance?.connectionStatus === 'WARNING') return 'WARNING'
+    if (appliance?.connectionStatus === 'ERROR') return 'ERROR'
+    return appliance?.status || null
+  }
+  const isWarning = (appliance) => ['WARNING', 'ERROR'].includes(appliance?.connectionStatus)
+  const washer = findByType('WASHER')
+  const refrigerator = findByType('REFRIGERATOR', 'FRIDGE')
+  const airSensor = findByType('AIR_SENSOR')
+  const tv = findByType('TV')
+  const range = findByType('RANGE')
+  const doorSensor = findByType('DOOR_SENSOR')
+
+  return {
+    washer: washer ? {
+      status: deviceValue(washer, 'statusCode') || normalizedStatus(washer),
+      remainingMinutes: deviceValue(washer, 'remainingMinutes'),
+      error: isWarning(washer),
+    } : null,
+    refrigerator: refrigerator ? {
+      doorOpen: deviceValue(refrigerator, 'doorOpen'),
+      temperatureStatus: deviceValue(refrigerator, 'temperatureStatus') || normalizedStatus(refrigerator),
+      error: isWarning(refrigerator),
+    } : null,
+    airSensor: airSensor ? {
+      airQuality: deviceValue(airSensor, 'airQuality') || normalizedStatus(airSensor),
+      pmLevel: deviceValue(airSensor, 'pmLevel'),
+      ventilationNeeded: deviceValue(airSensor, 'ventilationNeeded'),
+      co2Status: deviceValue(airSensor, 'co2Status'),
+    } : null,
+    tv: tv ? {
+      hasPopup: deviceValue(tv, 'hasPopup') || false,
+      popupMessage: deviceValue(tv, 'popupMessage'),
+    } : null,
+    range: range ? {
+      powerOn: deviceValue(range, 'powerOn'),
+      longOn: deviceValue(range, 'longOn') || isWarning(range),
+    } : null,
+    doorSensor: doorSensor ? {
+      doorOpen: deviceValue(doorSensor, 'doorOpen'),
+      securityEvent: deviceValue(doorSensor, 'securityEvent') || isWarning(doorSensor),
+    } : null,
+  }
+}
+
+function createApplianceStatusCard(card, response, selectedQuestion) {
+  const sourceCard = response?.appCard || response?.infoCard || response?.card || {}
+  const title = applianceDisplayTitle(selectedQuestion, card.title)
+  const summaryLines = String(card.summary || '')
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+  const deviceSummary = applianceDeviceContextSummary(response?.wearableDeviceContext, selectedQuestion)
+  const isFallback = isApplianceFallbackResponse(card, response) && !deviceSummary
+  const fallbackCopy = isFallback ? applianceFallbackCopy(selectedQuestion) : null
+  const status = deviceSummary
+    ? applianceStatusFromDeviceContext(response?.wearableDeviceContext, selectedQuestion)
+    : applianceStatusFrom(card.priority, card.summary, sourceCard, isFallback)
+
+  return {
+    title,
+    icon: selectedQuestion?.icon || applianceIconFor(title, selectedQuestion?.query),
+    statusLabel: status.label,
+    tone: status.tone,
+    mainText: deviceSummary?.mainText || fallbackCopy?.mainText || summaryLines[0] || title,
+    subText: deviceSummary ? deviceSummary.subText : (fallbackCopy?.subText || summaryLines[1] || ''),
+    details: applianceDetailRows(sourceCard, response),
+  }
+}
+
+function applianceDisplayTitle(question, fallbackTitle) {
+  const titles = {
+    washer: '세탁기 상태',
+    fridgeDoor: '냉장고 문 상태',
+    airQuality: '공기질 상태',
+    deviceLocation: '가전 위치',
+    stoveStatus: '전기레인지 상태',
+    doorSensor: '도어센서 상태',
+    connectedDevices: '연결된 기기 상태',
+  }
+
+  return titles[question?.id] || fallbackTitle || question?.label || '가전 상태'
+}
+
+function isApplianceFallbackResponse(card, response) {
+  const text = [
+    card?.summary,
+    response?.bandMessage,
+    response?.answerText,
+    response?.voiceText,
+    response?.voiceMessage,
+    response?.source,
+  ].filter(Boolean).join(' ')
+
+  return response?.source === 'LG Able Band 기본 안내' || /(이해하지 못|찾지 못|확인하지 못|불러오지 못|정보가 없|연결된 기기.*없)/.test(text)
+}
+
+function applianceFallbackCopy(question) {
+  const fallbackTextByType = {
+    washer: '세탁기 상태 정보를 확인하지 못했어요.',
+    fridgeDoor: '냉장고 문 상태 정보를 확인하지 못했어요.',
+    airQuality: '공기질 상태 정보를 확인하지 못했어요.',
+    deviceLocation: '가전 위치 정보를 확인하지 못했어요.',
+    stoveStatus: '전기레인지 상태 정보를 확인하지 못했어요.',
+    doorSensor: '도어센서 상태 정보를 확인하지 못했어요.',
+    connectedDevices: '연결된 기기 상태를 확인하지 못했어요.',
+  }
+
+  return {
+    mainText: fallbackTextByType[question?.id] || '기기 상태 정보를 확인하지 못했어요.',
+    subText: '다시 확인하거나 다른 가전을 선택해 주세요.',
+  }
+}
+
+function applianceStatusFrom(priority, summary, sourceCard, isFallback) {
+  if (isFallback) {
+    return { label: '정보 없음', tone: 'unavailable' }
+  }
+
+  const rawStatus = [
+    priority,
+    sourceCard?.status,
+    sourceCard?.statusText,
+    sourceCard?.currentStatus,
+    sourceCard?.riskLevel,
+    summary,
+  ].filter(Boolean).join(' ').toLowerCase()
+
+  if (/(urgent|critical|danger|emergency|위험|긴급|화재|가스|즉시|응급)/i.test(rawStatus)) {
+    return { label: '위험', tone: 'danger' }
+  }
+
+  if (/(high|medium|warning|caution|주의|경고|열림|확인|이상|나쁨)/i.test(rawStatus)) {
+    return { label: '주의', tone: 'warning' }
+  }
+
+  return { label: '정상', tone: 'normal' }
+}
+
+function applianceIconFor(title, query) {
+  const text = `${title || ''} ${query || ''}`
+  if (/냉장|fridge|refrigerator/i.test(text)) return '❄️'
+  if (/공기|co2|air/i.test(text)) return '💨'
+  if (/위치|location|uwb/i.test(text)) return '📍'
+  if (/도어|문.*센서|door.*sensor/i.test(text)) return '🚪'
+  if (/레인지|인덕션|화구|불|range|stove/i.test(text)) return '🔥'
+  if (/연결|기기|device|connect/i.test(text)) return '🔗'
+  return '🫧'
+}
+
+function applianceStatusFromDeviceContext(devices, question) {
+  if (question?.id === 'stoveStatus') {
+    return devices?.range?.longOn ? { label: '위험', tone: 'danger' } : { label: '정상', tone: 'normal' }
+  }
+
+  if (question?.id === 'fridgeDoor') {
+    return devices?.refrigerator?.doorOpen ? { label: '주의', tone: 'warning' } : { label: '정상', tone: 'normal' }
+  }
+
+  if (question?.id === 'airQuality') {
+    return devices?.airSensor?.ventilationNeeded ? { label: '주의', tone: 'warning' } : { label: '정상', tone: 'normal' }
+  }
+
+  if (question?.id === 'doorSensor') {
+    if (devices?.doorSensor?.securityEvent) return { label: '위험', tone: 'danger' }
+    return devices?.doorSensor?.doorOpen ? { label: '주의', tone: 'warning' } : { label: '정상', tone: 'normal' }
+  }
+
+  if (question?.id === 'washer') {
+    return devices?.washer?.error ? { label: '주의', tone: 'warning' } : { label: '정상', tone: 'normal' }
+  }
+
+  return { label: '정상', tone: 'normal' }
+}
+
+function applianceDeviceContextSummary(devices, question) {
+  if (!devices || !question?.id) {
+    return null
+  }
+
+  const summaries = {
+    washer: devices.washer && {
+      mainText: `현재 상태: ${String(devices.washer.status).toUpperCase() === 'RUNNING' ? '작동 중' : '정상'}`,
+      subText: devices.washer.remainingMinutes != null
+        ? `남은 시간: 약 ${devices.washer.remainingMinutes}분`
+        : '남은 시간: 확인할 수 없어요.',
+    },
+    fridgeDoor: devices.refrigerator && {
+      mainText: typeof devices.refrigerator.doorOpen === 'boolean'
+        ? `냉장고 문은 ${formatBooleanStatus(devices.refrigerator.doorOpen, '열려 있어요', '닫혀 있어요')}.`
+        : `냉장고 상태는 ${formatApplianceRuntimeStatus(devices.refrigerator.temperatureStatus)}입니다.`,
+      subText: devices.refrigerator.temperatureStatus ? `온도 상태는 ${formatApplianceRuntimeStatus(devices.refrigerator.temperatureStatus)}입니다.` : '',
+    },
+    airQuality: devices.airSensor && {
+      mainText: `현재 공기질은 ${formatAirQualityStatus(devices.airSensor.airQuality)}입니다.`,
+      subText: devices.airSensor.ventilationNeeded === true ? '환기가 필요해요.' : '',
+    },
+    stoveStatus: devices.range && {
+      mainText: typeof devices.range.powerOn === 'boolean'
+        ? `전기레인지는 ${formatBooleanStatus(devices.range.powerOn, '켜져 있어요', '꺼져 있어요')}.`
+        : `전기레인지 상태는 ${formatApplianceRuntimeStatus(devices.range.longOn ? 'WARNING' : 'NORMAL')}입니다.`,
+      subText: devices.range.longOn === true ? '장시간 사용 중이라 확인이 필요해요.' : '',
+    },
+    doorSensor: devices.doorSensor && {
+      mainText: typeof devices.doorSensor.doorOpen === 'boolean'
+        ? `문은 ${formatBooleanStatus(devices.doorSensor.doorOpen, '열려 있어요', '닫혀 있어요')}.`
+        : `도어센서 상태는 ${formatApplianceRuntimeStatus(devices.doorSensor.securityEvent ? 'WARNING' : 'NORMAL')}입니다.`,
+      subText: devices.doorSensor.securityEvent === true ? '보안 알림이 있어요.' : '',
+    },
+  }
+
+  return summaries[question.id] || null
+}
+
+function applyWearableDeviceSummary(response, devices, question) {
+  const deviceSummary = applianceDeviceContextSummary(devices, question)
+  if (!deviceSummary) {
+    return response
+  }
+
+  const text = [deviceSummary.mainText, deviceSummary.subText].filter(Boolean).join(' ')
+  return {
+    ...response,
+    summary: text,
+    voiceMessage: text,
+  }
+}
+
+function formatApplianceRuntimeStatus(status) {
+  const labels = {
+    RUNNING: '작동 중',
+    COMPLETE: '완료',
+    NORMAL: '정상',
+    CONNECTED: '정상',
+    ONLINE: '정상',
+    ACTIVE: '정상',
+    OK: '정상',
+    WARNING: '주의',
+    CAUTION: '주의',
+    ERROR: '오류',
+    DISCONNECTED: '연결 끊김',
+    OFFLINE: '연결 끊김',
+  }
+  return status ? labels[String(status).toUpperCase()] || String(status) : '정보 없음'
+}
+
+function formatAirQualityStatus(status) {
+  const labels = { GOOD: '좋음', NORMAL: '정상', MODERATE: '보통', POOR: '나쁨', BAD: '나쁨' }
+  return status ? labels[String(status).toUpperCase()] || formatApplianceRuntimeStatus(status) : '정보 없음'
+}
+
+function formatBooleanStatus(value, trueLabel, falseLabel) {
+  if (value === true) return trueLabel
+  if (value === false) return falseLabel
+  return '정보 없음'
+}
+
+function applianceDetailRows(sourceCard, response) {
+  return [
+    ['위치', firstPresent(sourceCard?.locationName, sourceCard?.location, sourceCard?.roomName, sourceCard?.room, response?.locationName)],
+    ['현재 상태', firstPresent(sourceCard?.currentStatus, sourceCard?.statusText, sourceCard?.status, response?.statusText, response?.status)],
+    ['마지막 업데이트', firstPresent(sourceCard?.lastUpdatedText, sourceCard?.lastUpdatedAt, sourceCard?.updatedAt, response?.updatedAt)],
+    ['센서값', firstPresent(sourceCard?.sensorValue, sourceCard?.co2, sourceCard?.co2Ppm, sourceCard?.pm25, response?.sensorValue)],
+    ['연결 상태', firstPresent(sourceCard?.connectionStatus, sourceCard?.connectionState, response?.connectionStatus)],
+  ]
+    .filter(([, value]) => value !== undefined && value !== null && String(value).trim())
+    .slice(0, 3)
+    .map(([label, value]) => ({ label, value: String(value).trim() }))
+}
+
+function firstPresent(...values) {
+  return values.find((value) => value !== undefined && value !== null && String(value).trim())
+}
+
+function guardianAlertPreview(response) {
+  const alerts = response?.alerts || response?.appCard?.alerts || response?.infoCard?.alerts || response?.card?.alerts
+  const latestAlert = Array.isArray(alerts) ? alerts[0] : null
+  const preview = latestAlert?.title || latestAlert?.message
+
+  return preview ? `최근 알림: ${String(preview).trim()}` : ''
+}
+
+function normalizeWearableAiResponse(response, meta = {}) {
+  const sourceCard = response?.appCard || response?.infoCard || response?.card || {}
+  const rawSummary = sourceCard.summary || response?.bandMessage || response?.notificationTabMessage || response?.answerText || response?.voiceText || response?.voiceMessage || '답변을 불러오지 못했어요.'
+  const applianceFallback = applianceRecommendationNeedsFallback(meta, rawSummary)
+  const fallbackCopy = applianceFallback ? applianceFallbackCopy(meta.question) : null
+  const actionItems = normalizeActionItems(sourceCard.actionItems || sourceCard.recommendedActions || sourceCard.recommendedAction)
+  const title = sourceCard.title || response?.title || meta.question?.label || wearableAiCategories.find((item) => item.id === meta.categoryId)?.label || 'AI 도움'
+  const priority = normalizePriority(response?.priority || sourceCard.priority || response?.classification?.priority)
+  const source = applianceFallback
+    ? 'LG Able Band 기본 안내'
+    : sourceCard.source || sourceCard.sourceName || firstSourceTitle(response?.sourceDocuments) || 'LG Able Band AI'
+  const summary = fallbackCopy ? [fallbackCopy.mainText, fallbackCopy.subText].join('\n') : rawSummary
+  return { ...response, title, priority, summary: clampLines(summary, 3), actionItems: (actionItems.length ? actionItems : ['앱에서 자세한 내용을 확인하세요.']).slice(0, 2), source, voiceMessage: fallbackCopy ? summary : response?.voiceMessage || response?.voiceText || rawSummary, context: { ...(meta.context || {}), lastInfoAgent: { title, query: meta.query || '' }, lastInfoCard: { ...sourceCard, title }, selectedDocument: response?.selectedDocument || response?.sourceDocuments?.[0] || meta.context?.selectedDocument } }
+}
+
+function welfareDetailContent(card, detailId) {
+  const sourceCard = card?.appCard || card?.infoCard || card?.card || {}
+  const valueByDetail = {
+    apply: firstPresent(sourceCard.applicationMethod, sourceCard.applyMethod, card?.applicationMethod, card?.applyMethod),
+    contact: firstPresent(sourceCard.contact, sourceCard.contactInfo, card?.contact, card?.contactInfo),
+    target: firstPresent(sourceCard.supportTarget, sourceCard.eligibility, sourceCard.applicationTarget, card?.supportTarget, card?.eligibility, card?.applicationTarget),
+  }
+
+  return valueByDetail[detailId] || card.summary
+}
+
+function applianceRecommendationNeedsFallback(meta, text) {
+  if (meta.categoryId !== 'devices' || !applianceTypeForQuestion(meta.question)) {
+    return false
+  }
+
+  return /(어떤 상태를 확인할지.*구체적으로|어떤 기기 상태인지|더 자세히 질문)/.test(String(text || ''))
+}
+
+function applianceTypeForQuestion(question) {
+  return {
+    washer: 'washer',
+    fridgeDoor: 'refrigeratorDoor',
+    airQuality: 'airQuality',
+    deviceLocation: 'applianceLocation',
+    stoveStatus: 'electricRange',
+    doorSensor: 'doorSensor',
+    connectedDevices: 'connectedDevices',
+  }[question?.id] || ''
+}
+function createWearableAiLoadingResponse(question, query) {
+  return {
+    title: question?.label || 'AI 도움',
+    priority: 'NORMAL',
+    summary: '답변을 준비하고 있어요.',
+    actionItems: ['잠시만 기다려 주세요.'],
+    source: 'LG Able Band AI',
+    voiceMessage: '',
+    context: {
+      lastInfoAgent: {
+        title: question?.label || 'AI 도움',
+        query,
+      },
+    },
+  }
+}
+function createWearableAiFallbackResponse(meta = {}) {
+  const category = wearableAiCategories.find((item) => item.id === meta.categoryId)
+  const title = meta.question?.label || category?.label || 'AI 도움'
+  const summaryByCategory = {
+    welfare: '복지 정보는 대상, 신청 방법, 문의처를 차례로 확인하면 좋아요. 자세한 조건은 앱에서 확인할 수 있어요.',
+    safety: '위험 상황은 먼저 안전한 곳으로 이동하고, 필요한 경우 보호자에게 도움 요청을 보내세요.',
+    devices: '가전 상태는 연결 여부와 최근 알림을 먼저 확인하세요. 위치 안내가 필요하면 기기 찾기를 시작할 수 있어요.',
+    guardian: '보호자 연결이나 긴급 도움 요청이 필요하면 앱과 밴드에서 즉시 요청할 수 있어요.',
+  }
+  const summary = summaryByCategory[meta.categoryId] || '지금은 AI 서버 응답이 늦어 기본 안내를 보여드려요.'
+
+  return {
+    title,
+    priority: 'NORMAL',
+    summary,
+    actionItems: ['앱에서 자세한 내용을 확인하세요.', '필요하면 다시 질문해 주세요.'],
+    source: 'LG Able Band 기본 안내',
+    voiceMessage: summary,
+    context: {
+      ...(meta.context || {}),
+      lastInfoAgent: {
+        title,
+        query: meta.query || '',
+      },
+    },
+  }
+}
+function normalizeActionItems(value) { if (Array.isArray(value)) return value.map((item) => String(item || '').trim()).filter(Boolean); if (typeof value === 'string' && value.trim()) return value.split(/\n|\.|,/).map((item) => item.trim()).filter(Boolean); return [] }
+function normalizePriority(value) { const priority = String(value || 'NORMAL').trim().toUpperCase(); return ['URGENT', 'CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'NORMAL', 'DANGER', 'EMERGENCY'].includes(priority) ? priority : 'NORMAL' }
+function firstSourceTitle(sourceDocuments) { const firstSource = Array.isArray(sourceDocuments) ? sourceDocuments[0] : null; return firstSource?.source || firstSource?.title || firstSource?.url || '' }
+function clampLines(text, maxLines = 3) { const sentences = String(text || '').replace(/\s+/g, ' ').split(/(?<=[.!?。！？])\s+|\n+/).map((item) => item.trim()).filter(Boolean); const selected = (sentences.length ? sentences : [String(text || '').trim()]).slice(0, maxLines); return selected.join('\n') || '답변이 비어 있어요. 앱에서 자세한 내용을 확인하세요.' }
+
 function formatAnswerTextForDisplay(text) {
   return String(text || '')
     .replace(/\r\n/g, '\n')
@@ -2540,7 +3548,7 @@ function formatApplianceStatus(appliance) {
   if (['WARNING', 'CAUTION', 'CHECK'].includes(status)) {
     return '확인이 필요해요'
   }
-  return appliance?.connectionStatus || appliance?.status || '상태 정보를 확인 중이에요'
+  return formatApplianceRuntimeStatus(status)
 }
 
 function getUnreadAlerts(alerts) {
