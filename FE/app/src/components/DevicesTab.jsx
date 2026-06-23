@@ -149,11 +149,6 @@ export function DevicesTab({ devices = [], uwb, onDevicesChange }) {
     selectedDevice && deleteState.deletingDeviceId === selectedDevice.deviceId,
   )
 
-  const uwbTarget = getGuideTarget(connectedDevices, selectedDevice, uwb)
-  const isGuidingCurrentTarget = Boolean(
-    uwbTarget && bleGuide.isActive && bleGuide.targetName === uwbTarget.name,
-  )
-
   useEffect(() => {
     if (!connectionMessage) {
       return undefined
@@ -194,19 +189,6 @@ export function DevicesTab({ devices = [], uwb, onDevicesChange }) {
     }
 
     setConnectionMessage(`${selectedDevice.name} 상태를 방금 새로고침했습니다.`)
-  }
-
-  function handleToggleLocationGuide(targetDevice = uwbTarget || selectedDevice) {
-    if (!targetDevice) {
-      return
-    }
-
-    if (bleGuide.isActive && bleGuide.targetName === targetDevice.name) {
-      bleGuide.stopGuide()
-      return
-    }
-
-    bleGuide.startGuide(targetDevice.name)
   }
 
   function handleStartLocationEdit() {
@@ -579,57 +561,6 @@ export function DevicesTab({ devices = [], uwb, onDevicesChange }) {
 
   return (
     <section className="tab-stack device-tab" aria-labelledby="connected-devices-title">
-
-      {uwbTarget ? (
-        <section className="content-card uwb-card">
-          <div className="uwb-card-header">
-            <div>
-              <p className="card-label">UWB 위치 안내</p>
-              <strong className="card-title">{bleGuide.targetName || uwbTarget.name} 찾기</strong>
-            </div>
-          </div>
-
-          <div className="uwb-distance-panel" aria-live="polite">
-            <strong className="uwb-distance-value">{bleGuide.distanceText}m</strong>
-            <p className="uwb-distance-caption">{bleGuide.helperText}</p>
-          </div>
-
-          <div className="uwb-meta-row">
-            <span>{bleGuide.statusLabel}</span>
-            <span>{bleGuide.deviceLabel}</span>
-          </div>
-
-          {bleGuide.errorMessage ? (
-            <p className="limit-message" role="alert">
-              {bleGuide.errorMessage}
-            </p>
-          ) : null}
-
-          <button
-            className="primary-button full-button"
-            type="button"
-            disabled={bleGuide.isConnecting}
-            onClick={() => handleToggleLocationGuide(uwbTarget)}
-          >
-            {bleGuide.isConnecting
-              ? '위치 안내 연결 중...'
-              : isGuidingCurrentTarget
-                ? '위치 안내 종료'
-                : '위치 안내 시작'}
-          </button>
-        </section>
-      ) : (
-        <section className="content-card uwb-card">
-          <div className="section-title-row">
-            <div>
-              <p className="card-label">UWB 위치 안내</p>
-              <strong className="card-title">연결된 가전이 없습니다</strong>
-            </div>
-          </div>
-          <p>가전을 먼저 연결하면 이 화면에서 위치 안내를 바로 시작할 수 있습니다.</p>
-        </section>
-      )}
-
       <section className="content-card device-connected-card" aria-labelledby="connected-devices-title">
         <div className="section-title-row">
           <div>

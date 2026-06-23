@@ -623,7 +623,7 @@ public class MvpDataService {
 			return SafetyStatusLevel.EMERGENCY;
 		}
 		if (type == AlertType.DANGER || severity == Severity.HIGH) {
-			return SafetyStatusLevel.DANGER;
+			return SafetyStatusLevel.CAUTION;
 		}
 		if (severity == Severity.MEDIUM) {
 			return SafetyStatusLevel.CAUTION;
@@ -644,7 +644,7 @@ public class MvpDataService {
 		return switch (summary.level()) {
 			case SAFE -> "Able Band가 실시간 안전 상태를 확인 중입니다.";
 			case CAUTION -> "%s 상태를 확인해 주세요.".formatted(alertTitle(summary));
-			case DANGER -> "%s 위험 알림이 있습니다. %s 상태를 확인해 주세요.".formatted(alertTitle(summary), deviceName(summary));
+			case DANGER -> "%s 주의 알림이 있습니다. %s 상태를 확인해 주세요.".formatted(alertTitle(summary), deviceName(summary));
 			case EMERGENCY -> "%s 긴급 알림이 있습니다. 즉시 %s 상태를 확인해 주세요.".formatted(alertTitle(summary), deviceName(summary));
 		};
 	}

@@ -35,7 +35,7 @@ public class ContextService {
 			: request.deviceName();
 		String title = title(request, risk);
 		String message = message(request, risk);
-		boolean notifyGuardian = risk.severity() == Severity.HIGH || risk.severity() == Severity.CRITICAL;
+		boolean notifyGuardian = risk.severity() == Severity.CRITICAL;
 		List<String> channels = channels(request.accessibilityType(), risk.severity());
 		String vibrationPattern = vibrationPattern(risk.severity());
 		String screenMode = risk.severity() == Severity.CRITICAL ? "EMERGENCY_FULL_SCREEN" : "HIGH_CONTRAST";
@@ -91,11 +91,12 @@ public class ContextService {
 		if (eventType.contains("FALL") || eventType.contains("SOS") || (eventType.contains("INACTIVITY") && noResponse)) {
 			return new Risk("EMERGENCY", AlertType.EMERGENCY, Severity.CRITICAL, SafetyStatusLevel.EMERGENCY, 100);
 		}
-		if (eventType.contains("LONG") || eventType.contains("DANGER") || duration >= 300) {
-			return new Risk("DANGER", AlertType.DANGER, Severity.HIGH, SafetyStatusLevel.DANGER, 85);
+		if (request.deviceType() == DeviceType.RANGE && (eventType.contains("LONG") || duration >= 300)) {
+			return new Risk("EMERGENCY", AlertType.EMERGENCY, Severity.CRITICAL, SafetyStatusLevel.EMERGENCY, 95);
 		}
-		if (eventType.contains("OPEN") || eventType.contains("WARNING") || noResponse) {
-			return new Risk("CAUTION", AlertType.DANGER, Severity.MEDIUM, SafetyStatusLevel.CAUTION, 55);
+		if (eventType.contains("LONG") || eventType.contains("DANGER") || duration >= 300
+			|| eventType.contains("OPEN") || eventType.contains("WARNING") || noResponse) {
+			return new Risk("CAUTION", AlertType.LIFE, Severity.MEDIUM, SafetyStatusLevel.CAUTION, 55);
 		}
 		return new Risk("LIFE", AlertType.LIFE, Severity.LOW, SafetyStatusLevel.SAFE, 20);
 	}
@@ -125,7 +126,7 @@ public class ContextService {
 			channels.add("TV_POPUP");
 			channels.add("THINQ_LIGHT");
 		}
-		if (severity == Severity.HIGH || severity == Severity.CRITICAL) {
+		if (severity == Severity.CRITICAL) {
 			channels.add("GUARDIAN_PUSH");
 		}
 		return List.copyOf(channels);

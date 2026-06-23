@@ -1,7 +1,7 @@
-export const SAFETY_STATUS_DISPLAYS = {
+﻿export const SAFETY_STATUS_DISPLAYS = {
   SAFE: { label: '안전', emoji: '🙂' },
   CAUTION: { label: '주의', emoji: '😐' },
-  DANGER: { label: '위험', emoji: '😟' },
+  DANGER: { label: '주의', emoji: '😐' },
   EMERGENCY: { label: '긴급', emoji: '😨' },
 }
 
@@ -31,7 +31,7 @@ export function formatStatusUpdatedAt(value, now = new Date()) {
 
   const elapsedMinutes = Math.floor((currentDate.getTime() - date.getTime()) / 60_000)
   if (elapsedMinutes < 1) {
-    return '방금'
+    return '방금 전'
   }
 
   if (elapsedMinutes < 10) {
@@ -130,12 +130,7 @@ function isCountableRecentAlert(alert) {
 }
 
 function isDangerAlert(alert) {
-  return (
-    alert.type === 'DANGER' ||
-    alert.type === 'EMERGENCY' ||
-    alert.severity === 'HIGH' ||
-    alert.severity === 'CRITICAL'
-  )
+  return alert.type === 'EMERGENCY' || alert.severity === 'CRITICAL'
 }
 
 function normalizeAlertSearchText(values) {

@@ -712,12 +712,12 @@ public class LivingSignalService {
 	}
 
 	private AlertType alertTypeForSoundType(String soundType) {
-		return "fire_alarm".equals(soundType) ? AlertType.DANGER : AlertType.LIFE;
+		return "fire_alarm".equals(soundType) ? AlertType.EMERGENCY : AlertType.LIFE;
 	}
 
 	private Severity severityForSoundType(String soundType) {
 		return switch (soundType) {
-			case "fire_alarm" -> Severity.HIGH;
+			case "fire_alarm" -> Severity.CRITICAL;
 			case "apartment_announcement", "doorbell" -> Severity.MEDIUM;
 			default -> Severity.LOW;
 		};

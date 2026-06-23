@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+﻿import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   confirmGuardianHistoryItem,
   getGuardianDashboard,
@@ -8,7 +8,7 @@ import { formatStatusUpdatedAt, getSafetyStatusDisplay } from '../utils/homeSumm
 
 const severityLabels = {
   CRITICAL: '긴급',
-  HIGH: '위험',
+  HIGH: '주의',
   MEDIUM: '주의',
   LOW: '생활',
 }
@@ -20,7 +20,7 @@ const sourceLabels = {
 }
 
 const CONFIRMED_HISTORY_STORAGE_PREFIX = 'lg-able-band.guardianHistory.confirmed'
-const SAFE_GUARDIAN_MESSAGE = '오늘은 전달된 위험 알림이 없습니다.'
+const SAFE_GUARDIAN_MESSAGE = '오늘은 전달된 긴급 알림이 없습니다.'
 const GUARDIAN_DASHBOARD_POLL_INTERVAL_MS = 3_000
 const GUARDIAN_ALERT_TOAST_DURATION_MS = 10_000
 const GUARDIAN_ALERT_VIBRATION_PATTERN = [240, 100, 240, 100, 480]
@@ -139,13 +139,6 @@ export function GuardianPlaceholder({ account, onLogout }) {
   const historyItems = allHistoryItems.filter(
     (item) => !confirmedHistoryKeys.includes(item.key),
   )
-  const visibleDangerAlertKeys = new Set(
-    historyItems.filter((item) => item.kind === 'danger').map((item) => item.key),
-  )
-  const visibleDangerAlerts = (dashboard?.dangerAlerts || []).filter((alert) =>
-    visibleDangerAlertKeys.has(getDangerHistoryKey(alert)),
-  )
-  const latestDangerAlert = visibleDangerAlerts[0] || null
   const displayedHistoryItems = isHistoryExpanded ? historyItems : historyItems.slice(0, 2)
   const canExpandHistory = historyItems.length > 2
   const hasActiveHistory = historyItems.length > 0
@@ -289,8 +282,8 @@ export function GuardianPlaceholder({ account, onLogout }) {
               alt="LG Able Band"
             />
           </span>
-          <h1 id="guardian-title">보호자 홈</h1>
-          <p className="header-summary">{protectedUserName}님의 현재 안전 상태를 간단히 확인해요.</p>
+          <h1 id="guardian-title">보호자</h1>
+          <p className="header-summary">{protectedUserName}님의 현재 안전 상태를 확인해요.</p>
         </div>
       </header>
 
@@ -348,41 +341,6 @@ export function GuardianPlaceholder({ account, onLogout }) {
             </div>
           </section>
         ) : null}
-
-        <section className="content-card alert-summary-card guardian-home-alert-card" aria-labelledby="guardian-alert-title">
-          <div className="section-title-row">
-            <div>
-              <p className="card-label">위험 알림</p>
-              <strong className="card-title" id="guardian-alert-title">
-                {latestDangerAlert ? latestDangerAlert.title : '최근 위험 알림이 없습니다.'}
-              </strong>
-            </div>
-            {latestDangerAlert ? (
-              <span className={`severity severity-${latestDangerAlert.severity.toLowerCase()}`}>
-                {severityLabels[latestDangerAlert.severity] || latestDangerAlert.severity}
-              </span>
-            ) : (
-              <span className="severity severity-low">안전</span>
-            )}
-          </div>
-          {latestDangerAlert ? (
-            <>
-              <p className="guardian-home-copy">{latestDangerAlert.message}</p>
-              <dl className="guardian-detail-grid guardian-home-detail-grid">
-                <div>
-                  <dt>발생 기기</dt>
-                  <dd>{latestDangerAlert.deviceName || '연동 기기'}</dd>
-                </div>
-                <div>
-                  <dt>발생 시간</dt>
-                  <dd>{formatGuardianTime(latestDangerAlert.occurredAt)}</dd>
-                </div>
-              </dl>
-            </>
-          ) : (
-            <p className="empty-state">새로운 위험 알림이 들어오면 이 카드에서 바로 확인할 수 있습니다.</p>
-          )}
-        </section>
 
         <section className="content-card device-summary-card guardian-home-history-card" aria-labelledby="guardian-history-title">
           <div className="section-title-row">
