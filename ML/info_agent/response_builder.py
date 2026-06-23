@@ -993,6 +993,20 @@ def _field_value_for_followup(followup_type: str, fields: dict[str, str]) -> str
     return ""
 
 
+def _friendly_followup_answer(followup_type: str, value: str) -> str:
+    """Turn terse source-field text into an action-oriented chat reply."""
+    if followup_type != "APPLY_METHOD":
+        return value
+
+    normalized = " ".join(value.split())
+    if "의료기관 방문" in normalized and "장애인복지카드" in normalized:
+        return (
+            "별도 신청은 필요하지 않아요. 지원 대상에 해당하면 의료기관 방문 시 "
+            "장애인복지카드를 제시해 주세요."
+        )
+    return normalized
+
+
 def _requested_field_present(followup_type: str | None, fields: dict[str, str]) -> bool:
     if followup_type == "ELIGIBILITY":
         return any(
@@ -1153,7 +1167,7 @@ def build_field_priority_answer(
     if requested_field:
         value = _field_value_for_followup(requested_field, fields)
         if value:
-            return _truncate(value, 240)
+            return _truncate(_friendly_followup_answer(requested_field, value), 240)
         return _missing_field_followup_answer(
             followup_type=requested_field,
             title=title,
@@ -1224,7 +1238,7 @@ def build_followup_answer(
         answer = _detail_answer(title, summary, fields, source)
     else:
         value = _field_value_for_followup(followup_type, fields)
-        answer = _truncate(value, 240) if value else _missing_field_followup_answer(
+        answer = _truncate(_friendly_followup_answer(followup_type, value), 240) if value else _missing_field_followup_answer(
             followup_type=followup_type,
             title=title,
             summary=summary,
