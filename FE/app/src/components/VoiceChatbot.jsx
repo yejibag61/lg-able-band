@@ -1720,11 +1720,6 @@ export function VoiceChatbot({
                         <InfoAgentCard
                           response={message.data}
                           onStopAudio={() => runChatbotButtonAction()}
-                          onReplay={() => runChatbotButtonAction(() => replayAndCueUserTurn(getSpokenAssistantText(
-                            message.data,
-                            message.data.voiceText || message.data.answerText || message.text,
-                            chatbotContext,
-                          )))}
                         />
                       ) : null}
 
@@ -1893,7 +1888,7 @@ export function VoiceChatbot({
   )
 }
 
-function InfoAgentCard({ response, onReplay, onStopAudio }) {
+function InfoAgentCard({ response, onStopAudio }) {
   const priority = response.classification?.priority
   const category = response.classification?.category
   const showUrgentActions = category === '재난/안전' || priority === 'URGENT'
@@ -1955,11 +1950,8 @@ function InfoAgentCard({ response, onReplay, onStopAudio }) {
         </div>
       ) : null}
 
-      <div className="voice-info-actions">
-        <button type="button" className="compact-button" aria-label="AI 접근성 정보 다시 듣기" onClick={onReplay}>
-          다시 듣기
-        </button>
-        {showUrgentActions && response.notifyGuardian ? (
+      {showUrgentActions && response.notifyGuardian ? (
+        <div className="voice-info-actions">
           <button
             type="button"
             className="primary-button compact-button"
@@ -1971,8 +1963,8 @@ function InfoAgentCard({ response, onReplay, onStopAudio }) {
           >
             보호자에게 공유
           </button>
-        ) : null}
-      </div>
+        </div>
+      ) : null}
     </article>
   )
 }

@@ -4358,6 +4358,21 @@ h1 {
   color: #0f172a;
 }
 
+.wearable-bottom-sheet-actions .wearable-unpair-action {
+  border-color: #fecaca;
+  background: #fff7f7;
+  color: #b91c1c;
+}
+
+.wearable-bottom-sheet-actions .wearable-unpair-action:hover:not(:disabled) {
+  border-color: #fca5a5;
+  background: #fef2f2;
+}
+
+.wearable-bottom-sheet-actions .wearable-unpair-action:disabled {
+  cursor: wait;
+}
+
 .wearable-bottom-sheet:not(.is-expanded) .wearable-bottom-sheet-body {
   opacity: 0;
   pointer-events: none;

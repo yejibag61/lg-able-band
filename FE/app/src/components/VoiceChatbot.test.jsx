@@ -20,7 +20,7 @@ describe('VoiceChatbot info agent response', () => {
     window.webkitSpeechRecognition = originalWebkitSpeechRecognition
   })
 
-  it('renders the accessible info card and reads voiceText again', async () => {
+  it('renders the accessible info card and reads voiceText again from the message action', async () => {
     const user = userEvent.setup()
     mockVoiceChatResponse({
       intent: 'INFO_AGENT_QUERY',
@@ -67,7 +67,9 @@ describe('VoiceChatbot info agent response', () => {
     expect(screen.getByRole('button', { name: '지금 어떻게 해야 해?' })).toBeTruthy()
     expect(screen.queryByLabelText('추천 질문')).toBeNull()
 
-    await user.click(screen.getByRole('button', { name: 'AI 접근성 정보 다시 듣기' }))
+    expect(screen.queryByRole('button', { name: 'AI 접근성 정보 다시 듣기' })).toBeNull()
+
+    await user.click(screen.getByRole('button', { name: 'AI 응답 다시 듣기' }))
 
     await waitFor(() => {
       const lastSpokenText = window.speechSynthesis.speak.mock.calls.at(-1)?.[0]?.text

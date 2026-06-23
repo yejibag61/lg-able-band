@@ -59,6 +59,7 @@ function App() {
   const [isUwbPolling, setIsUwbPolling] = useState(true)
   const [statusMessage, setStatusMessage] = useState('')
   const [isBusy, setIsBusy] = useState(false)
+  const [isUnpairing, setIsUnpairing] = useState(false)
   const [isChatbotWakeListening, setIsChatbotWakeListening] = useState(false)
   const [isChatbotOpen, setIsChatbotOpen] = useState(false)
   const [isChatbotSpeaking, setIsChatbotSpeaking] = useState(false)
@@ -827,6 +828,11 @@ function App() {
   }
 
   async function handleUnpair() {
+    if (isUnpairing) {
+      return
+    }
+
+    setIsUnpairing(true)
     setIsBusy(true)
     try {
       await unpairWearable(pairing)
@@ -835,6 +841,7 @@ function App() {
       setStatusMessage('연동 해제에 실패했습니다.')
     } finally {
       setIsBusy(false)
+      setIsUnpairing(false)
     }
   }
 
@@ -983,6 +990,7 @@ function App() {
         {showBottomSheet ? (
           <WearableBottomSheet
             isBusy={isBusy}
+            isUnpairing={isUnpairing}
             onEmergencyRequest={handleEmergencyRequest}
             onUnpair={handleUnpair}
           />
@@ -1000,7 +1008,7 @@ function WearableToast({ message }) {
   )
 }
 
-function WearableBottomSheet({ isBusy, onEmergencyRequest, onUnpair }) {
+function WearableBottomSheet({ isBusy, isUnpairing, onEmergencyRequest, onUnpair }) {
   const sheetRef = useRef(null)
   const dragStateRef = useRef({
     moved: false,
@@ -1129,8 +1137,14 @@ function WearableBottomSheet({ isBusy, onEmergencyRequest, onUnpair }) {
           <button className="primary-action" type="button" disabled={isBusy} onClick={onEmergencyRequest}>
             {isBusy ? '요청 중...' : '긴급 도움 요청'}
           </button>
-          <button className="secondary-action" type="button" disabled={isBusy} onClick={onUnpair}>
-            연동 해제
+          <button
+            aria-busy={isUnpairing}
+            className="secondary-action wearable-unpair-action"
+            type="button"
+            disabled={isBusy}
+            onClick={onUnpair}
+          >
+            {isUnpairing ? '연동 해제 중...' : '연동 해제'}
           </button>
         </div>
       </div>
