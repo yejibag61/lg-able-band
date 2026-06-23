@@ -644,6 +644,9 @@ export function VoiceChatbot({
     setVoiceStatus('AI 답변을 준비 중이에요.')
     setChatResponse(createWearableAiLoadingResponse(question, requestText))
 
+    // 빠른 응답에서도 로딩 카드와 진행 뱃지가 한 번은 화면에 표시되도록 합니다.
+    await waitForNextPaint()
+
     let deviceContext = null
 
     try {
@@ -2233,14 +2236,10 @@ function WearableAiAnswerCard({
       <article className="wearable-ai-answer-card" aria-live="polite">
         <div className="wearable-ai-answer-topline">
           <h2>{cardTitle}</h2>
-          {categoryId !== 'welfare' ? (
-            <span className="wearable-ai-priority-badge" aria-label={'중요도 ' + card.priority}>
-              {card.priority}
-            </span>
-          ) : null}
+          {isRequesting ? <span className="wearable-loading-badge">{categoryId === 'welfare' ? '확인 중' : '준비 중'}</span> : null}
         </div>
         <p className="wearable-ai-summary">{cardSummary}</p>
-        {!welfareDetailId ? (
+        {!isRequesting && !welfareDetailId ? (
           <div className="wearable-ai-action-block">
             <strong>해야 할 일</strong>
             <ul>
@@ -2250,8 +2249,8 @@ function WearableAiAnswerCard({
             </ul>
           </div>
         ) : null}
-        {categoryId !== 'welfare' ? <p className="wearable-ai-source">출처: {card.source}</p> : null}
-        {!welfareDetailId ? (
+        {!isRequesting && categoryId !== 'welfare' ? <p className="wearable-ai-source">출처: {card.source}</p> : null}
+        {!isRequesting && !welfareDetailId ? (
           <div className={`wearable-ai-card-actions${categoryId === 'welfare' ? ' wearable-welfare-card-actions' : ''}`} aria-label="답변 관련 기능">
             <button type="button" disabled={isRequesting} onClick={() => onFollowup(wearableAiFollowups[0])}>
               신청 방법
@@ -2277,23 +2276,24 @@ function WearableAiAnswerCard({
           </div>
         ) : null}
       </article>
-      <div className="wearable-ai-followups" aria-label="후속 질문">
-        <strong className="wearable-ai-followups-title">더 궁금한 것이 있나요?</strong>
-        {followupQuestions.map((followup) => (
-          <button
-            key={followup.id}
-            type="button"
-            disabled={isRequesting}
-            aria-label={followup.label}
-            onClick={() => onFollowup(followup)}
-          >
-            {followup.label}
+      {!isRequesting ? (
+        <div className="wearable-ai-followups" aria-label="후속 질문">
+          <strong className="wearable-ai-followups-title">더 궁금한 것이 있나요?</strong>
+          {followupQuestions.map((followup) => (
+            <button
+              key={followup.id}
+              type="button"
+              aria-label={followup.label}
+              onClick={() => onFollowup(followup)}
+            >
+              {followup.label}
+            </button>
+          ))}
+          <button type="button" aria-label="닫기" onClick={onCloseFollowups}>
+            닫기
           </button>
-        ))}
-        <button type="button" disabled={isRequesting} aria-label="닫기" onClick={onCloseFollowups}>
-          닫기
-        </button>
-      </div>
+        </div>
+      ) : null}
     </div>
   )
 }
@@ -2317,7 +2317,8 @@ function GuardianRequestAnswerCard({ isRequesting, onClose, response, selectedQu
     },
   }
   const content = contentByQuestion[selectedQuestion?.id] || contentByQuestion.connect
-  const alertPreview = selectedQuestion?.id === 'guardianAlerts' ? guardianAlertPreview(response) : ''
+  const lines = isRequesting ? ['보호자 연결을 준비하고 있어요.'] : content.lines
+  const alertPreview = !isRequesting && selectedQuestion?.id === 'guardianAlerts' ? guardianAlertPreview(response) : ''
 
   return (
     <div
@@ -2330,16 +2331,19 @@ function GuardianRequestAnswerCard({ isRequesting, onClose, response, selectedQu
         <div className="wearable-guardian-request-heading">
           <span className="wearable-guardian-request-icon" aria-hidden="true">{content.icon}</span>
           <h2>{content.title}</h2>
+          {isRequesting ? <span className="wearable-loading-badge">연결 중</span> : null}
         </div>
         <div className="wearable-guardian-request-copy">
-          {content.lines.map((line) => <p key={line}>{line}</p>)}
+          {lines.map((line) => <p key={line}>{line}</p>)}
           {alertPreview ? <p className="wearable-guardian-alert-preview">{alertPreview}</p> : null}
         </div>
-        <div className="wearable-ai-card-actions wearable-guardian-card-actions" aria-label="답변 기능">
-          <button type="button" disabled={isRequesting} onClick={onClose}>
-            닫기
-          </button>
-        </div>
+        {!isRequesting ? (
+          <div className="wearable-ai-card-actions wearable-guardian-card-actions" aria-label="답변 기능">
+            <button type="button" onClick={onClose}>
+              닫기
+            </button>
+          </div>
+        ) : null}
       </article>
     </div>
   )
@@ -2355,23 +2359,37 @@ function SafetyAlertAnswerCard({ card, isRequesting, onClose, selectedQuestion }
       <Header title="AI 답변" subtitle="알림 내용을 확인하세요." titleId="wearable-safety-answer-title" />
       <article className="wearable-ai-answer-card wearable-safety-alert-card" aria-live="polite">
         <div className="wearable-safety-alert-heading">
-          <span className="wearable-safety-alert-label">
-            <span aria-hidden="true">{selectedQuestion?.icon || '🛡️'}</span>
-            생활/안전
-          </span>
+          <div className="wearable-safety-alert-topline">
+            <span className="wearable-safety-alert-label">
+              <span aria-hidden="true">{selectedQuestion?.icon || '🛡️'}</span>
+              생활/안전
+            </span>
+            {isRequesting ? <span className="wearable-loading-badge">확인 중</span> : null}
+          </div>
           <h2>{selectedQuestion?.label || card.title}</h2>
         </div>
         <div className="wearable-safety-answer-copy">
           <p className="wearable-ai-summary">{card.summary}</p>
         </div>
-        <div className="wearable-ai-card-actions wearable-safety-card-actions" aria-label="답변 기능">
-          <button type="button" disabled={isRequesting} onClick={onClose}>
-            닫기
-          </button>
-        </div>
+        {!isRequesting ? (
+          <div className="wearable-ai-card-actions wearable-safety-card-actions" aria-label="답변 기능">
+            <button type="button" onClick={onClose}>
+              닫기
+            </button>
+          </div>
+        ) : null}
       </article>
     </div>
   )
+}
+
+function waitForNextPaint() {
+  return new Promise((resolve) => {
+    const schedule = typeof window.requestAnimationFrame === 'function'
+      ? window.requestAnimationFrame
+      : (callback) => window.setTimeout(callback, 0)
+    schedule(() => resolve())
+  })
 }
 
 function ApplianceStatusAnswerCard({
@@ -2389,9 +2407,6 @@ function ApplianceStatusAnswerCard({
   const statusCard = isRequesting
     ? { ...resolvedStatusCard, statusLabel: '확인 중', tone: 'checking' }
     : resolvedStatusCard
-  const statusBadgeStyle = statusCard.tone === 'unavailable'
-    ? { background: '#f3e8ff', color: '#7e22ce' }
-    : undefined
   const followupQuestions = wearableAiQuestions.devices
     .filter((question) => !question.direct && question.id !== selectedQuestion?.id)
     .slice(0, 2)
@@ -2413,9 +2428,7 @@ function ApplianceStatusAnswerCard({
         <button className="wearable-appliance-back" type="button" aria-label="이전으로" onClick={onBack}>
           ‹
         </button>
-        <span className={`wearable-appliance-status-badge status-${statusCard.tone}`} style={statusBadgeStyle}>
-          {statusCard.statusLabel}
-        </span>
+        {isRequesting ? <span className="wearable-loading-badge">확인 중</span> : null}
       </div>
 
       <article className="wearable-ai-answer-card wearable-appliance-main-card" aria-live="polite">
@@ -2427,46 +2440,36 @@ function ApplianceStatusAnswerCard({
         {statusCard.subText ? <p>{statusCard.subText}</p> : null}
       </article>
 
-      <section className="wearable-ai-answer-card wearable-appliance-quick-card" aria-label="빠른 액션">
-        <strong className="wearable-appliance-section-title">빠른 액션</strong>
-        <div className="wearable-ai-card-actions">
-          {selectedQuestion ? (
-            <button type="button" disabled={isRequesting} onClick={onRepeatQuestion}>
-              다시 확인
-            </button>
-          ) : null}
-          <button type="button" disabled={isRequesting} onClick={onAppDetail}>
-            앱에서 자세히
-          </button>
-          <button type="button" disabled={isRequesting} onClick={onClose}>
-            닫기
-          </button>
-        </div>
-      </section>
+      {!isRequesting ? (
+        <>
+          <section className="wearable-ai-answer-card wearable-appliance-quick-card" aria-label="빠른 액션">
+            <strong className="wearable-appliance-section-title">빠른 액션</strong>
+            <div className="wearable-ai-card-actions">
+              {selectedQuestion ? <button type="button" onClick={onRepeatQuestion}>다시 확인</button> : null}
+              <button type="button" onClick={onAppDetail}>앱에서 자세히</button>
+              <button type="button" onClick={onClose}>닫기</button>
+            </div>
+          </section>
 
-      <section className="wearable-ai-answer-card wearable-ai-followups wearable-appliance-followups" aria-label="후속 질문">
-        <strong className="wearable-ai-followups-title">후속 질문</strong>
-        {followupQuestions.map((question) => (
-          <button
-            className="wearable-device-followup-button"
-            key={question.id}
-            type="button"
-            disabled={isRequesting}
-            onClick={() => onDeviceQuestion(question)}
-          >
-            <span className="wearable-question-icon" aria-hidden="true">{question.icon}</span>
-            <strong className="wearable-question-text">{question.displayLabel}</strong>
-          </button>
-        ))}
-        <button className="wearable-device-followup-button" type="button" disabled={isRequesting} onClick={onClose}>
-          <span className="wearable-question-icon" aria-hidden="true">🗂️</span>
-          <strong className="wearable-question-text">다른 가전 보기</strong>
-        </button>
-        <button className="wearable-device-followup-button" type="button" disabled={isRequesting} onClick={onClose}>
-          <span className="wearable-question-icon" aria-hidden="true">✕</span>
-          <strong className="wearable-question-text">닫기</strong>
-        </button>
-      </section>
+          <section className="wearable-ai-answer-card wearable-ai-followups wearable-appliance-followups" aria-label="후속 질문">
+            <strong className="wearable-ai-followups-title">후속 질문</strong>
+            {followupQuestions.map((question) => (
+              <button className="wearable-device-followup-button" key={question.id} type="button" onClick={() => onDeviceQuestion(question)}>
+                <span className="wearable-question-icon" aria-hidden="true">{question.icon}</span>
+                <strong className="wearable-question-text">{question.displayLabel}</strong>
+              </button>
+            ))}
+            <button className="wearable-device-followup-button" type="button" onClick={onClose}>
+              <span className="wearable-question-icon" aria-hidden="true">🗂️</span>
+              <strong className="wearable-question-text">다른 가전 보기</strong>
+            </button>
+            <button className="wearable-device-followup-button" type="button" onClick={onClose}>
+              <span className="wearable-question-icon" aria-hidden="true">✕</span>
+              <strong className="wearable-question-text">닫기</strong>
+            </button>
+          </section>
+        </>
+      ) : null}
     </div>
   )
 }
@@ -3220,7 +3223,7 @@ function guardianAlertPreview(response) {
 
 function normalizeWearableAiResponse(response, meta = {}) {
   const sourceCard = response?.appCard || response?.infoCard || response?.card || {}
-  const rawSummary = sourceCard.summary || response?.bandMessage || response?.notificationTabMessage || response?.answerText || response?.voiceText || response?.voiceMessage || '답변을 불러오지 못했어요.'
+  const rawSummary = sourceCard.summary || response?.summary || response?.bandMessage || response?.notificationTabMessage || response?.answerText || response?.voiceText || response?.voiceMessage || '답변을 불러오지 못했어요.'
   const applianceFallback = applianceRecommendationNeedsFallback(meta, rawSummary)
   const fallbackCopy = applianceFallback ? applianceFallbackCopy(meta.question) : null
   const actionItems = normalizeActionItems(sourceCard.actionItems || sourceCard.recommendedActions || sourceCard.recommendedAction)
