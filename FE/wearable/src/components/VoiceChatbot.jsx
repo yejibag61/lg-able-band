@@ -22,14 +22,16 @@ const TURN_BEEP_FREQUENCY_HZ = 880
 const TURN_CUE_MAX_MS = 420
 const POST_CUE_LISTEN_DELAY_MS = 350
 const USER_SILENCE_MS = 3000
-const WAITING_USER_TIMEOUT_MS = 11000
-const RECOGNITION_STUCK_RESTART_MS = 7000
+const WAITING_USER_TIMEOUT_MS = 14000
+const RECOGNITION_STUCK_RESTART_MS = 12000
 const MIN_USER_TRANSCRIPT_CHARS = 2
 const UWB_POLL_INTERVAL_MS = 2500
-const WAKE_RESTART_DELAY_MS = 700
-const WAKE_BLOCKED_RESTART_DELAY_MS = 3000
-const WAKE_STUCK_RESTART_MS = 10000
-const USER_RESTART_DELAY_MS = 1300
+const WAKE_RESTART_DELAY_MS = 3500
+const WAKE_BLOCKED_RESTART_DELAY_MS = 6000
+const WAKE_STUCK_RESTART_MS = 15000
+const WAKE_HEALTH_CHECK_INTERVAL_MS = 7000
+const WAKE_START_GUARD_MS = 5000
+const USER_RESTART_DELAY_MS = 3000
 const WAKE_OPEN_DEDUPE_MS = 1800
 const CONVERSATION_STATE = {
   IDLE: 'IDLE',
@@ -379,7 +381,7 @@ export function VoiceChatbot({
       if (!isOpenRef.current && !wakeRecognitionRef.current) {
         startWakeListening()
       }
-    }, 1600)
+    }, WAKE_HEALTH_CHECK_INTERVAL_MS)
 
     return () => {
       window.clearInterval(wakeHealthCheckTimer)
@@ -1655,7 +1657,7 @@ export function VoiceChatbot({
       wakeMatchedRef.current = false
       onWakeListeningChange?.(true)
       scheduleWakeRestart(WAKE_BLOCKED_RESTART_DELAY_MS)
-    }, 2500)
+    }, WAKE_START_GUARD_MS)
   }
 
   function stopWakeListening() {
@@ -1760,7 +1762,7 @@ export function VoiceChatbot({
       if (isOpenRef.current && !userSpeechHandledRef.current && !latestTranscriptRef.current) {
         startVoiceTurn()
       }
-    }, 2500)
+    }, 4000)
   }
 
   function scheduleUserSpeechEnd(text) {

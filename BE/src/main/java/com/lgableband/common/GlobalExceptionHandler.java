@@ -3,6 +3,8 @@ package com.lgableband.common;
 import java.util.Map;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -10,6 +12,8 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+	private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
 	@ExceptionHandler(ApiException.class)
 	public ResponseEntity<ErrorResponse> handleApiException(ApiException ex) {
@@ -34,7 +38,8 @@ public class GlobalExceptionHandler {
 	}
 
 	@ExceptionHandler(Exception.class)
-	public ResponseEntity<ErrorResponse> handleException() {
+	public ResponseEntity<ErrorResponse> handleException(Exception ex) {
+		log.error("Unhandled API exception", ex);
 		return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
 			.body(new ErrorResponse("SERVER_ERROR", "서버 오류가 발생했습니다.", Map.of()));
 	}

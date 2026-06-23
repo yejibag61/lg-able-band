@@ -5,6 +5,21 @@ cd /d "%~dp0"
 if not exist node_modules (
   echo [INFO] node_modules not found. Installing dependencies...
   call npm.cmd install
+  if errorlevel 1 (
+    echo [ERROR] npm install failed.
+    pause
+    exit /b 1
+  )
+)
+
+if not exist node_modules\.bin\vite.cmd (
+  echo [INFO] Vite not found. Installing dependencies...
+  call npm.cmd install
+  if errorlevel 1 (
+    echo [ERROR] npm install failed.
+    pause
+    exit /b 1
+  )
 )
 
 if not exist node_modules\.bin\vite.cmd (
