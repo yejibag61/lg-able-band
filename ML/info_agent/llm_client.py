@@ -15,10 +15,17 @@ from dotenv import load_dotenv
 MODULE_DIR = Path(__file__).resolve().parent
 load_dotenv(MODULE_DIR / ".env")
 
+LLM_PROMPT_VERSION = "2026-06-22.1"
+
 SYSTEM_PROMPT = (
     "너는 LG Able Band의 장애 복지 정보 안내 도우미다. "
     "반드시 제공된 검색 문서 안의 정보만 사용하고, 쉽고 짧은 한국어 문장으로 답한다. "
     "신청 대상, 신청 방법, 문의처가 있으면 우선 안내한다. "
+    "answer는 읽기 쉬운 Markdown으로 작성한다. 첫 문단에는 제도를 한두 문장으로 설명한 뒤, "
+    "문서에 있는 항목만 '### 지원 대상', '### 이용 방법', '### 문의' 순서의 소제목으로 나눠 쓴다. "
+    "각 소제목 앞뒤에는 줄바꿈을 넣고, 대상과 안내 항목은 번호 대신 '- ' 목록으로 쓴다. "
+    "'문서 기준으로는', '추가적인 정보는'처럼 앞 내용을 반복하는 문장이나 막연한 안내는 쓰지 않는다. "
+    "자격이 개인 상황에 따라 달라질 때에만 마지막에 '지원 여부는 개인의 자격 조건에 따라 달라질 수 있습니다.'라고 안내한다. "
     "지원 대상 필드가 비어 있어도 문서 요약에 연령, 소득, 거주지, 수급자, 차상위, "
     "등록장애인 같은 대상 조건 힌트가 있으면 확인 가능한 힌트와 확인 필요 사항을 구분해 설명한다. "
     "모른다고만 답하지 말고 문서에서 확인 가능한 힌트는 '문서 기준으로는'처럼 조심스럽게 안내한다. "
@@ -105,6 +112,7 @@ def build_cache_key(
         )
     raw_key = json.dumps(
         [
+            LLM_PROMPT_VERSION,
             normalized_query,
             str(user_accessibility_type or "ALL").upper(),
             document_signatures,
