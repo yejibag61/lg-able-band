@@ -30,33 +30,34 @@ const filters = [
   { id: 'ALL', label: '전체' },
   { id: 'UNREAD', label: '미확인' },
   { id: 'EMERGENCY', label: '긴급' },
+  { id: 'CAUTION', label: '주의' },
   { id: 'LIFE', label: '생활' },
 ]
 const channelLabels = {
-  BAND_VIBRATION: '諛대뱶 吏꾨룞',
-  BAND_SCREEN: '諛대뱶 ?붾㈃',
-  APP_SCREEN: '???붾㈃',
-  APP_VOICE: '?뚯꽦 ?덈궡',
-  TV_POPUP: 'TV ?앹뾽',
-  THINQ_LIGHT: 'ThinQ 議곕챸',
-  THINQ_ON_LIGHT: 'ThinQ 議곕챸',
-  GUARDIAN_PUSH: '蹂댄샇???뚮┝',
-  GUARDIAN_CALL: '蹂댄샇???듯솕',
+  BAND_VIBRATION: '밴드 진동',
+  BAND_SCREEN: '밴드 화면',
+  APP_SCREEN: '앱 화면',
+  APP_VOICE: '음성 안내',
+  TV_POPUP: 'TV 팝업',
+  THINQ_LIGHT: 'ThinQ 조명',
+  THINQ_ON_LIGHT: 'ThinQ 조명',
+  GUARDIAN_PUSH: '보호자 알림',
+  GUARDIAN_CALL: '보호자 통화',
 }
 
 const vibrationLabels = {
-  BASIC_SHORT: '吏㏃? 吏꾨룞',
-  BASIC_REPEAT: '諛섎났 吏꾨룞',
-  STRONG_REPEAT: '媛뺥븳 諛섎났 吏꾨룞',
-  SOS_REPEAT: '湲닿툒 諛섎났 吏꾨룞',
+  BASIC_SHORT: '짧은 진동',
+  BASIC_REPEAT: '반복 진동',
+  STRONG_REPEAT: '강한 반복 진동',
+  SOS_REPEAT: '긴급 반복 진동',
 }
 
 const screenModeLabels = {
-  SIMPLE_TEXT: '媛꾨떒 ?덈궡 ?붾㈃',
-  LARGE_TEXT: '??湲???붾㈃',
-  HIGH_CONTRAST: '怨좊?鍮??붾㈃',
-  HIGH_CONTRAST_LARGE_TEXT: '怨좊?鍮???湲???붾㈃',
-  EMERGENCY_FULL_SCREEN: '湲닿툒 ?꾩껜 ?붾㈃',
+  SIMPLE_TEXT: '간단 안내 화면',
+  LARGE_TEXT: '큰 글씨 화면',
+  HIGH_CONTRAST: '고대비 화면',
+  HIGH_CONTRAST_LARGE_TEXT: '고대비 큰 글씨 화면',
+  EMERGENCY_FULL_SCREEN: '긴급 전체 화면',
 }
 
 const notificationStatsMock = {
@@ -215,16 +216,16 @@ export function AlertsTab({
         ),
       )
       onAlertStatusChange(alertId, 'CONFIRMED')
-      setFeedbackMessage('?뚮┝???뺤씤 ?꾨즺濡?泥섎━?덉뒿?덈떎.')
+      setFeedbackMessage('알림을 확인 완료로 처리했습니다.')
     } catch (error) {
-      setFeedbackMessage(error.message || '?뚮┝ ?뺤씤 泥섎━???ㅽ뙣?덉뒿?덈떎.')
+      setFeedbackMessage(error.message || '알림 확인 처리에 실패했습니다.')
     }
   }
 
   async function handleReplayAlert(alert) {
     setInlineFeedback(null)
     if (accessibility.voiceGuide === false) {
-      setFeedbackMessage('?뚯꽦 ?덈궡媛 爰쇱졇 ?덉뼱 ?뚮┝ ?덈궡瑜??ъ깮?섏? ?딆븯?듬땲??')
+      setFeedbackMessage('음성 안내가 꺼져 있어 알림 안내를 재생하지 않습니다.')
       return
     }
 
@@ -233,8 +234,8 @@ export function AlertsTab({
 
     setFeedbackMessage(
       speechStarted
-        ? '?뚮┝ ?덈궡瑜??ㅼ떆 ?ㅻ젮?쒕━怨??덉뒿?덈떎.'
-        : '??釉뚮씪?곗??먯꽌???뚯꽦 ?덈궡瑜??ъ슜?????놁뒿?덈떎.',
+        ? '알림 안내를 다시 들려드리고 있습니다.'
+        : '이 브라우저에서는 음성 안내를 사용할 수 없습니다.',
     )
 
     try {
@@ -252,7 +253,7 @@ export function AlertsTab({
       onAlertStatusChange(alert.alertId, 'REPLAYED')
     } catch (error) {
       if (!speechStarted) {
-        setFeedbackMessage(error.message || '?뚮┝ ?ㅼ떆 ?ｊ린???ㅽ뙣?덉뒿?덈떎.')
+        setFeedbackMessage(error.message || '알림 다시 듣기에 실패했습니다.')
       }
     }
   }
@@ -277,7 +278,7 @@ export function AlertsTab({
     setInlineFeedback({
       appendToEnd: nextVisibleAlertId === null,
       insertBeforeAlertId: nextVisibleAlertId,
-      message: '?뚮┝????젣?섎뒗 以묒엯?덈떎.',
+      message: '알림을 삭제하는 중입니다.',
     })
 
     try {
@@ -285,7 +286,7 @@ export function AlertsTab({
       setInlineFeedback({
         appendToEnd: nextVisibleAlertId === null,
         insertBeforeAlertId: nextVisibleAlertId,
-        message: '?뚮┝??紐⑸줉?먯꽌 ??젣?덉뒿?덈떎.',
+        message: '알림을 목록에서 삭제했습니다.',
       })
     } catch (error) {
       setAlertItems((currentAlerts) => {
@@ -299,7 +300,7 @@ export function AlertsTab({
       })
       onAlertRestore(deletedAlert)
       setInlineFeedback(null)
-      setFeedbackMessage(error.message || '?뚮┝ ??젣???ㅽ뙣?덉뒿?덈떎.')
+      setFeedbackMessage(error.message || '알림 삭제에 실패했습니다.')
     }
   }
 
@@ -310,7 +311,7 @@ export function AlertsTab({
   return (
     <section
       className="tab-stack alert-tab"
-      aria-label={selectedAlert ? undefined : '?ㅼ떆媛??뚮┝ 紐⑸줉'}
+      aria-label={selectedAlert ? undefined : '실시간 알림 목록'}
       aria-labelledby={selectedAlert ? 'alert-detail-title' : undefined}
     >
       {selectedAlert ? (
@@ -327,7 +328,7 @@ export function AlertsTab({
         />
       ) : (
         <>
-          <div className="alert-filter-row" aria-label="?뚮┝ ?꾪꽣">
+          <div className="alert-filter-row" aria-label="알림 필터">
             {filters.map((filter) => (
               <button
                 className={activeFilter === filter.id ? 'filter-chip active' : 'filter-chip'}
@@ -345,7 +346,7 @@ export function AlertsTab({
             ))}
           </div>
 
-          <div className="alert-list" aria-label="?뚮┝ 紐⑸줉">
+          <div className="alert-list" aria-label="알림 목록">
             {filteredAlerts.length > 0 ? (
               <>
               {filteredAlerts.map((alert) => (
@@ -372,16 +373,16 @@ export function AlertsTab({
                         <button
                           className="device-inline-add-button alert-delete-button"
                           type="button"
-                          aria-label={`${alert.title} ??젣`}
+                          aria-label={`${alert.title} 삭제`}
                           onClick={() => handleDeleteAlert(alert.alertId)}
                         >
-                          ??젣
+                          삭제
                         </button>
                       </div>
                       <h3>{alert.title}</h3>
                       <p className="alert-card-message">{alert.message}</p>
                       <small className="alert-meta-line">
-                        {alert.deviceName} 쨌 {alert.locationName} 쨌 {formatAlertTime(alert.occurredAt)}
+                        {alert.deviceName} · {alert.locationName} · {formatAlertTime(alert.occurredAt)}
                       </small>
                     </div>
                   </div>
@@ -395,19 +396,19 @@ export function AlertsTab({
                     <button
                       className="secondary-button compact-button"
                       type="button"
-                      aria-label={`${alert.title} ?곸꽭 蹂닿린`}
+                      aria-label={`${alert.title} 상세 보기`}
                       onClick={() => handleSelectAlert(alert.alertId)}
                     >
-                      ?곸꽭 蹂닿린
+                      상세 보기
                     </button>
                     {alert.status !== 'CONFIRMED' ? (
                       <button
                         className="primary-button compact-button"
                         type="button"
-                        aria-label={`${alert.title} ?뺤씤 ?꾨즺`}
+                        aria-label={`${alert.title} 확인 완료`}
                         onClick={() => handleConfirmAlert(alert.alertId)}
                       >
-                        ?뺤씤 ?꾨즺
+                        확인 완료
                       </button>
                     ) : null}
                   </div>
@@ -421,7 +422,7 @@ export function AlertsTab({
             ) : inlineFeedback ? (
               <InlineAlertFeedback message={inlineFeedback.message} />
             ) : (
-              <p className="empty-state">議곌굔??留욌뒗 ?뚮┝???놁뒿?덈떎.</p>
+              <p className="empty-state">조건에 맞는 알림이 없습니다.</p>
             )}
           </div>
 
@@ -670,8 +671,8 @@ function AiInsightCard({ insight }) {
       </span>
       <div>
         <div className="ai-insight-heading">
-          <strong id="ai-insight-title">AI ?몄궗?댄듃</strong>
-          <span>遺꾩꽍 湲곕컲 ?쒖븞</span>
+          <strong id="ai-insight-title">AI 인사이트</strong>
+          <span>분석 기반 제안</span>
         </div>
         <p>{insight}</p>
       </div>
@@ -806,32 +807,32 @@ function AlertDetail({ alert, feedbackMessage, onBack, onConfirm, onReplay, warn
 
       <p className="alert-detail-summary">{alert.message}</p>
 
-      <div className="alert-guide-box" aria-label="?뚮┝ ?덈궡">
+      <div className="alert-guide-box" aria-label="알림 안내">
         <p>{guide}</p>
       </div>
 
       <dl className="alert-detail-grid">
         <div>
-          <dt>?뚮┝ ?좏삎</dt>
+          <dt>알림 유형</dt>
           <dd>{typeLabels[alert.type] || alert.type}</dd>
         </div>
         <div>
-          <dt>諛쒖깮 ?꾩튂</dt>
+          <dt>발생 위치</dt>
           <dd>{alert.locationName}</dd>
         </div>
         <div>
-          <dt>諛쒖깮 湲곌린</dt>
+          <dt>발생 기기</dt>
           <dd>{alert.device?.name || alert.deviceName}</dd>
         </div>
         <div>
-          <dt>諛쒖깮 ?쒓컙</dt>
+          <dt>발생 시간</dt>
           <dd>{formatAlertTime(alert.occurredAt)}</dd>
         </div>
       </dl>
 
       {alert.recommendedAction ? (
         <div className="alert-followup-box">
-          <p className="card-label">異붿쿇 ?됰룞</p>
+          <p className="card-label">추천 행동</p>
           <p>{alert.recommendedAction}</p>
         </div>
       ) : null}
@@ -840,11 +841,11 @@ function AlertDetail({ alert, feedbackMessage, onBack, onConfirm, onReplay, warn
 
       <div className={alert.status === 'CONFIRMED' ? 'action-row single-action' : 'action-row'}>
         <button className="secondary-button compact-button" type="button" onClick={onReplay}>
-          ?ㅼ떆 ?ｊ린
+          다시 듣기
         </button>
         {alert.status !== 'CONFIRMED' ? (
           <button className="primary-button compact-button" type="button" onClick={onConfirm}>
-            ?뺤씤 ?꾨즺
+            확인 완료
           </button>
         ) : null}
       </div>
@@ -862,29 +863,29 @@ function WarningRecommendationCard({ recommendation }) {
   const channelNames = recommendation.recommendedChannels.map(
     (channel) => channelLabels[channel] || channel,
   )
-  const deliverySummary = channelNames.join(' 쨌 ')
+  const deliverySummary = channelNames.join(' · ')
   const guidanceSummary = [
     vibrationLabels[recommendation.vibrationPattern] || recommendation.vibrationPattern,
     screenModeLabels[recommendation.screenMode] || recommendation.screenMode,
-    recommendation.voiceEnabled ? '?뚯꽦 ?덈궡 ?ъ슜' : '?뚯꽦 ?덈궡 ?놁쓬',
-  ].join(' 쨌 ')
+    recommendation.voiceEnabled ? '음성 안내 사용' : '음성 안내 없음',
+  ].join(' · ')
 
   return (
-    <section className="warning-recommendation-card" aria-label="?꾨떖 諛⑹떇">
+    <section className="warning-recommendation-card" aria-label="전달 방식">
       <div className="warning-recommendation-header">
         <div>
-          <p className="card-label">?꾨떖 諛⑹떇</p>
-          <strong className="card-title">???뚮┝? ?대젃寃??꾨떖?쇱슂.</strong>
+          <p className="card-label">전달 방식</p>
+          <strong className="card-title">이 알림은 이렇게 전달돼요.</strong>
         </div>
       </div>
 
       <dl className="warning-summary-grid">
         <div>
-          <dt>?꾨떖 ?섎떒</dt>
+          <dt>전달 수단</dt>
           <dd>{deliverySummary}</dd>
         </div>
         <div>
-          <dt>蹂댁“ ?덈궡</dt>
+          <dt>보조 안내</dt>
           <dd>{guidanceSummary}</dd>
         </div>
       </dl>
@@ -901,8 +902,12 @@ function filterAlert(alert, activeFilter) {
     return alert.type === 'EMERGENCY' || alert.severity === 'CRITICAL'
   }
 
+  if (activeFilter === 'CAUTION') {
+    return alert.type === 'DANGER' || alert.type === 'CAUTION' || alert.severity === 'MEDIUM' || alert.severity === 'HIGH'
+  }
+
   if (activeFilter === 'LIFE') {
-    return alert.type === 'LIFE'
+    return alert.type === 'LIFE' && !['MEDIUM', 'HIGH', 'CRITICAL'].includes(alert.severity)
   }
 
   return true
