@@ -1,11 +1,14 @@
 """Final integration entry point for the LG Able Band information agent."""
 
+import sys
+from pathlib import Path
 from typing import Any
 
-try:
-    from .response_builder import build_info_response
-except ImportError:
-    from response_builder import build_info_response
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+    __package__ = "info_agent"
+
+from .response_builder import build_info_response
 
 
 AGENT_TYPE = "INFO_AGENT"

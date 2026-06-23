@@ -212,27 +212,30 @@ public class AlertService {
 		}
 
 		return inTransaction(() -> {
+			if (principal.guardianId() != null) {
+				int deliveryRows = confirmGuardianAlertDelivery(
+					jdbcTemplate,
+					alertId,
+					principal.userId(),
+					principal.guardianId(),
+					confirmedAt
+				);
+				if (deliveryRows == 0) {
+					throw new ApiException(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND", "알림을 찾을 수 없습니다.");
+				}
+				return new StatusResponse(alertId, AlertStatus.CONFIRMED, confirmedAt, null);
+			}
+
 			int updatedRows = jdbcTemplate.update(
 				"""
 				UPDATE alert
 				SET status = ?, updated_at = ?
 				WHERE alert_id = ? AND user_id = ?
-				  AND (
-				    ? IS NULL
-				    OR EXISTS (
-				      SELECT 1
-				      FROM alert_delivery ad
-				      WHERE ad.alert_id = alert.alert_id
-				        AND ad.target_guardian_id = ?
-				    )
-				  )
 				""",
 				AlertStatus.CONFIRMED.name(),
 				Timestamp.valueOf(confirmedAt.toLocalDateTime()),
 				alertId,
-				principal.userId(),
-				principal.guardianId(),
-				principal.guardianId()
+				principal.userId()
 			);
 
 			if (updatedRows == 0) {
@@ -351,6 +354,30 @@ public class AlertService {
 			confirmedTimestamp,
 			alertId,
 			guardianId
+		);
+	}
+
+	private int confirmGuardianAlertDelivery(
+		JdbcTemplate jdbcTemplate,
+		long alertId,
+		long userId,
+		long guardianId,
+		OffsetDateTime confirmedAt
+	) {
+		return jdbcTemplate.update(
+			"""
+			UPDATE alert_delivery ad
+			JOIN alert a ON a.alert_id = ad.alert_id
+			SET ad.delivery_status = 'CONFIRMED',
+			    ad.confirmed_at = COALESCE(ad.confirmed_at, ?)
+			WHERE ad.alert_id = ?
+			  AND ad.target_guardian_id = ?
+			  AND a.user_id = ?
+			""",
+			Timestamp.valueOf(confirmedAt.toLocalDateTime()),
+			alertId,
+			guardianId,
+			userId
 		);
 	}
 

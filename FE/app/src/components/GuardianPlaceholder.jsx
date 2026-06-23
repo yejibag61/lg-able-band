@@ -32,6 +32,7 @@ export function GuardianPlaceholder({ account, onLogout }) {
   const liveAlertTimerRef = useRef(null)
   const [currentTime, setCurrentTime] = useState(() => new Date())
   const [liveAlert, setLiveAlert] = useState(null)
+  const [isHistoryExpanded, setIsHistoryExpanded] = useState(false)
   const confirmedHistoryStorageKey = getConfirmedHistoryStorageKey(account)
   const [confirmedHistoryKeys, setConfirmedHistoryKeys] = useState(() =>
     readConfirmedHistoryKeys(confirmedHistoryStorageKey),
@@ -136,7 +137,7 @@ export function GuardianPlaceholder({ account, onLogout }) {
   const dashboard = dashboardState.data
   const allHistoryItems = createGuardianHistoryItems(dashboard)
   const historyItems = allHistoryItems.filter(
-    (item) => item.alertId || !confirmedHistoryKeys.includes(item.key),
+    (item) => !confirmedHistoryKeys.includes(item.key),
   )
   const visibleDangerAlertKeys = new Set(
     historyItems.filter((item) => item.kind === 'danger').map((item) => item.key),
@@ -145,6 +146,8 @@ export function GuardianPlaceholder({ account, onLogout }) {
     visibleDangerAlertKeys.has(getDangerHistoryKey(alert)),
   )
   const latestDangerAlert = visibleDangerAlerts[0] || null
+  const displayedHistoryItems = isHistoryExpanded ? historyItems : historyItems.slice(0, 2)
+  const canExpandHistory = historyItems.length > 2
   const hasActiveHistory = historyItems.length > 0
   const safetyLevel = hasActiveHistory ? 'EMERGENCY' : 'SAFE'
   const safetyDisplay = getSafetyStatusDisplay(safetyLevel)
@@ -198,6 +201,23 @@ export function GuardianPlaceholder({ account, onLogout }) {
 
   const confirmHistoryItem = useCallback(async (item) => {
     const itemKey = item.key
+    const relatedHistoryKeys = historyItems
+      .filter((historyItem) => {
+        if (historyItem.key === itemKey) {
+          return true
+        }
+        if (!item.alertId || !historyItem.alertId) {
+          return false
+        }
+        return historyItem.alertId === item.alertId
+      })
+      .map((historyItem) => historyItem.key)
+    const nextConfirmedKeys = (currentKeys) =>
+      Array.from(new Set([...currentKeys, ...relatedHistoryKeys]))
+
+    setConfirmedHistoryKeys((currentKeys) =>
+      persistConfirmedHistoryKeys(confirmedHistoryStorageKey, nextConfirmedKeys(currentKeys)),
+    )
 
     try {
       await confirmGuardianHistoryItem(item)
@@ -205,14 +225,6 @@ export function GuardianPlaceholder({ account, onLogout }) {
         return
       }
 
-      if (!item.alertId) {
-        setConfirmedHistoryKeys((currentKeys) =>
-          persistConfirmedHistoryKeys(
-            confirmedHistoryStorageKey,
-            currentKeys.includes(itemKey) ? currentKeys : [...currentKeys, itemKey],
-          ),
-        )
-      }
       await loadDashboard()
     } catch (error) {
       if (!isMountedRef.current) {
@@ -224,7 +236,7 @@ export function GuardianPlaceholder({ account, onLogout }) {
         error: error.message || '알림 확인 상태를 저장하지 못했습니다.',
       }))
     }
-  }, [confirmedHistoryStorageKey, loadDashboard])
+  }, [confirmedHistoryStorageKey, historyItems, loadDashboard])
 
   if (dashboardState.loading) {
     return (
@@ -390,7 +402,7 @@ export function GuardianPlaceholder({ account, onLogout }) {
           </div>
           <div className="guardian-event-list">
             {historyItems.length > 0 ? (
-              historyItems.map((item) => (
+              displayedHistoryItems.map((item) => (
                 <article className="guardian-event-item" key={item.key}>
                   <div className="guardian-event-item-header">
                     <strong>{item.title}</strong>
@@ -410,6 +422,16 @@ export function GuardianPlaceholder({ account, onLogout }) {
             ) : (
               <p className="empty-state">최근 전달된 알림이 없습니다. 현재 상태는 안전입니다.</p>
             )}
+            {canExpandHistory ? (
+              <button
+                className="guardian-history-toggle-button"
+                type="button"
+                aria-expanded={isHistoryExpanded}
+                onClick={() => setIsHistoryExpanded((current) => !current)}
+              >
+                {isHistoryExpanded ? '▲ 접기' : '▼ 전체 알림 보기'}
+              </button>
+            ) : null}
           </div>
         </section>
 

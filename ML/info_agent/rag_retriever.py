@@ -1,6 +1,7 @@
 """TF-IDF document retrieval using the info-agent classifier results."""
 
 import json
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -9,10 +10,11 @@ import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
-try:
-    from .predict_classifier import predict_info_agent
-except ImportError:
-    from predict_classifier import predict_info_agent
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+    __package__ = "info_agent"
+
+from .predict_classifier import predict_info_agent
 
 
 MODULE_DIR = Path(__file__).resolve().parent

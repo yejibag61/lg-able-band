@@ -3,6 +3,8 @@ import { averageEmbeddings, cosineSimilarity, getSoundTypeLabel } from './living
 const EMBEDDING_BUCKETS = 8
 const SIGNAL_FLOOR = 0.08
 const LIVE_EMBEDDING_WINDOW = 4
+const MIN_MATCH_COUNT = 3
+const MIN_MATCH_MARGIN = 0.04
 
 const PREFERRED_AUDIO_CONSTRAINTS = {
   audio: {
@@ -166,6 +168,7 @@ export async function createAmbientDetectionSession({ sounds, threshold, onLevel
   let lastSoundId = null
   let sameSoundCount = 0
   let lastReportedAt = 0
+  let lastBestSimilarity = 0
 
   const intervalId = window.setInterval(() => {
     analyser.getByteFrequencyData(frequencyData)
@@ -187,12 +190,19 @@ export async function createAmbientDetectionSession({ sounds, threshold, onLevel
 
     const liveEmbedding = averageEmbeddings(liveFrames)
     let bestMatch = null
+    let secondBestSimilarity = 0
 
     soundEmbeddings.forEach((sound) => {
       const similarity = cosineSimilarity(liveEmbedding, sound.embedding)
 
       if (!bestMatch || similarity > bestMatch.similarity) {
+        secondBestSimilarity = bestMatch?.similarity || secondBestSimilarity
         bestMatch = { ...sound, similarity }
+        return
+      }
+
+      if (similarity > secondBestSimilarity) {
+        secondBestSimilarity = similarity
       }
     })
 
@@ -209,8 +219,12 @@ export async function createAmbientDetectionSession({ sounds, threshold, onLevel
 
     const now = Date.now()
 
-    if (bestMatch.similarity >= threshold && sameSoundCount >= 2 && now - lastReportedAt > 2500) {
+    const matchMargin = bestMatch.similarity - secondBestSimilarity
+    const stableMatch = bestMatch.similarity >= threshold && matchMargin >= MIN_MATCH_MARGIN
+
+    if (stableMatch && sameSoundCount >= MIN_MATCH_COUNT && now - lastReportedAt > 4000) {
       lastReportedAt = now
+      lastBestSimilarity = bestMatch.similarity
       onMatch({
         predicted: true,
         registeredSoundName: bestMatch.registeredSoundName,
@@ -222,8 +236,13 @@ export async function createAmbientDetectionSession({ sounds, threshold, onLevel
       return
     }
 
-    if (bestMatch.similarity < threshold && now - lastReportedAt > 3000) {
+    if (
+      !stableMatch &&
+      now - lastReportedAt > 5000 &&
+      Math.abs(bestMatch.similarity - lastBestSimilarity) > 0.03
+    ) {
       lastReportedAt = now
+      lastBestSimilarity = bestMatch.similarity
       onMatch({
         predicted: false,
         similarity: bestMatch.similarity,

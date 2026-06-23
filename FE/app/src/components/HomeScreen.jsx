@@ -358,6 +358,7 @@ export function HomeScreen({ session, onLogout }) {
                 soundType: match.soundType,
                 similarity: Number(match.similarity.toFixed(4)),
                 detectedAt: match.detectedAt,
+                targetUserEmail: sessionEmail,
               })
               const createdAlert = normalizeLivingSignalAlert(createdAlertResponse, match)
 

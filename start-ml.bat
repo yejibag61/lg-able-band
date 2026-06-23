@@ -2,17 +2,18 @@
 setlocal
 cd /d "%~dp0"
 
-set "INFO_AGENT_PYTHON=python"
+set "ML_PYTHON=C:\Users\lab4dx\AppData\Local\Programs\Python\Python312\python.exe"
+if not exist "%ML_PYTHON%" set "ML_PYTHON=python"
 
-call :start_and_wait 8000 /health LGABLEBAND_CONTEXT_AI "%~dp0ML\context" "python server.py"
+call :start_and_wait 8000 /health LGABLEBAND_CONTEXT_AI "%~dp0ML\context" """%ML_PYTHON%"" server.py"
 if errorlevel 1 exit /b %errorlevel%
-call :start_and_wait 8001 /health LGABLEBAND_WARNING_AI "%~dp0ML\warning" "python server.py"
+call :start_and_wait 8001 /health LGABLEBAND_WARNING_AI "%~dp0ML\warning" """%ML_PYTHON%"" server.py"
 if errorlevel 1 exit /b %errorlevel%
-call :start_and_wait 8002 /health LGABLEBAND_SOUND_CHATBOT "%~dp0ML\sound_chatbot" "python server.py"
+call :start_and_wait 8002 /health LGABLEBAND_SOUND_CHATBOT "%~dp0ML\sound_chatbot" """%ML_PYTHON%"" server.py"
 if errorlevel 1 exit /b %errorlevel%
-call :start_and_wait 8004 /health LGABLEBAND_INFO_AGENT "%~dp0" """%INFO_AGENT_PYTHON%"" -m ML.info_agent.info_agent_server"
+call :start_and_wait 8004 /health LGABLEBAND_INFO_AGENT "%~dp0" """%ML_PYTHON%"" -m ML.info_agent.info_agent_server"
 if errorlevel 1 exit /b %errorlevel%
-call :start_and_wait 8003 /health LGABLEBAND_EMERGENCY_AI "%~dp0ML\emergency" "python server.py"
+call :start_and_wait 8003 /health LGABLEBAND_EMERGENCY_AI "%~dp0ML\emergency" """%ML_PYTHON%"" server.py"
 if errorlevel 1 exit /b %errorlevel%
 exit /b
 

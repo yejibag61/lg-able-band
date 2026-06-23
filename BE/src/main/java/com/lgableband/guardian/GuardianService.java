@@ -140,6 +140,7 @@ public class GuardianService {
 
 		long linkedUserId = linkedUserId(jdbcTemplate, guardian.guardianId());
 		GuardianUserSummary user = guardianUser(jdbcTemplate, linkedUserId);
+		ensureGuardianAlertDeliveries(jdbcTemplate, linkedUserId, guardian.guardianId());
 		List<GuardianAlertSummary> alerts = guardianAlerts(jdbcTemplate, linkedUserId, guardian.guardianId());
 		List<GuardianEmergencySummary> emergencies = guardianEmergencies(jdbcTemplate, linkedUserId, guardian.guardianId());
 		return new GuardianDashboardResponse(user, alerts, emergencies, createDashboardSummary(alerts, emergencies));
@@ -307,7 +308,8 @@ public class GuardianService {
 	private List<GuardianAlertSummary> guardianAlerts(JdbcTemplate jdbcTemplate, long userId, long guardianId) {
 		return jdbcTemplate.query(
 			"""
-			SELECT a.alert_id, a.alert_type, a.severity, a.title, a.message, a.occurred_at, a.status,
+			SELECT a.alert_id, a.alert_type, a.severity, a.title, a.message, a.occurred_at,
+			       ad.delivery_status AS guardian_status,
 			       COALESCE(d.name, '') AS device_name
 			FROM alert a
 			JOIN alert_delivery ad ON ad.alert_id = a.alert_id AND ad.target_guardian_id = ?
@@ -315,6 +317,7 @@ public class GuardianService {
 			LEFT JOIN device d ON d.device_id = de.device_id
 			WHERE a.user_id = ?
 			  AND (a.alert_type IN ('DANGER', 'EMERGENCY') OR a.severity IN ('HIGH', 'CRITICAL'))
+			  AND ad.delivery_status <> 'CONFIRMED'
 			ORDER BY a.occurred_at DESC, a.alert_id DESC
 			LIMIT 20
 			""",
@@ -326,10 +329,31 @@ public class GuardianService {
 				rs.getString("message"),
 				rs.getString("device_name"),
 				toOffsetDateTime(rs.getObject("occurred_at", LocalDateTime.class)),
-				rs.getString("status")
+				rs.getString("guardian_status")
 			),
 			guardianId,
 			userId
+		);
+	}
+
+	private void ensureGuardianAlertDeliveries(JdbcTemplate jdbcTemplate, long userId, long guardianId) {
+		jdbcTemplate.update(
+			"""
+			INSERT INTO alert_delivery (alert_id, channel, target_guardian_id, delivery_status, delivered_at)
+			SELECT a.alert_id, 'PUSH', ?, 'SENT', COALESCE(a.occurred_at, CURRENT_TIMESTAMP(6))
+			FROM alert a
+			WHERE a.user_id = ?
+			  AND (a.alert_type IN ('DANGER', 'EMERGENCY') OR a.severity IN ('HIGH', 'CRITICAL'))
+			  AND NOT EXISTS (
+			    SELECT 1
+			    FROM alert_delivery ad
+			    WHERE ad.alert_id = a.alert_id
+			      AND ad.target_guardian_id = ?
+			  )
+			""",
+			guardianId,
+			userId,
+			guardianId
 		);
 	}
 
@@ -339,7 +363,7 @@ public class GuardianService {
 			SELECT er.emergency_id,
 			       er.alert_id,
 			       CASE
-			         WHEN er.status NOT IN ('RESOLVED', 'CANCELED') AND a.status = 'CONFIRMED' THEN 'RESOLVED'
+			         WHEN er.status NOT IN ('RESOLVED', 'CANCELED') AND ad.delivery_status = 'CONFIRMED' THEN 'RESOLVED'
 			         ELSE er.status
 			       END AS status,
 			       er.message,
@@ -351,7 +375,7 @@ public class GuardianService {
 			WHERE er.user_id = ?
 			ORDER BY CASE
 			    WHEN er.status NOT IN ('RESOLVED', 'CANCELED')
-			      AND (a.status IS NULL OR a.status <> 'CONFIRMED') THEN 0
+			      AND ad.delivery_status <> 'CONFIRMED' THEN 0
 			    ELSE 1
 			  END,
 			  er.requested_at DESC,
@@ -381,7 +405,7 @@ public class GuardianService {
 		List<GuardianAlertSummary> alerts,
 		List<GuardianEmergencySummary> emergencies
 	) {
-		long unreadAlerts = alerts.stream().filter(alert -> "UNREAD".equals(alert.status())).count();
+		long unreadAlerts = alerts.size();
 		boolean activeEmergency = emergencies.stream()
 			.anyMatch(request -> !"RESOLVED".equals(request.status()) && !"CANCELED".equals(request.status()));
 		String safetyMessage = activeEmergency

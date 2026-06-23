@@ -185,6 +185,10 @@ async function mockFetch(input, init = {}) {
   }
 
   if (url === `${API_BASE_URL}/api/living-signals/detections` && method === 'POST') {
+    const body = JSON.parse(init.body)
+    if (body.targetUserEmail !== 'user@example.com') {
+      return jsonResponse({ message: 'bad request' }, { status: 400 })
+    }
     return jsonResponse({
       alertId: 9901,
       type: 'LIFE',

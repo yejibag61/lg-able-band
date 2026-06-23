@@ -111,6 +111,7 @@ public class MvpDataService {
 		}
 
 		ensureDemoAdminUser(jdbcTemplate);
+		ensureDemoGuardianLink(jdbcTemplate);
 
 		DbAccount account = jdbcTemplate.query(
 			"""
@@ -203,6 +204,33 @@ public class MvpDataService {
 		);
 	}
 
+	public Long findUserIdByEmail(String email) {
+		if (email == null || email.isBlank()) {
+			return null;
+		}
+
+		JdbcTemplate jdbcTemplate = jdbcTemplate();
+		if (jdbcTemplate == null) {
+			return this.mockDataStore.accounts().values().stream()
+				.filter(account -> account.role() == AccountRole.USER)
+				.filter(account -> account.email().equalsIgnoreCase(email.trim()))
+				.findFirst()
+				.map(account -> this.mockDataStore.findUserByAccountId(account.accountId()).userId())
+				.orElse(null);
+		}
+
+		return jdbcTemplate.query(
+			"""
+			SELECT u.user_id
+			FROM account a
+			JOIN app_user u ON u.account_id = a.account_id
+			WHERE a.role = 'USER' AND LOWER(a.email) = LOWER(?)
+			""",
+			(rs, rowNum) -> rs.getLong("user_id"),
+			email.trim()
+		).stream().findFirst().orElse(null);
+	}
+
 	private CurrentUser currentUserFromPairedWearableToken(JdbcTemplate jdbcTemplate, String token) {
 		Long userId;
 		try {
@@ -259,6 +287,7 @@ public class MvpDataService {
 		if (principal.role() != AccountRole.GUARDIAN || principal.guardianId() == null) {
 			throw new ApiException(HttpStatus.FORBIDDEN, "FORBIDDEN", "GUARDIAN 계정만 사용할 수 있습니다.");
 		}
+		ensureDemoGuardianLink(jdbcTemplate);
 		DbGuardian guardian = findDbGuardian(jdbcTemplate, principal.guardianId());
 		DbAccount account = findDbAccount(jdbcTemplate, principal.accountId());
 		Long linkedUserId = jdbcTemplate.query(
@@ -663,6 +692,49 @@ public class MvpDataService {
 			jdbcTemplate,
 			userId,
 			List.of(NotificationChannel.VOICE, NotificationChannel.VIBRATION)
+		);
+	}
+
+	private void ensureDemoGuardianLink(JdbcTemplate jdbcTemplate) {
+		Long userId = jdbcTemplate.query(
+			"""
+			SELECT u.user_id
+			FROM account a
+			JOIN app_user u ON u.account_id = a.account_id
+			WHERE a.role = 'USER' AND LOWER(a.email) = LOWER(?)
+			""",
+			(rs, rowNum) -> rs.getLong("user_id"),
+			"lglg@lgableband.com"
+		).stream().findFirst().orElse(null);
+		Long guardianId = jdbcTemplate.query(
+			"""
+			SELECT g.guardian_id
+			FROM account a
+			JOIN guardian g ON g.account_id = a.account_id
+			WHERE a.role = 'GUARDIAN' AND LOWER(a.email) = LOWER(?)
+			""",
+			(rs, rowNum) -> rs.getLong("guardian_id"),
+			"lgp@lgableband.com"
+		).stream().findFirst().orElse(null);
+
+		if (userId == null || guardianId == null) {
+			return;
+		}
+
+		jdbcTemplate.update(
+			"""
+			INSERT INTO user_guardian (user_id, guardian_id, is_primary, notify_on_danger)
+			SELECT ?, ?, TRUE, TRUE
+			WHERE NOT EXISTS (
+			  SELECT 1
+			  FROM user_guardian
+			  WHERE user_id = ? AND guardian_id = ?
+			)
+			""",
+			userId,
+			guardianId,
+			userId,
+			guardianId
 		);
 	}
 

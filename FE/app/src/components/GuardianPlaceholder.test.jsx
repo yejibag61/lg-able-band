@@ -36,7 +36,7 @@ describe('GuardianPlaceholder', () => {
     expect(screen.getByText('1건')).toBeTruthy()
   })
 
-  it('does not hide server-backed alerts with local confirmation state after confirming', async () => {
+  it('hides confirmed server-backed alerts from the guardian home immediately after confirming', async () => {
     const user = userEvent.setup()
     render(<GuardianPlaceholder account={account} onLogout={() => {}} />)
 
@@ -53,7 +53,9 @@ describe('GuardianPlaceholder', () => {
     })
 
     expect(window.localStorage.getItem(storageKey)).toBeNull()
-    expect(screen.getAllByText('아직 처리되지 않은 긴급 요청입니다.')).toHaveLength(2)
+    await waitFor(() => {
+      expect(screen.queryByText('아직 처리되지 않은 긴급 요청입니다.')).toBeNull()
+    })
   })
 
   it('shows a live alert and vibrates when a new guardian alert arrives without refresh', async () => {
@@ -105,7 +107,7 @@ function createGuardianDashboard(overrides = {}) {
   return {
     user: {
       userId: 6,
-      name: '홍길덩',
+      name: '홍길동',
       accessibilityType: 'VISUAL',
     },
     dangerAlerts: overrides.dangerAlerts ?? [

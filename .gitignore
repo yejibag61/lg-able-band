@@ -4,3 +4,6 @@ node_modules/
 .env
 *.env
 ML/info_agent/models/*.joblib
+node_modules/
+dist/
+.vite/

@@ -223,6 +223,10 @@ public class MockDataStore {
 		return this.users.keySet().stream().sorted().toList();
 	}
 
+	public Map<Long, Account> accounts() {
+		return Map.copyOf(this.accounts);
+	}
+
 	public Device addDevice(long userId, String name, DeviceType type, boolean locationSupported, String room) {
 		Device device = new Device(
 			this.deviceSequence.incrementAndGet(),

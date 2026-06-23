@@ -79,7 +79,8 @@ public class LivingSignalController {
 				request.registeredSoundName(),
 				request.soundType(),
 				request.similarity(),
-				request.detectedAt()
+				request.detectedAt(),
+				request.targetUserEmail()
 			)
 		);
 	}
@@ -127,7 +128,8 @@ public class LivingSignalController {
 		@NotBlank String registeredSoundName,
 		@NotBlank String soundType,
 		@Min(0) @Max(1) double similarity,
-		OffsetDateTime detectedAt
+		OffsetDateTime detectedAt,
+		String targetUserEmail
 	) {
 	}
 }

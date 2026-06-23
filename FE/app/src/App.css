@@ -9363,6 +9363,18 @@ h2 {
   line-height: 1;
 }
 
+.phone-screen.guardian-screen .guardian-history-toggle-button {
+  width: 100%;
+  min-height: 38px;
+  border: 1px solid #f3a9bc;
+  border-radius: 999px;
+  background: #fff1f4;
+  color: #c91446;
+  font-size: 13.6px;
+  font-weight: 700;
+  box-shadow: 0 8px 18px rgba(201, 20, 70, 0.1);
+}
+
 .phone-screen.guardian-screen .guardian-event-item p {
   margin: 0;
   color: #4b5563;

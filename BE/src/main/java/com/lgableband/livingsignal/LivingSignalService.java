@@ -211,6 +211,10 @@ public class LivingSignalService {
 	public AlertService.AlertView createDetectionAlert(String authorization, DetectionAlertRequest request) {
 		JdbcTemplate jdbcTemplate = jdbcTemplate();
 		MvpDataService.CurrentUser user = this.dataService.currentUser(authorization);
+		Long targetUserId = this.dataService.findUserIdByEmail(request.targetUserEmail());
+		if (targetUserId == null) {
+			targetUserId = user.userId();
+		}
 		OffsetDateTime detectedAt = normalizeOffsetDateTime(request.detectedAt());
 		String registeredSoundName = request.registeredSoundName().trim();
 		String soundType = request.soundType().trim();
@@ -224,7 +228,7 @@ public class LivingSignalService {
 
 		if (jdbcTemplate == null) {
 			MockDataStore.Alert alert = this.mockDataStore.addContextAlert(
-				user.userId(),
+				targetUserId,
 				alertType,
 				severity,
 				title,
@@ -238,7 +242,7 @@ public class LivingSignalService {
 		}
 
 		try {
-			Long wearableDeviceId = findWearableDeviceId(jdbcTemplate, user.userId());
+			Long wearableDeviceId = findWearableDeviceId(jdbcTemplate, targetUserId);
 			Long eventId = wearableDeviceId == null
 				? null
 				: insertDetectionEvent(
@@ -255,7 +259,7 @@ public class LivingSignalService {
 				);
 			long alertId = insertDetectionAlert(
 				jdbcTemplate,
-				user.userId(),
+				targetUserId,
 				eventId,
 				alertType,
 				severity,
@@ -848,7 +852,8 @@ public class LivingSignalService {
 		String registeredSoundName,
 		String soundType,
 		double similarity,
-		OffsetDateTime detectedAt
+		OffsetDateTime detectedAt,
+		String targetUserEmail
 	) {
 	}
 }

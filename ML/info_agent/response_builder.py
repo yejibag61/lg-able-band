@@ -3,34 +3,26 @@
 import json
 import os
 import re
+import sys
+from pathlib import Path
 from typing import Any
 
-try:
-    from .important_field_extractor import infer_condition_fields
-    from .important_field_extractor import extract_important_fields
-    from .llm_client import (
-        build_cache_key,
-        build_llm_prompt,
-        cache_llm_response,
-        call_llm,
-        get_cached_llm_response,
-        llm_config,
-    )
-    from .rag_retriever import search_documents
-    from .url_content_collector import DEFAULT_CACHE_PATH, cache_key, collect_url, load_cache, write_cache
-except ImportError:
-    from important_field_extractor import infer_condition_fields
-    from important_field_extractor import extract_important_fields
-    from llm_client import (
-        build_cache_key,
-        build_llm_prompt,
-        cache_llm_response,
-        call_llm,
-        get_cached_llm_response,
-        llm_config,
-    )
-    from rag_retriever import search_documents
-    from url_content_collector import DEFAULT_CACHE_PATH, cache_key, collect_url, load_cache, write_cache
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+    __package__ = "info_agent"
+
+from .important_field_extractor import infer_condition_fields
+from .important_field_extractor import extract_important_fields
+from .llm_client import (
+    build_cache_key,
+    build_llm_prompt,
+    cache_llm_response,
+    call_llm,
+    get_cached_llm_response,
+    llm_config,
+)
+from .rag_retriever import search_documents
+from .url_content_collector import DEFAULT_CACHE_PATH, cache_key, collect_url, load_cache, write_cache
 
 
 ACCESSIBILITY_TYPES = {
