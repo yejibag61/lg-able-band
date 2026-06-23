@@ -1215,6 +1215,14 @@ h1 {
   gap: 7px;
 }
 
+.wearable-safety-alert-topline {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
 .wearable-safety-alert-label {
   display: inline-flex;
   align-items: center;
@@ -1289,6 +1297,7 @@ h1 {
 }
 
 .wearable-guardian-request-heading h2 {
+  min-width: 0;
   margin: 0;
   color: var(--wearable-text);
   font-size: 1.06rem;
@@ -4356,6 +4365,34 @@ h1 {
   border: 1px solid #d7e0ea;
   background: #ffffff;
   color: #0f172a;
+}
+
+.wearable-guardian-request-heading .wearable-loading-badge {
+  margin-left: auto;
+}
+
+.wearable-loading-badge {
+  display: inline-flex;
+  width: fit-content;
+  min-height: 24px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  padding: 4px 8px;
+  font-size: 0.68rem;
+  font-weight: 800;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.wearable-loading-badge {
+  flex: 0 0 auto;
+  background: var(--wearable-primary-soft);
+  color: var(--wearable-primary-strong);
+}
+
+.pairing-loading-copy .wearable-loading-badge {
+  margin-bottom: 8px;
 }
 
 .wearable-bottom-sheet-actions .wearable-unpair-action {
