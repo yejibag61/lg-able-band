@@ -3,7 +3,6 @@ setlocal
 cd /d "%~dp0"
 
 set "INFO_AGENT_PYTHON=python"
-if exist "%USERPROFILE%\anaconda3\python.exe" set "INFO_AGENT_PYTHON=%USERPROFILE%\anaconda3\python.exe"
 
 call :start_and_wait 8000 /health LGABLEBAND_CONTEXT_AI "%~dp0ML\context" "python server.py"
 if errorlevel 1 exit /b %errorlevel%

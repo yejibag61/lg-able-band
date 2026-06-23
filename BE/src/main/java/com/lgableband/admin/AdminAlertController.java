@@ -31,9 +31,33 @@ public class AdminAlertController {
 		return this.adminAlertService.broadcast(authorization, request.templateId(), request.audience());
 	}
 
+	@PostMapping("/simulator/events")
+	public AdminAlertService.SimulatorEventResponse simulatorEvent(
+		@RequestHeader("Authorization") String authorization,
+		@RequestBody SimulatorEventRequest request
+	) {
+		return this.adminAlertService.dispatchSimulatorEvent(
+			authorization,
+			request.targetUserId(),
+			request.applianceType(),
+			request.eventType(),
+			request.title(),
+			request.message()
+		);
+	}
+
 	public record AlertTemplateListResponse(List<AdminAlertService.AlertTemplateView> items) {
 	}
 
 	public record BroadcastRequest(String templateId, AdminAlertService.BroadcastAudience audience) {
+	}
+
+	public record SimulatorEventRequest(
+		long targetUserId,
+		String applianceType,
+		String eventType,
+		String title,
+		String message
+	) {
 	}
 }

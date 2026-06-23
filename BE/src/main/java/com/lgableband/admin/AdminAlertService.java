@@ -16,8 +16,11 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.http.HttpStatus;
+import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
 import org.springframework.jdbc.support.KeyHolder;
@@ -26,6 +29,7 @@ import org.springframework.stereotype.Service;
 @Service
 public class AdminAlertService {
 
+	private static final Logger log = LoggerFactory.getLogger(AdminAlertService.class);
 	private static final ZoneOffset SERVICE_OFFSET = ZoneOffset.ofHours(9);
 
 	private static final Set<String> ADMIN_EMAILS = Set.of(
@@ -369,6 +373,97 @@ public class AdminAlertService {
 		return new BroadcastResponse(template.templateId(), template.title(), targetAudience, dispatchedCount, occurredAt);
 	}
 
+	public SimulatorEventResponse dispatchSimulatorEvent(
+		String authorization,
+		long targetUserId,
+		String applianceType,
+		String eventType,
+		String title,
+		String message
+	) {
+		requireAdmin(authorization);
+		log.info(
+			"Simulator event request received: targetUserId={}, applianceType={}, eventType={}, title={}",
+			targetUserId,
+			applianceType,
+			eventType,
+			title
+		);
+		if (targetUserId <= 0) {
+			throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_TARGET_USER", "대상 사용자 ID를 입력해주세요.");
+		}
+		if (applianceType == null || applianceType.isBlank()) {
+			throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_APPLIANCE_TYPE", "가전 종류가 비어 있습니다.");
+		}
+		if (eventType == null || eventType.isBlank()) {
+			throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_EVENT_TYPE", "이벤트 종류가 비어 있습니다.");
+		}
+		if (title == null || title.isBlank()) {
+			throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_TITLE", "알림 제목이 비어 있습니다.");
+		}
+		if (message == null || message.isBlank()) {
+			throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_MESSAGE", "알림 메시지가 비어 있습니다.");
+		}
+
+		SimulatorEventTemplate template = SimulatorEventTemplate.from(applianceType, eventType, title, message);
+		OffsetDateTime occurredAt = OffsetDateTime.now(SERVICE_OFFSET);
+		JdbcTemplate jdbcTemplate = jdbcTemplateProvider.getIfAvailable();
+
+		if (jdbcTemplate == null) {
+			mockDataStore.user(targetUserId);
+			mockDataStore.addContextAlert(
+				targetUserId,
+				template.alertType(),
+				template.severity(),
+				template.title(),
+				template.message(),
+				template.deviceName(),
+				occurredAt,
+				template.voiceGuide()
+			);
+			return new SimulatorEventResponse(
+				targetUserId,
+				template.applianceType(),
+				template.eventType(),
+				template.title(),
+				template.message(),
+				occurredAt
+			);
+		}
+
+		try {
+			jdbcTemplate.queryForObject(
+				"SELECT user_id FROM app_user WHERE user_id = ?",
+				(rs, rowNum) -> rs.getLong("user_id"),
+				targetUserId
+			);
+		}
+		catch (EmptyResultDataAccessException exception) {
+			throw new ApiException(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND", "대상 사용자를 찾을 수 없습니다.");
+		}
+
+		long deviceId = resolveOrCreateDevice(jdbcTemplate, targetUserId, template.toAlertTemplate());
+		long eventId = insertDeviceEvent(jdbcTemplate, deviceId, template.toAlertTemplate(), occurredAt);
+		insertAlert(jdbcTemplate, targetUserId, eventId, template.toAlertTemplate(), occurredAt);
+		log.info(
+			"Simulator event created successfully: targetUserId={}, deviceId={}, eventId={}, applianceType={}, eventType={}",
+			targetUserId,
+			deviceId,
+			eventId,
+			template.applianceType(),
+			template.eventType()
+		);
+
+		return new SimulatorEventResponse(
+			targetUserId,
+			template.applianceType(),
+			template.eventType(),
+			template.title(),
+			template.message(),
+			occurredAt
+		);
+	}
+
 	private boolean matchesAudience(AccessibilityType accessibilityType, BroadcastAudience audience) {
 		if (audience == BroadcastAudience.ALL) {
 			return true;
@@ -576,6 +671,16 @@ public class AdminAlertService {
 	) {
 	}
 
+	public record SimulatorEventResponse(
+		long targetUserId,
+		String applianceType,
+		String eventType,
+		String title,
+		String message,
+		OffsetDateTime occurredAt
+	) {
+	}
+
 	public enum BroadcastAudience {
 		ALL(null),
 		VISUAL(AccessibilityType.VISUAL),
@@ -606,5 +711,143 @@ public class AdminAlertService {
 		String locationName,
 		String recommendedAction
 	) {
+	}
+
+	private record SimulatorEventTemplate(
+		String applianceType,
+		String eventType,
+		String deviceName,
+		DeviceType deviceType,
+		AlertType alertType,
+		Severity severity,
+		String title,
+		String message,
+		String voiceGuide,
+		String locationName,
+		String recommendedAction
+	) {
+		private static SimulatorEventTemplate from(
+			String applianceType,
+			String eventType,
+			String title,
+			String message
+		) {
+			String normalizedAppliance = applianceType.trim().toUpperCase(Locale.ROOT);
+			String normalizedEvent = eventType.trim().toUpperCase(Locale.ROOT);
+			return switch (normalizedAppliance) {
+				case "WASHING_MACHINE" -> new SimulatorEventTemplate(
+					normalizedAppliance,
+					normalizedEvent,
+					"세탁기",
+					DeviceType.WASHER,
+					normalizedEvent.contains("ERROR") || normalizedEvent.contains("DOOR")
+						? AlertType.DANGER
+						: AlertType.LIFE,
+					normalizedEvent.contains("ERROR") || normalizedEvent.contains("DOOR")
+						? Severity.HIGH
+						: Severity.LOW,
+					title,
+					message,
+					message,
+					"세탁실",
+					"세탁기 상태를 확인해주세요."
+				);
+				case "AIR_QUALITY_SENSOR" -> new SimulatorEventTemplate(
+					normalizedAppliance,
+					normalizedEvent,
+					"LG 공기질 센서",
+					DeviceType.AIR_SENSOR,
+					AlertType.DANGER,
+					normalizedEvent.contains("FINE_DUST") || normalizedEvent.contains("HIGH_CO2")
+						? Severity.HIGH
+						: Severity.MEDIUM,
+					title,
+					message,
+					message,
+					"거실",
+					"실내 환기 상태를 확인해주세요."
+				);
+				case "TV" -> new SimulatorEventTemplate(
+					normalizedAppliance,
+					normalizedEvent,
+					"TV",
+					DeviceType.TV,
+					normalizedEvent.contains("FIND_REMOTE") ? AlertType.LOCATION : AlertType.LIFE,
+					normalizedEvent.contains("FIND_REMOTE") ? Severity.LOW : Severity.LOW,
+					title,
+					message,
+					message,
+					"거실",
+					"TV 상태를 확인해주세요."
+				);
+				case "ELECTRIC_RANGE" -> new SimulatorEventTemplate(
+					normalizedAppliance,
+					normalizedEvent,
+					"전기레인지",
+					DeviceType.RANGE,
+					normalizedEvent.contains("OVERHEAT") || normalizedEvent.contains("RESIDUAL")
+						? AlertType.DANGER
+						: AlertType.LIFE,
+					normalizedEvent.contains("OVERHEAT") || normalizedEvent.contains("RESIDUAL")
+						? Severity.HIGH
+						: Severity.LOW,
+					title,
+					message,
+					message,
+					"주방",
+					"전기레인지 열 상태를 확인해주세요."
+				);
+				case "DOOR_SENSOR" -> new SimulatorEventTemplate(
+					normalizedAppliance,
+					normalizedEvent,
+					"도어 센서",
+					DeviceType.DOOR_SENSOR,
+					normalizedEvent.contains("LEFT_OPEN") || normalizedEvent.contains("CHECK_DOOR")
+						? AlertType.DANGER
+						: AlertType.LIFE,
+					normalizedEvent.contains("LEFT_OPEN") || normalizedEvent.contains("CHECK_DOOR")
+						? Severity.HIGH
+						: Severity.LOW,
+					title,
+					message,
+					message,
+					"현관",
+					"문 상태를 확인해주세요."
+				);
+				case "REFRIGERATOR" -> new SimulatorEventTemplate(
+					normalizedAppliance,
+					normalizedEvent,
+					"냉장고",
+					DeviceType.REFRIGERATOR,
+					normalizedEvent.contains("FIND_ITEM") ? AlertType.LOCATION
+						: normalizedEvent.contains("TEMPERATURE") ? AlertType.DANGER
+						: AlertType.LIFE,
+					normalizedEvent.contains("TEMPERATURE") ? Severity.HIGH : Severity.LOW,
+					title,
+					message,
+					message,
+					"주방",
+					"냉장고 상태를 확인해주세요."
+				);
+				default -> throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_APPLIANCE_TYPE", "지원하지 않는 가전 종류입니다.");
+			};
+		}
+
+		private AlertTemplate toAlertTemplate() {
+			return new AlertTemplate(
+				"simulator-" + this.applianceType + "-" + this.eventType,
+				"시뮬레이터",
+				this.eventType,
+				this.deviceName,
+				this.deviceType,
+				this.alertType,
+				this.severity,
+				this.title,
+				this.message,
+				this.voiceGuide,
+				this.locationName,
+				this.recommendedAction
+			);
+		}
 	}
 }
