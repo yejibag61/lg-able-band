@@ -354,6 +354,29 @@ public class DeviceService {
 			throw new ApiException(HttpStatus.CONFLICT, "DUPLICATED_DEVICE", "이미 연결된 기기입니다.");
 		}
 
+		DeviceRow currentUserExisting = jdbcTemplate.query(
+			"""
+			SELECT device_id, user_id
+			FROM device
+			WHERE user_id = ?
+			  AND vendor_device_id = ?
+			ORDER BY device_id DESC
+			LIMIT 1
+			""",
+			(rs, rowNum) -> new DeviceRow(
+				rs.getLong("device_id"),
+				rs.getLong("user_id")
+			),
+			userId,
+			vendorDeviceId
+		).stream().findFirst().orElse(null);
+
+		if (currentUserExisting != null) {
+			updateClaimedWearableDevice(jdbcTemplate, currentUserExisting.deviceId(), userId, request);
+			insertRegistrationEvent(jdbcTemplate, currentUserExisting.deviceId(), request);
+			return claimedWearableSummary(currentUserExisting.deviceId(), request);
+		}
+
 		DeviceRow existing = jdbcTemplate.query(
 			"""
 			SELECT device_id, user_id
@@ -368,6 +391,17 @@ public class DeviceService {
 		).stream().findFirst()
 			.orElseThrow(() -> new ApiException(HttpStatus.CONFLICT, "DUPLICATED_DEVICE", "이미 연결된 기기입니다."));
 
+		updateClaimedWearableDevice(jdbcTemplate, existing.deviceId(), userId, request);
+		insertRegistrationEvent(jdbcTemplate, existing.deviceId(), request);
+		return claimedWearableSummary(existing.deviceId(), request);
+	}
+
+	private void updateClaimedWearableDevice(
+		JdbcTemplate jdbcTemplate,
+		long deviceId,
+		long userId,
+		DeviceCreateRequest request
+	) {
 		jdbcTemplate.update(
 			"""
 			UPDATE device
@@ -387,11 +421,13 @@ public class DeviceService {
 			normalizeRoom(request.room()),
 			request.locationSupported(),
 			request.remoteEnabled(),
-			existing.deviceId()
+			deviceId
 		);
-		insertRegistrationEvent(jdbcTemplate, existing.deviceId(), request);
+	}
+
+	private DeviceSummary claimedWearableSummary(long deviceId, DeviceCreateRequest request) {
 		return new DeviceSummary(
-			existing.deviceId(),
+			deviceId,
 			request.name(),
 			request.type(),
 			ConnectionStatus.CONNECTED,
