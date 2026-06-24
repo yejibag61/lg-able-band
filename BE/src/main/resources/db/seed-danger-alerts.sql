@@ -18,11 +18,11 @@ SELECT @user_id AS target_user_id, @target_email AS target_email;
 INSERT INTO device (
 	user_id, device_type, vendor_device_id, name, connection_status, location_supported, remote_enabled
 )
-SELECT @user_id, 'RANGE', NULL, '안전 전기레인지', 'WARNING', FALSE, FALSE
+SELECT @user_id, 'RANGE', NULL, '전기레인지', 'WARNING', FALSE, FALSE
 WHERE @user_id IS NOT NULL
   AND NOT EXISTS (
 	SELECT 1 FROM device
-	WHERE user_id = @user_id AND device_type = 'RANGE' AND name = '안전 전기레인지'
+	WHERE user_id = @user_id AND device_type = 'RANGE' AND name = '전기레인지'
 );
 
 SET @range_device_id = (

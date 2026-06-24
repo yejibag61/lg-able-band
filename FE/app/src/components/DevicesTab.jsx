@@ -47,7 +47,7 @@ const deviceCatalog = [
   },
   {
     templateId: 'range',
-    name: '안전 전기레인지',
+    name: '전기레인지',
     type: 'RANGE',
     typeLabel: '전기레인지',
     room: '주방',

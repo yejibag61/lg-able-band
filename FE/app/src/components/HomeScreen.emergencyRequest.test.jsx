@@ -55,7 +55,7 @@ describe('HomeScreen emergency request', () => {
     window.localStorage.clear()
   })
 
-  it('asks the user to register a guardian when SOS is clicked without one', async () => {
+  it('always attempts an SOS request even when the home summary is stale', async () => {
     const user = userEvent.setup()
     render(<HomeScreen session={session} onLogout={() => {}} />)
 
@@ -67,9 +67,9 @@ describe('HomeScreen emergency request', () => {
     await user.click(sosButton)
 
     await waitFor(() => {
-      expect(screen.getByRole('status').textContent).toContain('보호자를 등록')
+      expect(screen.getByRole('alert').textContent).toContain('보호자를 등록')
     })
-    expect(findEmergencyRequestCall()).toBeUndefined()
+    expect(findEmergencyRequestCall()).toBeTruthy()
   })
 })
 
@@ -106,6 +106,10 @@ async function mockFetch(input, init = {}) {
         largeText: false,
       },
     })
+  }
+
+  if (url === `${API_BASE_URL}/api/emergency-requests` && method === 'POST') {
+    return jsonResponse({ message: '보호자를 등록한 뒤 다시 시도해 주세요.' }, { status: 400 })
   }
 
   return jsonResponse({ message: 'not found' }, { status: 404 })

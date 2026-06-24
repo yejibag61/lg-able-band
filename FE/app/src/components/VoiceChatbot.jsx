@@ -79,8 +79,8 @@ const deviceVoiceCatalog = [
     typeLabel: 'TV',
   },
   {
-    aliases: ['전기레인지', '안전 전기레인지', '인덕션', '가스레인지'],
-    defaultName: '안전 전기레인지',
+    aliases: ['전기레인지', '전기레인지', '인덕션', '가스레인지'],
+    defaultName: '전기레인지',
     defaultVendorDeviceId: 'thinq-range-001',
     locationSupported: false,
     remoteEnabled: false,

@@ -24,6 +24,14 @@ export async function createEmergencyRequest(message = '긴급한 도움이 필�
       })
     }
 
+    if (error instanceof ApiRequestError && error.status) {
+      throw new ApiRequestError(`${error.message} (HTTP ${error.status})`, {
+        status: error.status,
+        code: error.code,
+        details: error.details,
+      })
+    }
+
     throw error
   }
 }

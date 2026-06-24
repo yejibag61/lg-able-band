@@ -125,6 +125,11 @@ export function GuardianPlaceholder({ account, onLogout }) {
 
     return subscribeGuardianDashboardEvents((event) => {
       if (event.type === 'guardian-alert') {
+        setDashboardState((current) => ({
+          ...current,
+          data: mergeGuardianLiveAlert(current.data, event.data),
+          lastUpdatedAt: new Date().toISOString(),
+        }))
         loadDashboard({ silent: true })
       }
     })
@@ -442,6 +447,42 @@ function createGuardianHistoryItems(dashboard) {
 
     return secondTime - firstTime
   })
+}
+
+function mergeGuardianLiveAlert(dashboard, event) {
+  if (!dashboard || !event?.emergencyRequestId) {
+    return dashboard
+  }
+
+  const emergencyRequest = {
+    emergencyRequestId: event.emergencyRequestId,
+    alertId: event.alertId || null,
+    status: 'SENT',
+    message: event.message || '사용자가 긴급 도움을 요청했습니다.',
+    source: event.source || 'APP',
+    sentAt: event.occurredAt || new Date().toISOString(),
+    guardianNotified: true,
+  }
+  const existingRequests = dashboard.emergencyRequests || []
+
+  return {
+    ...dashboard,
+    emergencyRequests: [
+      emergencyRequest,
+      ...existingRequests.filter(
+        (request) => request.emergencyRequestId !== emergencyRequest.emergencyRequestId,
+      ),
+    ],
+    summary: {
+      ...dashboard.summary,
+      activeEmergency: true,
+      emergencyRequestCount: Math.max(
+        Number(dashboard.summary?.emergencyRequestCount) || 0,
+        existingRequests.length + 1,
+      ),
+      safetyMessage: '긴급 도움 요청이 진행 중입니다.',
+    },
+  }
 }
 
 function isActiveDangerAlert(alert) {

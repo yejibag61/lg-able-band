@@ -26,7 +26,7 @@ export const mockHomeSummary = {
       severity: 'HIGH',
       title: '전기레인지 확인',
       message: '주방에서 위험 신호가 감지되었습니다.',
-      deviceName: '안전 전기레인지',
+      deviceName: '전기레인지',
       occurredAt: '2026-06-10T13:55:00+09:00',
       status: 'READ',
     },
