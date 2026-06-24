@@ -1172,8 +1172,7 @@ function MenuTab({
         <p className="card-label">생활 신호 설정</p>
         <strong className="card-title">생활 알림음 등록 및 관리</strong>
         <p>
-          현재 {livingSignals.summary.registeredSoundCount}개 신호, 샘플{' '}
-          {livingSignals.summary.enrolledClipCount}개가 등록되어 있어요.
+          등록된 신호가 감지되면 알림이 발송됩니다.
         </p>
       </button>
 
