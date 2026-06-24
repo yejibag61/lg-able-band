@@ -6475,7 +6475,6 @@ h1 {
   place-items: center;
 }
 
-
 .wearable-chat-speaking .wearable-chat-speaker {
   width: 88px;
   height: 88px;
@@ -6486,4 +6485,127 @@ h1 {
 .wearable-appliance-status-badge,
 .wearable-appliance-quick-card {
   display: none !important;
+}
+
+
+/* Keep the physical wearable viewport stable while switching tabs. */
+.app-root {
+  width: 100vw;
+  height: 100svh;
+  min-height: 100svh;
+  overflow: hidden;
+}
+
+.wearable-shell {
+  flex: none;
+  width: min(100vw, calc(100svh * var(--wearable-demo-aspect-width) / var(--wearable-demo-aspect-height)));
+  height: min(100svh, calc(100vw * var(--wearable-demo-aspect-height) / var(--wearable-demo-aspect-width)));
+  max-width: 100vw;
+  max-height: 100svh;
+  aspect-ratio: var(--wearable-demo-aspect-width) / var(--wearable-demo-aspect-height);
+}
+
+.wearable-screen {
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+}
+
+.wearable-screen > section {
+  min-width: 0;
+  min-height: 0;
+}
+
+@media (max-aspect-ratio: 520/884) {
+  .wearable-shell {
+    width: 100vw;
+    height: calc(100vw * var(--wearable-demo-aspect-height) / var(--wearable-demo-aspect-width));
+  }
+}
+
+@media (min-aspect-ratio: 520/884) {
+  .wearable-shell {
+    width: calc(100svh * var(--wearable-demo-aspect-width) / var(--wearable-demo-aspect-height));
+    height: 100svh;
+  }
+}
+
+/* Never let the tab bar force narrow wearable displays to page-scale. */
+.mode-switch {
+  right: clamp(4px, 2vw, 10px) !important;
+  left: clamp(4px, 2vw, 10px) !important;
+  width: auto !important;
+  max-width: none;
+  transform: none;
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: clamp(2px, 1vw, 8px);
+  padding-inline: clamp(3px, 1.5vw, 10px);
+  min-height: clamp(48px, 12svh, 76px);
+}
+
+.mode-button {
+  width: auto !important;
+  min-width: 0 !important;
+  max-width: 100%;
+  padding-inline: clamp(2px, 1.5vw, 10px);
+  font-size: clamp(0.66rem, 3.5vw, 0.9rem);
+  white-space: nowrap;
+}
+
+.wearable-screen-with-mode-switch {
+  padding-top: clamp(60px, 15svh, 98px) !important;
+}
+
+@media (max-height: 420px) {
+  .mode-switch {
+    top: 4px !important;
+    min-height: 46px;
+    padding-block: 4px;
+  }
+
+  .wearable-screen-with-mode-switch {
+    padding-top: 54px !important;
+  }
+
+  .device-select-screen {
+    padding-top: 6px;
+    padding-bottom: 8px;
+  }
+}
+
+.device-select-screen,
+.wearable-chat-screen-embedded {
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  align-self: stretch;
+  justify-self: stretch;
+}
+
+.wearable-chat-screen-embedded .wearable-chat-content {
+  width: 100%;
+  min-width: 0;
+}
+
+/* Real wearable displays should fill their viewport instead of letterboxing. */
+.wearable-shell {
+  width: 100vw !important;
+  height: 100svh !important;
+  max-width: 100vw;
+  max-height: 100svh;
+  aspect-ratio: auto;
+}
+
+.wearable-screen-with-mode-switch > .device-select-screen {
+  grid-row: 1;
+  width: 100%;
+  height: 100%;
+  max-height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
