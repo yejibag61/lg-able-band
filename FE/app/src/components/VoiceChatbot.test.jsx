@@ -173,23 +173,16 @@ describe('VoiceChatbot info agent response', () => {
     expect(screen.getByRole('button', { name: '장애인 활동지원 서비스 알려줘' })).toBeTruthy()
   })
 
-  it('opens the assistant on the feature selection screen without scrolling into chat', async () => {
+  it('opens the assistant directly on the AI question screen without scrolling into chat', async () => {
     const user = userEvent.setup()
 
     render(<VoiceChatbot preview={{}} session={{}} summary={{}} />)
     await user.click(screen.getByRole('button', { name: '음성 챗봇 열기' }))
 
-    expect(screen.getByRole('button', { name: '대신말하기 화면으로 이동' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'AI에게 묻기 화면으로 이동' })).toBeTruthy()
-    expect(screen.getByText('정보를 찾아드려요')).toBeTruthy()
-    expect(screen.getByRole('button', { name: '챗봇 음성 호출로 시작' })).toBeTruthy()
-    expect(screen.getByText('‘챗봇 켜줘’라고 말하면 바로 시작해요.')).toBeTruthy()
-    expect(screen.queryByLabelText('인식된 문장')).toBeNull()
-    expect(window.HTMLElement.prototype.scrollIntoView).not.toHaveBeenCalled()
-
-    await user.click(screen.getByRole('button', { name: 'AI에게 묻기 화면으로 이동' }))
-
+    expect(screen.queryByRole('button', { name: '대신말하기 화면으로 이동' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'AI에게 묻기 화면으로 이동' })).toBeNull()
     expect(screen.getByLabelText('질문 카테고리')).toBeTruthy()
+    expect(screen.getByLabelText('인식된 문장')).toBeTruthy()
     expect(window.HTMLElement.prototype.scrollIntoView).not.toHaveBeenCalled()
   })
 
@@ -625,8 +618,7 @@ describe('VoiceChatbot info agent response', () => {
 
 async function openTalkMode(user) {
   await user.click(screen.getByRole('button', { name: '음성 챗봇 열기' }))
-  const talkButton = await screen.findByRole('button', { name: 'AI에게 묻기 화면으로 이동' })
-  await user.click(talkButton)
+  await screen.findByLabelText('질문 카테고리')
 }
 
 function mockVoiceChatResponse(data) {

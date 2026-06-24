@@ -1,6 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { ChatbotFeatureSelect } from './ChatbotFeatureSelect'
-import { SpeakForMeScreen } from './SpeakForMeScreen'
 import { CHATBOT_QUESTION_CATEGORIES, FALLBACK_CHAT_ALERTS } from '../data/chatbotRecommendations'
 import { createDevice, getDevices } from '../services/deviceService'
 import { createEmergencyRequest } from '../services/emergencyService'
@@ -128,7 +126,7 @@ export function VoiceChatbot({
   summary,
 }) {
   const [isOpen, setIsOpen] = useState(embedded || initialOpen)
-  const [assistantMode, setAssistantMode] = useState(initialOpen ? 'talk' : 'select')
+  const [assistantMode, setAssistantMode] = useState('talk')
   const [isListening, setIsListening] = useState(false)
   const [inputText, setInputText] = useState('')
   const [status, setStatus] = useState('대기 중')
@@ -323,7 +321,8 @@ export function VoiceChatbot({
     conversationActiveRef.current = false
     manualStopRef.current = false
     setChatbotVoiceState(CHATBOT_VOICE_STATE.CLOSED)
-    setAssistantMode(embedded ? 'talk' : 'select')
+    setAssistantMode('talk')
+    setSelectedQuestionCategoryId(null)
     setIsOpen(true)
     setError('')
     setStatus('대기 중')
@@ -420,7 +419,7 @@ export function VoiceChatbot({
     stopActiveRecognition()
     setIsListening(false)
     setStatus('대화 종료')
-    setAssistantMode('select')
+    setAssistantMode('talk')
     setShowResetConfirm(false)
     setSelectedQuestionCategoryId(null)
     setAlternativeQuestionPrompts([])
@@ -447,7 +446,7 @@ export function VoiceChatbot({
     setIsListening(false)
     setIsRequesting(false)
     setStatus('대기 중')
-    setAssistantMode('select')
+    setAssistantMode('talk')
     setShowResetConfirm(false)
     setSelectedQuestionCategoryId(null)
     setAlternativeQuestionPrompts([])
@@ -1548,39 +1547,14 @@ export function VoiceChatbot({
 
       {isOpen ? (
         <section className={embedded ? 'voice-chatbot-panel voice-chatbot-embedded' : 'voice-chatbot-panel'} aria-label="음성 챗봇">
-          {assistantMode === 'select' ? (
-            <>
-              <div className="voice-chatbot-header">
-                <div className="voice-chatbot-brand">
-                  <span className="voice-ai-avatar" aria-hidden="true">AI</span>
-                  <div>
-                    <h2>챗봇</h2>
-                    <p className="card-label">LG Able Band</p>
-                  </div>
-                </div>
-                <button type="button" className="voice-close-button" aria-label="챗봇 닫기" onClick={closeChatbot}>
-                  ×
-                </button>
-              </div>
-              <ChatbotFeatureSelect
-                onOpenSpeak={() => runChatbotButtonAction(() => setAssistantMode('speak'))}
-                onOpenTalk={() => runChatbotButtonAction(openChatbot)}
-              />
-            </>
-          ) : null}
-
-          {assistantMode === 'speak' ? (
-            <SpeakForMeScreen onBack={() => runChatbotButtonAction(returnToFeatureSelect)} />
-          ) : null}
-
           {assistantMode === 'talk' ? (
             <>
           <div className="voice-chatbot-header voice-talk-header">
             <button
               type="button"
               className="voice-close-button voice-talk-back"
-              aria-label="챗봇 선택으로 돌아가기"
-              onClick={() => runChatbotButtonAction(returnToFeatureSelect)}
+              aria-label="챗봇 닫기"
+              onClick={() => runChatbotButtonAction(closeChatbot)}
             >
               ‹
             </button>

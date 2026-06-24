@@ -6259,6 +6259,36 @@ h1 {
   line-height: 1.2;
 }
 
+.wearable-ai-category-voice-start {
+  display: grid;
+  justify-items: center;
+  width: 100%;
+  margin-top: clamp(8px, 2vh, 18px);
+}
+
+.wearable-ai-category-mic {
+  display: grid;
+  width: clamp(72px, 18vw, 92px);
+  height: clamp(72px, 18vw, 92px);
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  color: #fff;
+  background: #151a22;
+  box-shadow: 0 18px 34px rgba(21, 26, 34, 0.2);
+}
+
+.wearable-ai-category-mic .wearable-chat-svg-icon {
+  width: 34px;
+  height: 34px;
+  stroke-width: 2.4;
+}
+
+.wearable-ai-category-mic:focus-visible {
+  outline: 3px solid rgba(225, 29, 72, 0.32);
+  outline-offset: 4px;
+}
+
 .wearable-ai-question-list {
   gap: clamp(10px, 2vh, 16px);
 }

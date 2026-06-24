@@ -51,7 +51,6 @@ const VOICE_INTENT = {
   FIND_FRIDGE: 'FIND_FRIDGE',
   GUARDIAN_CONNECT: 'GUARDIAN_CONNECT',
   EMERGENCY_REQUEST: 'EMERGENCY_REQUEST',
-  SUBSTITUTE_SPEECH: 'SUBSTITUTE_SPEECH',
   WELFARE_INFO: 'WELFARE_INFO',
   WELFARE_ASSISTIVE_DEVICE: 'WELFARE_ASSISTIVE_DEVICE',
   SHARE_TO_GUARDIAN: 'SHARE_TO_GUARDIAN',
@@ -296,8 +295,8 @@ export function VoiceChatbot({
   statusMessage,
   uwbSession,
 }) {
-  const [isOpen, setIsOpen] = useState(false)
-  const [currentChatScreen, setCurrentChatScreen] = useState('start')
+  const [isOpen, setIsOpen] = useState(embedded)
+  const [currentChatScreen, setCurrentChatScreen] = useState('ask')
   const [selectedPhrase, setSelectedPhrase] = useState('')
   const [selectedPhraseIcon, setSelectedPhraseIcon] = useState('')
   const [selectedQuestion, setSelectedQuestion] = useState('alert')
@@ -457,7 +456,7 @@ export function VoiceChatbot({
     onOpenChange?.(true)
     stopWakeListening()
     setIsOpen(true)
-    setCurrentChatScreen('start')
+    setCurrentChatScreen('ask')
     setSelectedPhrase('')
     setSelectedPhraseIcon('')
     setSelectedQuestion('alert')
@@ -495,7 +494,7 @@ export function VoiceChatbot({
     setIsRequesting(false)
     setConversationState(CONVERSATION_STATE.IDLE)
     setVoiceStatus('챗봇을 종료했어요.')
-    setCurrentChatScreen('start')
+    setCurrentChatScreen('ask')
     setSelectedPhrase('')
     setSelectedPhraseIcon('')
     setSelectedQuestion('alert')
@@ -907,7 +906,7 @@ export function VoiceChatbot({
         return
       }
 
-      setCurrentChatScreen('start')
+      setCurrentChatScreen('ask')
       setVoiceStatus('마이크 권한을 확인해주세요.')
       microphoneReadyRef.current = false
       runAiTurn('마이크 권한을 확인해주세요.')
@@ -1097,9 +1096,6 @@ export function VoiceChatbot({
         notifyVibration('STRONG')
         pendingActionRef.current = { type: 'emergencySend' }
         return withNotificationFeedback({ text: '보호자에게 긴급 요청을 보낼게요. 정말 보낼까요?' })
-      case VOICE_INTENT.SUBSTITUTE_SPEECH:
-        pendingActionRef.current = { type: 'substituteSpeech' }
-        return { text: '전하고 싶은 말을 말씀해주세요. 제가 대신 전달할 문장으로 준비할게요.' }
       case VOICE_INTENT.WELFARE_INFO:
         return { text: '복지 정보를 안내할게요. 장애인 활동지원, 보조기기 지원, 긴급 돌봄, 보호자 연계 정보를 들을 수 있어요. 어떤 정보가 필요하신가요?' }
       case VOICE_INTENT.WELFARE_ASSISTIVE_DEVICE:
@@ -1441,7 +1437,7 @@ export function VoiceChatbot({
   function goBack() {
     stopChatbotSpeech()
 
-    if (currentChatScreen === 'start' || (embedded && !isOpen)) {
+    if (currentChatScreen === 'start' || currentChatScreen === 'ask' || (embedded && !isOpen)) {
       closeChatbot()
       return
     }
@@ -1449,7 +1445,6 @@ export function VoiceChatbot({
     const previousScreen = {
       speak: 'start',
       speakMore: 'speak',
-      speaking: 'speak',
       ask: 'start',
       recommendations: 'ask',
       aiCard: 'recommendations',
@@ -1844,7 +1839,6 @@ export function VoiceChatbot({
           {currentChatScreen === 'start' ? (
             <StartScreen
               onAsk={() => setCurrentChatScreen('ask')}
-              onSpeak={() => setCurrentChatScreen('speak')}
               onVoiceStart={startVoiceFromInitialScreen}
             />
           ) : null}
@@ -1852,27 +1846,9 @@ export function VoiceChatbot({
           {currentChatScreen === 'listening' ? <ListeningScreen status={voiceStatus} transcript={transcript} /> : null}
           {currentChatScreen === 'thinking' ? <ThinkingScreen transcript={transcript} /> : null}
 
-          {currentChatScreen === 'speak' ? (
-            <PhraseListScreen
-              title="대신 말하기"
-              onSelect={selectPhrase}
-              phrases={[...quickPhrases, ...morePhrases]}
-            />
+          {currentChatScreen === 'ask' ? (
+            <AiCategoryScreen onSelect={selectAiCategory} onVoiceStart={startVoiceFromInitialScreen} />
           ) : null}
-
-          {currentChatScreen === 'speaking' ? (
-            <SpeakingScreen
-              icon={selectedPhraseIcon}
-              phrase={selectedPhrase}
-              onBack={() => setCurrentChatScreen('speak')}
-              onReplay={() => {
-                speakText(selectedPhrase)
-                requestAppTTS(selectedPhrase)
-              }}
-            />
-          ) : null}
-
-          {currentChatScreen === 'ask' ? <AiCategoryScreen onSelect={selectAiCategory} /> : null}
 
           {currentChatScreen === 'recommendations' ? (
             <RecommendationScreen categoryId={selectedAiCategory} isRequesting={isRequesting} onSelect={selectRecommendedQuestion} />
@@ -1947,25 +1923,11 @@ export function VoiceChatbot({
   )
 }
 
-function StartScreen({ onAsk, onSpeak, onVoiceStart }) {
+function StartScreen({ onAsk, onVoiceStart }) {
   return (
     <div className="wearable-chat-content wearable-chat-start">
       <Header/>
       <div className="wearable-chat-menu">
-        <button
-          className="wearable-chat-choice wearable-chat-choice-primary"
-          type="button"
-          aria-label="대신말하기"
-          onClick={onSpeak}
-        >
-          <span className="wearable-chat-choice-icon" aria-hidden="true">
-            <SpeakerIcon />
-          </span>
-          <span>
-            <strong>대신말하기</strong>
-            <small>내 말을 대신 전해주세요</small>
-          </span>
-        </button>
         <button
           className="wearable-chat-choice wearable-chat-choice-secondary"
           type="button"
@@ -2115,7 +2077,7 @@ function SpeakingScreen({ icon, onBack, onReplay, phrase }) {
   )
 }
 
-function AiCategoryScreen({ onSelect }) {
+function AiCategoryScreen({ onSelect, onVoiceStart }) {
   return (
     <div className="wearable-chat-content wearable-ai-category-screen" role="region" aria-labelledby="wearable-ai-category-title">
       <Header title="AI에게 묻기" subtitle="어떤 정보를 알려드릴까요?" titleId="wearable-ai-category-title" />
@@ -2134,6 +2096,16 @@ function AiCategoryScreen({ onSelect }) {
             <strong>{category.label}</strong>
           </button>
         ))}
+      </div>
+      <div className="wearable-ai-category-voice-start">
+        <button
+          className="wearable-ai-category-mic"
+          type="button"
+          aria-label="음성 챗봇 시작"
+          onClick={onVoiceStart}
+        >
+          <MicIcon />
+        </button>
       </div>
     </div>
   )
@@ -2927,7 +2899,7 @@ function openInApp(payload) {
 }
 
 function sendPhraseToApp(phrase) {
-  console.log('앱으로 대신 말하기 문장 전달:', {
+  console.log('앱으로 문장 전달:', {
     type: 'speakForMe',
     text: phrase,
   })
@@ -3551,10 +3523,6 @@ function classifyVoiceIntent(text) {
     return VOICE_INTENT.EMERGENCY_REQUEST
   }
 
-  if (includesAny(normalizedText, ['대신말하기', '대신말해', '전하고싶은말', '말전달'])) {
-    return VOICE_INTENT.SUBSTITUTE_SPEECH
-  }
-
   if (includesAny(normalizedText, ['보호자에게전달', '보호자에게보내', '보호자한테전달', '보호자한테보내'])) {
     return VOICE_INTENT.SHARE_TO_GUARDIAN
   }
@@ -3607,7 +3575,6 @@ function getVoiceIntentDisplayTitle(intent) {
     [VOICE_INTENT.FIND_FRIDGE]: '냉장고 위치 안내',
     [VOICE_INTENT.GUARDIAN_CONNECT]: '보호자 연결',
     [VOICE_INTENT.EMERGENCY_REQUEST]: '긴급 요청',
-    [VOICE_INTENT.SUBSTITUTE_SPEECH]: '대신 말하기',
     [VOICE_INTENT.WELFARE_INFO]: '복지 정보',
     [VOICE_INTENT.WELFARE_ASSISTIVE_DEVICE]: '보조기기 지원',
     [VOICE_INTENT.SHARE_TO_GUARDIAN]: '보호자에게 전달',
@@ -3634,7 +3601,6 @@ function createIntentVoiceResponse(intent) {
     [VOICE_INTENT.FIND_FRIDGE]: '냉장고 위치 안내를 시작할게요.',
     [VOICE_INTENT.GUARDIAN_CONNECT]: '보호자에게 도움 요청을 보낼까요?',
     [VOICE_INTENT.EMERGENCY_REQUEST]: '긴급 도움 요청을 보낼까요?',
-    [VOICE_INTENT.SUBSTITUTE_SPEECH]: '전하고 싶은 말을 말씀해주세요.',
     [VOICE_INTENT.WELFARE_INFO]: '복지 정보를 안내할게요.',
     [VOICE_INTENT.WELFARE_ASSISTIVE_DEVICE]: '보조기기 지원 정보를 안내할게요.',
     [VOICE_INTENT.SHARE_TO_GUARDIAN]: '보호자에게 정보를 전달할게요.',
