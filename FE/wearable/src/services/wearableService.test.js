@@ -521,7 +521,7 @@ describe('wearableService', () => {
     await expect(service.startUwbSession(10)).rejects.toThrow('network down')
   })
 
-  it('keeps the stored access token when unpair fails so the user can retry', async () => {
+  it('clears the stored access token when unpair fails', async () => {
     localStorage.setItem('lg-able-band.wearableAccessToken', 'paired-api-token')
     const service = createWearableService({
       baseUrl: 'http://api.test',
@@ -532,7 +532,7 @@ describe('wearableService', () => {
     })
 
     await expect(service.unpairWearable(await getPairingSession())).rejects.toThrow('network down')
-    expect(localStorage.getItem('lg-able-band.wearableAccessToken')).toBe('paired-api-token')
+    expect(localStorage.getItem('lg-able-band.wearableAccessToken')).toBeNull()
   })
 
   it('sends final api confirm request body', async () => {

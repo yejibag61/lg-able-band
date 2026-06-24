@@ -6,6 +6,7 @@ export async function wearableApiRequest(path, options = {}) {
     body,
     fetchImpl = globalThis.fetch,
     method = body === undefined ? 'GET' : 'POST',
+    signal,
     token = getWearableAccessToken(),
   } = options
 
@@ -24,6 +25,7 @@ export async function wearableApiRequest(path, options = {}) {
   const response = await fetchImpl(`${trimTrailingSlash(baseUrl)}${path}`, {
     method,
     headers,
+    signal,
     body: body === undefined ? undefined : JSON.stringify(body),
   })
 

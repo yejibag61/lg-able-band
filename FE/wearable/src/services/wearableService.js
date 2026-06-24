@@ -66,26 +66,32 @@ export function createWearableService({
         return { status: 'UNPAIRED' }
       }
 
-      const unpaired = await withFallback({
-        apiEnabled: isPairingApiEnabled(),
-        fallbackEnabled: isExplicitDevelopmentFallbackEnabled(fallbackEnabled),
-        fallback: () => ({ pairingSessionId, status: 'UNPAIRED' }),
-        request: async () => {
-          const response = await request(pairingUnpairPath(pairingSession), {
-            method: 'POST',
-            body: {
-              deviceId: pairingSession?.deviceId,
-              nonce: pairingSession?.nonce,
-            },
-          })
-          return {
-            pairingSessionId,
-            status: response?.status || 'UNPAIRED',
-          }
-        },
-      })
-      clearWearableAccessToken()
-      return unpaired
+      const controller = new AbortController()
+      const timeoutId = globalThis.setTimeout(() => controller.abort(), 8000)
+      try {
+        return await withFallback({
+          apiEnabled: isPairingApiEnabled(),
+          fallbackEnabled: isExplicitDevelopmentFallbackEnabled(fallbackEnabled),
+          fallback: () => ({ pairingSessionId, status: 'UNPAIRED' }),
+          request: async () => {
+            const response = await request(pairingUnpairPath(pairingSession), {
+              method: 'POST',
+              signal: controller.signal,
+              body: {
+                deviceId: pairingSession?.deviceId,
+                nonce: pairingSession?.nonce,
+              },
+            })
+            return {
+              pairingSessionId,
+              status: response?.status || 'UNPAIRED',
+            }
+          },
+        })
+      } finally {
+        globalThis.clearTimeout(timeoutId)
+        clearWearableAccessToken()
+      }
     },
     async getCurrentAlert() {
       const alerts = await this.getCurrentAlerts()
