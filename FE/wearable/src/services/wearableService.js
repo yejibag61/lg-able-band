@@ -407,7 +407,7 @@ export function normalizeUwbSession(session) {
 }
 
 function normalizeApplianceDisplayName(name) {
-  if (name === '안전 전기레인지') {
+  if (name === '전기레인지') {
     return '전기레인지'
   }
 
@@ -676,7 +676,7 @@ function getMockUwbTargets() {
     normalizeUwbTarget({ deviceId: 10, name: '세탁기', type: 'WASHER', connectionStatus: 'CONNECTED' }),
     normalizeUwbTarget({ deviceId: 14, name: '냉장고', type: 'FRIDGE', connectionStatus: 'CONNECTED' }),
     normalizeUwbTarget({ deviceId: 11, name: 'TV', type: 'TV', connectionStatus: 'CONNECTED' }),
-    normalizeUwbTarget({ deviceId: 12, name: '안전 전기레인지', type: 'RANGE', connectionStatus: 'WARNING' }),
+    normalizeUwbTarget({ deviceId: 12, name: '전기레인지', type: 'RANGE', connectionStatus: 'WARNING' }),
     normalizeUwbTarget({ deviceId: 13, name: '도어센서', type: 'DOOR_SENSOR', connectionStatus: 'CONNECTED' }),
   ]
 }

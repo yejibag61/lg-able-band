@@ -12,9 +12,9 @@ import { getDevices } from '../services/deviceService'
 import { createEmergencyRequest } from '../services/emergencyService'
 import { isAlertFeedbackCandidate, runAlertsFeedback } from '../services/notificationFeedbackService'
 import {
-  createGuardian,
   deleteGuardian,
   getGuardians,
+  linkGuardianByEmail,
   updateGuardian,
 } from '../services/guardianService'
 import { AdminAlertBroadcastTab } from './AdminAlertBroadcastTab'
@@ -28,7 +28,6 @@ import {
 } from './VoiceChatbot'
 import { completeWearablePairing } from '../services/wearablePairingService'
 import {
-  getEmergencyAvailability,
   mergeAlertStatusIntoHomeSummary,
   updateAlertsWithStatus,
 } from '../utils/homeSummaryUtils'
@@ -566,20 +565,38 @@ export function HomeScreen({ session, onLogout }) {
     handleTabChange('alerts')
   }
 
-  async function handleEmergencyRequest(emergencyAvailability) {
-    if (emergencySubmitting) {
+  async function syncGuardianAccountLinks() {
+    const guardianEmails = linkedGuardians
+      .map((guardian) => guardian.name?.trim())
+      .filter((value) => isEmailAddress(value))
+
+    if (guardianEmails.length === 0) {
       return
     }
 
-    const availability = emergencyAvailability || getEmergencyAvailability(homeState.summary)
-    if (!availability.canRequest) {
-      setEmergencyMessage(availability.reason)
+    const results = await Promise.allSettled(
+      guardianEmails.map((email) =>
+        linkGuardianByEmail({ email, isPrimary: false, notifyOnDanger: true }),
+      ),
+    )
+
+    results.forEach((result) => {
+      if (result.status === 'fulfilled') {
+        const guardian = normalizeGuardianForView(result.value)
+        setLinkedGuardians((current) => upsertGuardian(current, guardian))
+      }
+    })
+  }
+
+  async function handleEmergencyRequest() {
+    if (emergencySubmitting) {
       return
     }
 
     setEmergencySubmitting(true)
     setEmergencyMessage('긴급 요청을 보내는 중입니다.')
     try {
+      await syncGuardianAccountLinks()
       const request = await createEmergencyRequest()
       setEmergencyMessage(request.statusMessage || '보호자에게 긴급 요청을 보냈습니다.')
       const nextHomeView = await loadHomeView()
@@ -730,7 +747,13 @@ export function HomeScreen({ session, onLogout }) {
   }
 
   async function handleCreateGuardian(form) {
-    const guardian = normalizeGuardianForView(await createGuardian(form))
+    const guardian = normalizeGuardianForView(
+      await linkGuardianByEmail({
+        email: form.name,
+        isPrimary: form.isPrimary,
+        notifyOnDanger: form.notifyOnDanger,
+      }),
+    )
     setLinkedGuardians((current) => upsertGuardian(current, guardian))
     return guardian
   }
@@ -1808,7 +1831,7 @@ function GuardianInviteScreen({ guardians, guardianListState, onBack, onCreateGu
         <label className="field">
           <span>보호자와의 관계</span>
           <input
-            type="tel"
+            type="text"
             value={form.phone}
             onChange={(event) => handleChange('phone', event.target.value)}
             placeholder=""
@@ -2270,6 +2293,10 @@ function createGuardianDraft(guardian) {
     isPrimary: Boolean(guardian.isPrimary),
     notifyOnDanger: Boolean(guardian.notifyOnDanger),
   }
+}
+
+function isEmailAddress(value) {
+  return typeof value === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
 }
 
 function upsertGuardian(currentGuardians, guardian) {

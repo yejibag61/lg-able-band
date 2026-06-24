@@ -17,7 +17,7 @@ export const mockAlerts = [
     title: '전기레인지 과열 주의',
     message: '주방에서 위험 신호가 감지되었습니다. 보호자에게도 전달됩니다.',
     voiceGuide: '전기레인지 과열 주의가 감지되었습니다. 전원을 확인하고 안전한 곳에서 대기하세요.',
-    deviceName: '안전 전기레인지',
+    deviceName: '전기레인지',
     locationName: '주방',
     occurredAt: '2026-06-10T14:42:00+09:00',
     status: 'UNREAD',

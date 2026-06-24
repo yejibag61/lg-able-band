@@ -70,16 +70,16 @@ public class EmergencyService {
 		}
 
 		PlatformTransactionManager transactionManager = this.transactionManagerProvider.getIfAvailable();
-		EmergencyRequestSummary summary;
+		CreatedEmergency created;
 		if (transactionManager == null) {
-			summary = createDbEmergency(jdbcTemplate, user.userId(), request, guardians);
+			created = createDbEmergency(jdbcTemplate, user.userId(), request, guardians);
 		}
 		else {
-			summary = new TransactionTemplate(transactionManager)
+			created = new TransactionTemplate(transactionManager)
 				.execute(status -> createDbEmergency(jdbcTemplate, user.userId(), request, guardians));
 		}
-		publishLiveEmergency(summary, null);
-		return summary;
+		publishLiveEmergency(created.summary(), created.alertId());
+		return created.summary();
 	}
 
 	public EmergencyRequestListResponse list(String authorization) {
@@ -150,7 +150,7 @@ public class EmergencyService {
 		return "RESOLVED".equals(status) || "CANCELED".equals(status);
 	}
 
-	private EmergencyRequestSummary createDbEmergency(
+	private CreatedEmergency createDbEmergency(
 		JdbcTemplate jdbcTemplate,
 		long userId,
 		EmergencyController.EmergencyRequestBody request,
@@ -162,7 +162,7 @@ public class EmergencyService {
 		for (GuardianTarget guardian : guardians) {
 			insertAlertDelivery(jdbcTemplate, alertId, guardian.guardianId(), now);
 		}
-		return new EmergencyRequestSummary(
+		EmergencyRequestSummary summary = new EmergencyRequestSummary(
 			emergencyId,
 			"SENT",
 			request.message(),
@@ -171,12 +171,13 @@ public class EmergencyService {
 			true,
 			guardianTargets(jdbcTemplate, userId, alertId)
 		);
+		return new CreatedEmergency(summary, alertId);
 	}
 
-	private void publishLiveEmergency(EmergencyRequestSummary summary, Long fallbackAlertId) {
+	private void publishLiveEmergency(EmergencyRequestSummary summary, Long alertId) {
 		this.guardianLiveAlertService.publishEmergency(
 			summary.guardianTargets(),
-			fallbackAlertId == null ? 0L : fallbackAlertId,
+			alertId == null ? 0L : alertId,
 			summary.emergencyRequestId(),
 			summary.message(),
 			summary.source(),
@@ -396,6 +397,9 @@ public class EmergencyService {
 	}
 
 	public record GuardianTarget(long guardianId, String name, String deliveryStatus) {
+	}
+
+	private record CreatedEmergency(EmergencyRequestSummary summary, long alertId) {
 	}
 
 	private record EmergencyRow(

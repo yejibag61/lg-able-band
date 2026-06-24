@@ -7,10 +7,10 @@ export const mockAppPreview = {
       title: '전기레인지 과열 주의',
       message: '주방에서 위험 신호가 감지되었습니다. 보호자에게도 전달됩니다.',
       voiceGuide: '전기레인지 과열 주의가 감지되었습니다. 전원을 확인하고 안전한 곳에서 대기하세요.',
-      deviceName: '안전 전기레인지',
+      deviceName: '전기레인지',
       device: {
         deviceId: 3,
-        name: '안전 전기레인지',
+        name: '전기레인지',
         type: 'RANGE',
       },
       locationName: '주방',
