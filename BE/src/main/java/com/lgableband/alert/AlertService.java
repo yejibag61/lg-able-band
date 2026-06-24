@@ -24,6 +24,14 @@ import org.springframework.transaction.support.TransactionTemplate;
 @Service
 public class AlertService {
 
+	private static final String EXCLUDE_EMERGENCY_REQUEST_ALERT_SQL = """
+		  AND NOT EXISTS (
+		    SELECT 1
+		    FROM emergency_request er
+		    WHERE er.alert_id = a.alert_id
+		  )
+		""";
+
 	private final ObjectProvider<JdbcTemplate> jdbcTemplateProvider;
 	private final ObjectProvider<PlatformTransactionManager> transactionManagerProvider;
 	private final MvpDataService dataService;
@@ -76,6 +84,7 @@ public class AlertService {
 			LEFT JOIN device d ON d.device_id = de.device_id
 			WHERE a.user_id = ?
 			""");
+		sql.append(EXCLUDE_EMERGENCY_REQUEST_ALERT_SQL);
 		List<Object> args = new ArrayList<>();
 		args.add(user.userId());
 
@@ -223,6 +232,7 @@ public class AlertService {
 				if (deliveryRows == 0) {
 					throw new ApiException(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND", "알림을 찾을 수 없습니다.");
 				}
+				resolveLinkedEmergencyRequests(jdbcTemplate, principal.userId(), alertId);
 				return new StatusResponse(alertId, AlertStatus.CONFIRMED, confirmedAt, null);
 			}
 

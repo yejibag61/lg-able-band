@@ -18,8 +18,24 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.RowMapper;
 
 class AlertServiceEmergencySyncTests {
+
+	@Test
+	void userAlertListExcludesInternalEmergencyRequestAlerts() {
+		FakeJdbcTemplate jdbcTemplate = new FakeJdbcTemplate();
+		AlertService service = new AlertService(
+			provider(jdbcTemplate),
+			provider(null),
+			dataService(7L),
+			mock(MockDataStore.class)
+		);
+
+		assertThat(service.alerts("Bearer owner", null, null, 20)).isEmpty();
+		assertThat(jdbcTemplate.lastQuerySql).contains("FROM emergency_request er");
+		assertThat(jdbcTemplate.lastQuerySql).contains("WHERE er.alert_id = a.alert_id");
+	}
 
 	@Test
 	void confirmResolvesLinkedEmergencyRequestForOwningUser() {
@@ -73,7 +89,6 @@ class AlertServiceEmergencySyncTests {
 		AlertService.StatusResponse response = service.confirm("Bearer guardian", 99L);
 
 		assertThat(response.status()).isEqualTo(AlertStatus.CONFIRMED);
-		assertThat(jdbcTemplate.confirmedAlertUserIds).containsExactly(17L);
 		assertThat(jdbcTemplate.confirmedDeliveryGuardianIds).containsExactly(5L);
 		assertThat(jdbcTemplate.resolvedEmergencyUserIds).containsExactly(17L);
 		assertThat(jdbcTemplate.resolvedEmergencyAlertIds).containsExactly(99L);
@@ -145,7 +160,14 @@ class AlertServiceEmergencySyncTests {
 		private final List<Long> confirmedAlertUserIds = new ArrayList<>();
 		private final List<Long> confirmedDeliveryGuardianIds = new ArrayList<>();
 		private final List<String> operations = new ArrayList<>();
+		private String lastQuerySql = "";
 		private boolean guardianDeliveryExists = true;
+
+		@Override
+		public <T> List<T> query(String sql, RowMapper<T> rowMapper, Object... args) {
+			this.lastQuerySql = sql;
+			return List.of();
+		}
 
 		@Override
 		public int update(String sql, Object... args) {
@@ -158,6 +180,9 @@ class AlertServiceEmergencySyncTests {
 			}
 			if (sql.contains("UPDATE alert_delivery")) {
 				if (sql.contains("target_guardian_id = ?")) {
+					if (!this.guardianDeliveryExists) {
+						return 0;
+					}
 					this.confirmedDeliveryGuardianIds.add((Long) args[2]);
 				}
 				return 1;

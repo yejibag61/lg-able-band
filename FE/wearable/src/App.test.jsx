@@ -377,6 +377,38 @@ describe('Wearable MVP', () => {
     })
   })
 
+  it('returns to a fresh QR even when the unpair API fails', async () => {
+    const refreshedSession = createPairingApiSession({
+      pairingSessionId: 'pairing-api-002',
+      deviceId: 'able-band-api-002',
+      pairingCode: 'ABLE-API-002',
+      nonce: 'nonce-api-002',
+      pairingPayload: 'lg-able-band://pair?pairingSessionId=pairing-api-002&nonce=nonce-api-002',
+    })
+    setupPairingApi({
+      createSessions: [pairingApiSession, refreshedSession],
+      statusesBySession: {
+        'pairing-api-001': ['PAIRED'],
+        'pairing-api-002': ['WAITING'],
+      },
+      unpairFailure: true,
+    })
+    render(<App />)
+
+    await screen.findByRole('heading', { name: '전기레인지 과열 주의' })
+    fireEvent.click(await screen.findByRole('button', { name: '연동 해제' }))
+
+    expect(await screen.findByText('연동 해제 응답을 확인하지 못했습니다. 새 QR로 다시 연동해주세요.')).toBeTruthy()
+    expect(localStorage.getItem('lg-able-band.wearableAccessToken')).toBeNull()
+    await waitFor(() => {
+      const regeneratedPayload = screen
+        .getByAltText('Able Band pairing QR code')
+        .getAttribute('data-pairing-payload')
+      expect(regeneratedPayload).toContain('pairing-api-002')
+      expect(regeneratedPayload).toContain('nonce-api-002')
+    })
+  })
+
   it('creates a fresh QR after an expired pairing session is reset', async () => {
     const refreshedSession = createPairingApiSession({
       pairingSessionId: 'pairing-api-002',
@@ -573,6 +605,7 @@ function setupPairingApi({
   emergencyErrorCode = '',
   statusDelayMs = 0,
   statusesBySession = {},
+  unpairFailure = false,
   uwbTargetFailure = false,
 } = {}) {
   const createQueue = [...createSessions]
@@ -611,6 +644,10 @@ function setupPairingApi({
       const pairingSessionId = decodeURIComponent(pairingSessionMatch[1])
       const session = sessions.get(pairingSessionId) || pairingApiSession
       if (endpoint.endsWith('/unpair') && method === 'POST') {
+        if (unpairFailure) {
+          return jsonResponse({ message: 'unpair failed' }, 500)
+        }
+
         return jsonResponse({ pairingSessionId, status: 'UNPAIRED' })
       }
 

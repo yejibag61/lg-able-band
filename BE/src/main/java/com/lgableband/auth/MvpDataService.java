@@ -36,6 +36,14 @@ import org.springframework.stereotype.Service;
 @Service
 public class MvpDataService {
 
+	private static final String EXCLUDE_EMERGENCY_REQUEST_ALERT_SQL = """
+		  AND NOT EXISTS (
+		    SELECT 1
+		    FROM emergency_request er
+		    WHERE er.alert_id = a.alert_id
+		  )
+		""";
+
 	private final ObjectProvider<JdbcTemplate> jdbcTemplateProvider;
 	private final MockDataStore mockDataStore;
 	private final Map<String, SessionPrincipal> dbSessions = new ConcurrentHashMap<>();
@@ -546,9 +554,10 @@ public class MvpDataService {
 			LEFT JOIN device_event de ON de.event_id = a.event_id
 			LEFT JOIN device d ON d.device_id = de.device_id
 			WHERE a.user_id = ?
+			%s
 			ORDER BY a.occurred_at DESC
 			LIMIT 3
-			""",
+			""".formatted(EXCLUDE_EMERGENCY_REQUEST_ALERT_SQL),
 			(rs, rowNum) -> new DbAlertSummary(
 				rs.getLong("alert_id"),
 				rs.getString("alert_type"),
@@ -573,9 +582,10 @@ public class MvpDataService {
 			LEFT JOIN device d ON d.device_id = de.device_id
 			WHERE a.user_id = ?
 			  AND a.status <> 'CONFIRMED'
+			%s
 			ORDER BY a.occurred_at DESC
 			LIMIT 100
-			""",
+			""".formatted(EXCLUDE_EMERGENCY_REQUEST_ALERT_SQL),
 			(rs, rowNum) -> new DbAlertSummary(
 				rs.getLong("alert_id"),
 				rs.getString("alert_type"),
