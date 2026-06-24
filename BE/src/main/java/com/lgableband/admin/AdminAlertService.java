@@ -1,4 +1,4 @@
-﻿package com.lgableband.admin;
+package com.lgableband.admin;
 
 import com.lgableband.common.AccessibilityType;
 import com.lgableband.auth.MvpDataService;
@@ -9,7 +9,6 @@ import com.lgableband.common.Severity;
 import com.lgableband.mock.MockDataStore;
 import java.sql.PreparedStatement;
 import java.sql.Statement;
-import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -40,255 +39,255 @@ public class AdminAlertService {
 	private static final List<AlertTemplate> ALERT_TEMPLATES = List.of(
 		template(
 			"washer-complete",
-			"?명긽湲?,
-			"?꾨즺 ?뚮┝",
+			"세탁기",
+			"완료 알림",
 			"WASHER",
-			"?명긽湲?,
+			"세탁기",
 			AlertType.LIFE,
 			Severity.LOW,
-			"?명긽 ?꾨즺 ?뚮┝",
-			"?명긽???꾨즺?섏뿀?듬땲?? ?명긽臾쇱쓣 爰쇰궡 二쇱꽭??",
-			"?명긽???꾨즺?섏뿀?듬땲?? ?명긽臾쇱쓣 爰쇰궡 二쇱꽭??",
-			"?명긽??,
-			"?명긽臾쇱쓣 爰쇰궡怨??꾩썝 ?곹깭瑜??뺤씤??二쇱꽭??"
+			"세탁 완료 알림",
+			"세탁이 완료되었습니다. 세탁물을 꺼내 주세요.",
+			"세탁이 완료되었습니다. 세탁물을 꺼내 주세요.",
+			"세탁실",
+			"세탁물을 꺼내고 전원 상태를 확인해 주세요."
 		),
 		template(
 			"washer-mode-change",
-			"?명긽湲?,
-			"?명긽 紐⑤뱶 蹂寃??덈궡",
+			"세탁기",
+			"세탁 모드 변경 안내",
 			"WASHER",
-			"?명긽湲?,
+			"세탁기",
 			AlertType.LIFE,
 			Severity.MEDIUM,
-			"?명긽 紐⑤뱶 蹂寃??덈궡",
-			"?명긽 紐⑤뱶媛 蹂寃쎈릺?덉뒿?덈떎. ?꾩옱 ?ㅼ젙???뺤씤??二쇱꽭??",
-			"?명긽 紐⑤뱶媛 蹂寃쎈릺?덉뒿?덈떎. ?꾩옱 ?ㅼ젙???뺤씤??二쇱꽭??",
-			"?명긽??,
-			"?명긽 肄붿뒪瑜??ㅼ떆 ?뺤씤?섍퀬 ?꾩슂??寃쎌슦 議곗젙??二쇱꽭??"
+			"세탁 모드 변경 안내",
+			"세탁 모드가 변경되었습니다. 현재 설정을 확인해 주세요.",
+			"세탁 모드가 변경되었습니다. 현재 설정을 확인해 주세요.",
+			"세탁실",
+			"세탁 코스를 다시 확인하고 필요하면 조정해 주세요."
 		),
 		template(
 			"washer-door-warning",
-			"?명긽湲?,
-			"?ㅻ쪟쨌臾??대┝ ?덈궡",
+			"세탁기",
+			"오류 및 문 열림 안내",
 			"WASHER",
-			"?명긽湲?,
+			"세탁기",
 			AlertType.LIFE,
 			Severity.MEDIUM,
-			"?명긽湲??ㅻ쪟 ?먮뒗 臾??대┝ ?덈궡",
-			"?명긽湲?臾몄씠 ?대젮 ?덇굅???숈옉 ?ㅻ쪟媛 媛먯??섏뿀?듬땲??",
-			"?명긽湲?臾몄씠 ?대젮 ?덇굅???숈옉 ?ㅻ쪟媛 媛먯??섏뿀?듬땲??",
-			"?명긽??,
-			"?명긽湲?臾몄씠 ?ロ? ?덈뒗吏 ?뺤씤?섍퀬 ?ㅻ쪟 ?곹깭瑜??먭???二쇱꽭??"
+			"세탁기 오류 또는 문 열림 안내",
+			"세탁기 문이 열려 있거나 동작 오류가 감지되었습니다.",
+			"세탁기 문이 열려 있거나 동작 오류가 감지되었습니다.",
+			"세탁실",
+			"세탁기 문이 닫혀 있는지 확인하고 오류 상태를 점검해 주세요."
 		),
 		template(
 			"air-sensor-co2",
-			"LG 怨듦린吏??쇱꽌",
-			"?댁궛?뷀깂???덈궡",
+			"LG 공기질 센서",
+			"이산화탄소 안내",
 			"AIR_SENSOR",
-			"LG 怨듦린吏??쇱꽌",
+			"LG 공기질 센서",
 			AlertType.LIFE,
 			Severity.MEDIUM,
-			"?댁궛?뷀깂???띾룄 ?덈궡",
-			"?댁궛?뷀깂???띾룄媛 ?믪뒿?덈떎. ?섍린媛 ?꾩슂?⑸땲??",
-			"?댁궛?뷀깂???띾룄媛 ?믪뒿?덈떎. ?섍린媛 ?꾩슂?⑸땲??",
-			"嫄곗떎",
-			"李쎈Ц???닿퀬 ?ㅻ궡 怨듦린瑜??섍린??二쇱꽭??"
+			"이산화탄소 농도 안내",
+			"이산화탄소 농도가 높습니다. 환기가 필요합니다.",
+			"이산화탄소 농도가 높습니다. 환기가 필요합니다.",
+			"거실",
+			"창문을 열고 실내 공기를 환기해 주세요."
 		),
 		template(
 			"air-sensor-temp-humidity",
-			"LG 怨듦린吏??쇱꽌",
-			"?⑤룄/?듬룄 ?덈궡",
+			"LG 공기질 센서",
+			"온도/습도 안내",
 			"AIR_SENSOR",
-			"LG 怨듦린吏??쇱꽌",
+			"LG 공기질 센서",
 			AlertType.LIFE,
 			Severity.MEDIUM,
-			"?⑤룄 諛??듬룄 ?덈궡",
-			"?ㅻ궡 ?⑤룄 ?먮뒗 ?듬룄媛 苡뚯쟻 踰붿쐞瑜?踰쀬뼱?ъ뒿?덈떎.",
-			"?ㅻ궡 ?⑤룄 ?먮뒗 ?듬룄媛 苡뚯쟻 踰붿쐞瑜?踰쀬뼱?ъ뒿?덈떎.",
-			"嫄곗떎",
-			"?먯뼱而? ?쒕갑 ?먮뒗 ?쒖뒿 湲곕뒫???뺤씤??二쇱꽭??"
+			"온도 및 습도 안내",
+			"실내 온도 또는 습도가 쾌적 범위를 벗어났습니다.",
+			"실내 온도 또는 습도가 쾌적 범위를 벗어났습니다.",
+			"거실",
+			"에어컨, 난방 또는 제습 기능을 확인해 주세요."
 		),
 		template(
 			"air-sensor-dust",
-			"LG 怨듦린吏??쇱꽌",
-			"誘몄꽭癒쇱? ?덈궡",
+			"LG 공기질 센서",
+			"미세먼지 안내",
 			"AIR_SENSOR",
-			"LG 怨듦린吏??쇱꽌",
+			"LG 공기질 센서",
 			AlertType.LIFE,
 			Severity.MEDIUM,
-			"誘몄꽭癒쇱? ?덈궡",
-			"?ㅻ궡 誘몄꽭癒쇱? ?띾룄媛 ?믪뒿?덈떎.",
-			"?ㅻ궡 誘몄꽭癒쇱? ?띾룄媛 ?믪뒿?덈떎.",
-			"嫄곗떎",
-			"怨듦린泥?젙湲곗? ?섍린 ?곹깭瑜??뺤씤??二쇱꽭??"
+			"미세먼지 안내",
+			"실내 미세먼지 농도가 높습니다.",
+			"실내 미세먼지 농도가 높습니다.",
+			"거실",
+			"공기청정기와 환기 상태를 확인해 주세요."
 		),
 		template(
 			"tv-power-status",
 			"TV",
-			"?꾩썝 ?곹깭 ?덈궡",
+			"전원 상태 안내",
 			"TV",
 			"TV",
 			AlertType.LIFE,
 			Severity.LOW,
-			"TV ?꾩썝 ?곹깭 ?덈궡",
-			"TV ?꾩썝 ?곹깭媛 蹂寃쎈릺?덉뒿?덈떎.",
-			"TV ?꾩썝 ?곹깭媛 蹂寃쎈릺?덉뒿?덈떎.",
-			"嫄곗떎",
-			"TV ?꾩썝 ?곹깭瑜??뺤씤??二쇱꽭??"
+			"TV 전원 상태 안내",
+			"TV 전원 상태가 변경되었습니다.",
+			"TV 전원 상태가 변경되었습니다.",
+			"거실",
+			"TV 전원 상태를 확인해 주세요."
 		),
 		template(
 			"tv-volume-channel",
 			"TV",
-			"蹂쇰ⅷ쨌梨꾨꼸 ?덈궡",
+			"볼륨 및 채널 안내",
 			"TV",
 			"TV",
 			AlertType.LIFE,
 			Severity.LOW,
-			"TV 蹂쇰ⅷ 諛?梨꾨꼸 ?덈궡",
-			"TV 蹂쇰ⅷ ?먮뒗 梨꾨꼸??蹂寃쎈릺?덉뒿?덈떎.",
-			"TV 蹂쇰ⅷ ?먮뒗 梨꾨꼸??蹂寃쎈릺?덉뒿?덈떎.",
-			"嫄곗떎",
-			"?꾩옱 梨꾨꼸怨?蹂쇰ⅷ???뺤씤??二쇱꽭??"
+			"TV 볼륨 및 채널 안내",
+			"TV 볼륨 또는 채널이 변경되었습니다.",
+			"TV 볼륨 또는 채널이 변경되었습니다.",
+			"거실",
+			"현재 채널과 볼륨을 확인해 주세요."
 		),
 		template(
 			"tv-remote-find",
 			"TV",
-			"由щえ而?李얘린",
+			"리모컨 찾기",
 			"TV",
 			"TV",
 			AlertType.LOCATION,
 			Severity.MEDIUM,
-			"TV 由щえ而?李얘린",
-			"由щえ而??꾩튂 ?덈궡瑜??쒖옉?⑸땲??",
-			"由щえ而??꾩튂 ?덈궡瑜??쒖옉?⑸땲??",
-			"嫄곗떎",
-			"二쇰? 吏꾨룞 ?먮뒗 ?꾩튂 ?덈궡???곕씪 由щえ而⑥쓣 李얠븘 二쇱꽭??"
+			"TV 리모컨 찾기",
+			"리모컨 위치 안내를 시작합니다.",
+			"리모컨 위치 안내를 시작합니다.",
+			"거실",
+			"진동 또는 위치 안내에 따라 리모컨을 찾아 주세요."
 		),
 		template(
 			"range-power-on",
-			"?꾧린?덉씤吏",
-			"?꾩썝 耳쒖쭚 ?덈궡",
+			"전기레인지",
+			"전원 켜짐 안내",
 			"RANGE",
-			"?덉쟾 ?꾧린?덉씤吏",
+			"안전 전기레인지",
 			AlertType.LIFE,
 			Severity.LOW,
-			"?꾧린?덉씤吏 ?꾩썝 耳쒖쭚 ?덈궡",
-			"?꾧린?덉씤吏 ?꾩썝??耳쒖졇 ?덉뒿?덈떎.",
-			"?꾧린?덉씤吏 ?꾩썝??耳쒖졇 ?덉뒿?덈떎.",
-			"二쇰갑",
-			"議곕━ 以묒씠 ?꾨땲?쇰㈃ ?꾩썝??爰?二쇱꽭??"
+			"전기레인지 전원 켜짐 안내",
+			"전기레인지 전원이 켜져 있습니다.",
+			"전기레인지 전원이 켜져 있습니다.",
+			"주방",
+			"조리 중이 아니라면 전원을 꺼 주세요."
 		),
 		template(
 			"range-cooking-complete",
-			"?꾧린?덉씤吏",
-			"議곕━ ?꾨즺 ?뚮┝",
+			"전기레인지",
+			"조리 완료 알림",
 			"RANGE",
-			"?덉쟾 ?꾧린?덉씤吏",
+			"안전 전기레인지",
 			AlertType.LIFE,
 			Severity.MEDIUM,
-			"議곕━ ?꾨즺 ?뚮┝",
-			"議곕━媛 ?꾨즺?섏뿀?듬땲??",
-			"議곕━媛 ?꾨즺?섏뿀?듬땲??",
-			"二쇰갑",
-			"議곕━ ?곹깭瑜??뺤씤?섍퀬 ?덉쟾?섍쾶 ?뺣━??二쇱꽭??"
+			"조리 완료 알림",
+			"조리가 완료되었습니다.",
+			"조리가 완료되었습니다.",
+			"주방",
+			"조리 상태를 확인하고 안전하게 정리해 주세요."
 		),
 		template(
 			"range-heat-warning",
-			"?꾧린?덉씤吏",
-			"?붿뿴쨌怨쇱뿴 寃쎄퀬",
+			"전기레인지",
+			"과열 경고",
 			"RANGE",
-			"?덉쟾 ?꾧린?덉씤吏",
+			"안전 전기레인지",
 			AlertType.EMERGENCY,
 			Severity.CRITICAL,
-			"?붿뿴 ?먮뒗 怨쇱뿴 寃쎄퀬",
-			"?꾧린?덉씤吏???붿뿴 ?먮뒗 怨쇱뿴 ?꾪뿕??媛먯??섏뿀?듬땲??",
-			"?꾧린?덉씤吏???붿뿴 ?먮뒗 怨쇱뿴 ?꾪뿕??媛먯??섏뿀?듬땲??",
-			"二쇰갑",
-			"湲곌린 二쇰???鍮꾩슦怨??꾩썝???뺤씤??二쇱꽭??"
+			"과열 경고",
+			"전기레인지에서 과열 위험이 감지되었습니다.",
+			"전기레인지에서 과열 위험이 감지되었습니다.",
+			"주방",
+			"기기 주변을 비우고 전원을 확인해 주세요."
 		),
 		template(
 			"door-open",
-			"?꾩뼱?쇱꽌",
-			"臾??대┝ ?뚮┝",
+			"도어 센서",
+			"문 열림 알림",
 			"DOOR_SENSOR",
-			"?꾩뼱?쇱꽌",
+			"도어 센서",
 			AlertType.LIFE,
 			Severity.MEDIUM,
-			"臾??대┝ ?뚮┝",
-			"臾몄씠 ?대졇?듬땲??",
-			"臾몄씠 ?대졇?듬땲??",
-			"?꾧?",
-			"臾몄씠 ?덉쟾?섍쾶 ?대━怨??ロ엳?붿? ?뺤씤??二쇱꽭??"
+			"문 열림 알림",
+			"문이 열렸습니다.",
+			"문이 열렸습니다.",
+			"현관",
+			"문이 안전하게 열리고 닫혔는지 확인해 주세요."
 		),
 		template(
 			"door-long-open",
-			"?꾩뼱?쇱꽌",
-			"?μ떆媛??대┝ 寃쎄퀬",
+			"도어 센서",
+			"장시간 열림 경고",
 			"DOOR_SENSOR",
-			"?꾩뼱?쇱꽌",
+			"도어 센서",
 			AlertType.LIFE,
 			Severity.MEDIUM,
-			"臾??μ떆媛??대┝ 寃쎄퀬",
-			"臾몄씠 ?ㅻ옯?숈븞 ?대젮 ?덉뒿?덈떎.",
-			"臾몄씠 ?ㅻ옯?숈븞 ?대젮 ?덉뒿?덈떎.",
-			"?꾧?",
-			"臾몄쓣 ?レ븘???섎뒗 ?곹솴?몄? ?뺤씤??二쇱꽭??"
+			"문 장시간 열림 경고",
+			"문이 오랫동안 열려 있습니다.",
+			"문이 오랫동안 열려 있습니다.",
+			"현관",
+			"문을 닫아야 하는 상황인지 확인해 주세요."
 		),
 		template(
 			"door-before-outing",
-			"?꾩뼱?쇱꽌",
-			"?몄텧쨌痍⑥묠 ???뺤씤",
+			"도어 센서",
+			"외출 및 취침 전 확인",
 			"DOOR_SENSOR",
-			"?꾩뼱?쇱꽌",
+			"도어 센서",
 			AlertType.LIFE,
 			Severity.MEDIUM,
-			"?몄텧 ?먮뒗 痍⑥묠 ??臾??뺤씤",
-			"?몄텧 ?먮뒗 痍⑥묠 ?꾩뿉 臾??좉툑 ?곹깭瑜??뺤씤??二쇱꽭??",
-			"?몄텧 ?먮뒗 痍⑥묠 ?꾩뿉 臾??좉툑 ?곹깭瑜??뺤씤??二쇱꽭??",
-			"?꾧?",
-			"臾??좉툑怨??ロ옒 ?곹깭瑜??뺤씤??二쇱꽭??"
+			"외출 또는 취침 전 문 확인",
+			"외출 또는 취침 전에 문 잠금 상태를 확인해 주세요.",
+			"외출 또는 취침 전에 문 잠금 상태를 확인해 주세요.",
+			"현관",
+			"문 잠금과 닫힘 상태를 확인해 주세요."
 		),
 		template(
 			"fridge-door-open",
-			"?됱옣怨?,
-			"臾??대┝ ?뚮┝",
+			"냉장고",
+			"문 열림 알림",
 			"REFRIGERATOR",
-			"?됱옣怨?,
+			"냉장고",
 			AlertType.LIFE,
 			Severity.MEDIUM,
-			"?됱옣怨?臾??대┝ ?뚮┝",
-			"?됱옣怨?臾몄씠 ?대젮 ?덉뒿?덈떎.",
-			"?됱옣怨?臾몄씠 ?대젮 ?덉뒿?덈떎.",
-			"二쇰갑",
-			"?됱옣怨?臾몄씠 ?ロ삍?붿? ?뺤씤??二쇱꽭??"
+			"냉장고 문 열림 알림",
+			"냉장고 문이 열려 있습니다.",
+			"냉장고 문이 열려 있습니다.",
+			"주방",
+			"냉장고 문이 닫혔는지 확인해 주세요."
 		),
 		template(
 			"fridge-temperature-warning",
-			"?됱옣怨?,
-			"?⑤룄 ?댁긽 ?덈궡",
+			"냉장고",
+			"온도 이상 안내",
 			"REFRIGERATOR",
-			"?됱옣怨?,
+			"냉장고",
 			AlertType.LIFE,
 			Severity.MEDIUM,
-			"?됱옣怨??⑤룄 ?댁긽 ?덈궡",
-			"?됱옣怨??대? ?⑤룄???댁긽???덉뒿?덈떎.",
-			"?됱옣怨??대? ?⑤룄???댁긽???덉뒿?덈떎.",
-			"二쇰갑",
-			"?됱옣怨?臾멸낵 ?꾩썝 ?곹깭瑜??뺤씤??二쇱꽭??"
+			"냉장고 온도 이상 안내",
+			"냉장고 내부 온도에 이상이 있습니다.",
+			"냉장고 내부 온도에 이상이 있습니다.",
+			"주방",
+			"냉장고 문과 전원 상태를 확인해 주세요."
 		),
 		template(
 			"fridge-food-find",
-			"?됱옣怨?,
-			"?앹옱猷?李얘린",
+			"냉장고",
+			"식재료 찾기",
 			"REFRIGERATOR",
-			"?됱옣怨?,
+			"냉장고",
 			AlertType.LOCATION,
 			Severity.LOW,
-			"?됱옣怨??앹옱猷?李얘린",
-			"?됱옣怨????앹옱猷??꾩튂 ?덈궡瑜??쒖옉?⑸땲??",
-			"?됱옣怨????앹옱猷??꾩튂 ?덈궡瑜??쒖옉?⑸땲??",
-			"二쇰갑",
-			"?됱옣怨??덉そ 移몄쓣 李⑤??濡??뺤씤??二쇱꽭??"
+			"냉장고 식재료 찾기",
+			"냉장고 안의 식재료 위치 안내를 시작합니다.",
+			"냉장고 안의 식재료 위치 안내를 시작합니다.",
+			"주방",
+			"냉장고 안쪽 칸을 차례대로 확인해 주세요."
 		)
 	);
 
@@ -331,13 +330,23 @@ public class AdminAlertService {
 		JdbcTemplate jdbcTemplate = jdbcTemplateProvider.getIfAvailable();
 
 		if (jdbcTemplate == null) {
+			List<AlertRecipient> recipients = mockDataStore.userIds().stream()
+				.map(userId -> {
+					MockDataStore.UserProfile user = mockDataStore.user(userId);
+					MockDataStore.Account account = mockDataStore.accountById(user.accountId());
+					return new AlertRecipient(userId, account.email(), user.accessibilityType());
+				})
+				.filter(recipient -> matchesAudience(recipient.accessibilityType(), targetAudience))
+				.sorted((left, right) -> left.email().compareToIgnoreCase(right.email()))
+				.toList();
+
 			int dispatchedCount = 0;
-			for (Long userId : mockDataStore.userIds()) {
-				if (!matchesAudience(mockDataStore.user(userId).accessibilityType(), targetAudience)) {
+			for (AlertRecipient recipient : recipients) {
+				if (!matchesAudience(recipient.accessibilityType(), targetAudience)) {
 					continue;
 				}
 				mockDataStore.addContextAlert(
-					userId,
+					recipient.userId(),
 					template.alertType(),
 					template.severity(),
 					template.title(),
@@ -348,29 +357,68 @@ public class AdminAlertService {
 				);
 				dispatchedCount += 1;
 			}
-			return new BroadcastResponse(template.templateId(), template.title(), targetAudience, dispatchedCount, occurredAt);
+			return new BroadcastResponse(
+				template.templateId(),
+				template.title(),
+				targetAudience,
+				dispatchedCount,
+				recipients.stream().map(AlertRecipient::email).toList(),
+				occurredAt
+			);
 		}
 
-		List<Long> userIds = targetAudience == BroadcastAudience.ALL
+		List<AlertRecipient> recipients = targetAudience == BroadcastAudience.ALL
 			? jdbcTemplate.query(
-				"SELECT user_id FROM app_user ORDER BY user_id ASC",
-				(rs, rowNum) -> rs.getLong("user_id")
+				"""
+				SELECT u.user_id, a.email, u.accessibility_type
+				FROM account a
+				JOIN app_user u ON u.account_id = a.account_id
+				WHERE a.role = 'USER'
+				  AND a.email IS NOT NULL
+				  AND TRIM(a.email) <> ''
+				ORDER BY LOWER(a.email) ASC, u.user_id ASC
+				""",
+				(rs, rowNum) -> new AlertRecipient(
+					rs.getLong("user_id"),
+					rs.getString("email"),
+					AccessibilityType.valueOf(rs.getString("accessibility_type"))
+				)
 			)
 			: jdbcTemplate.query(
-				"SELECT user_id FROM app_user WHERE accessibility_type = ? ORDER BY user_id ASC",
-				(rs, rowNum) -> rs.getLong("user_id"),
+				"""
+				SELECT u.user_id, a.email, u.accessibility_type
+				FROM account a
+				JOIN app_user u ON u.account_id = a.account_id
+				WHERE a.role = 'USER'
+				  AND a.email IS NOT NULL
+				  AND TRIM(a.email) <> ''
+				  AND u.accessibility_type = ?
+				ORDER BY LOWER(a.email) ASC, u.user_id ASC
+				""",
+				(rs, rowNum) -> new AlertRecipient(
+					rs.getLong("user_id"),
+					rs.getString("email"),
+					AccessibilityType.valueOf(rs.getString("accessibility_type"))
+				),
 				targetAudience.accessibilityType().name()
 			);
 
 		int dispatchedCount = 0;
-		for (Long userId : userIds) {
-			long deviceId = resolveOrCreateDevice(jdbcTemplate, userId, template);
+		for (AlertRecipient recipient : recipients) {
+			long deviceId = resolveOrCreateDevice(jdbcTemplate, recipient.userId(), template);
 			long eventId = insertDeviceEvent(jdbcTemplate, deviceId, template, occurredAt);
-			insertAlert(jdbcTemplate, userId, eventId, template, occurredAt);
+			insertAlert(jdbcTemplate, recipient.userId(), eventId, template, occurredAt);
 			dispatchedCount += 1;
 		}
 
-		return new BroadcastResponse(template.templateId(), template.title(), targetAudience, dispatchedCount, occurredAt);
+		return new BroadcastResponse(
+			template.templateId(),
+			template.title(),
+			targetAudience,
+			dispatchedCount,
+			recipients.stream().map(AlertRecipient::email).toList(),
+			occurredAt
+		);
 	}
 
 	public SimulatorEventResponse dispatchSimulatorEvent(
@@ -687,6 +735,7 @@ public class AdminAlertService {
 		String title,
 		BroadcastAudience audience,
 		int dispatchedUserCount,
+		List<String> dispatchedEmails,
 		OffsetDateTime occurredAt
 	) {
 	}
@@ -733,6 +782,9 @@ public class AdminAlertService {
 	) {
 	}
 
+	private record AlertRecipient(long userId, String email, AccessibilityType accessibilityType) {
+	}
+
 	private record SimulatorEventTemplate(
 		String applianceType,
 		String eventType,
@@ -758,7 +810,7 @@ public class AdminAlertService {
 				case "WASHING_MACHINE" -> new SimulatorEventTemplate(
 					normalizedAppliance,
 					normalizedEvent,
-					"?명긽湲?,
+					"세탁기",
 					DeviceType.WASHER,
 					normalizedEvent.contains("ERROR") || normalizedEvent.contains("DOOR")
 						? AlertType.LIFE
@@ -769,13 +821,13 @@ public class AdminAlertService {
 					title,
 					message,
 					message,
-					"?명긽??,
-					"?명긽湲??곹깭瑜??뺤씤?댁＜?몄슂."
+					"세탁실",
+					"세탁기 상태를 확인해 주세요."
 				);
 				case "AIR_QUALITY_SENSOR" -> new SimulatorEventTemplate(
 					normalizedAppliance,
 					normalizedEvent,
-					"LG 怨듦린吏??쇱꽌",
+					"LG 공기질 센서",
 					DeviceType.AIR_SENSOR,
 					AlertType.LIFE,
 					normalizedEvent.contains("FINE_DUST") || normalizedEvent.contains("HIGH_CO2")
@@ -784,8 +836,8 @@ public class AdminAlertService {
 					title,
 					message,
 					message,
-					"嫄곗떎",
-					"?ㅻ궡 ?섍린 ?곹깭瑜??뺤씤?댁＜?몄슂."
+					"거실",
+					"실내 공기 상태를 확인해 주세요."
 				);
 				case "TV" -> new SimulatorEventTemplate(
 					normalizedAppliance,
@@ -799,13 +851,13 @@ public class AdminAlertService {
 					title,
 					message,
 					message,
-					"嫄곗떎",
-					"TV ?곹깭瑜??뺤씤?댁＜?몄슂."
+					"거실",
+					"TV 상태를 확인해 주세요."
 				);
 				case "ELECTRIC_RANGE" -> new SimulatorEventTemplate(
 					normalizedAppliance,
 					normalizedEvent,
-					"?꾧린?덉씤吏",
+					"전기레인지",
 					DeviceType.RANGE,
 					isEmergencySimulatorEvent(normalizedEvent)
 						|| normalizedEvent.contains("OVERHEAT")
@@ -820,13 +872,13 @@ public class AdminAlertService {
 					title,
 					message,
 					message,
-					"二쇰갑",
-					"?꾧린?덉씤吏 ???곹깭瑜??뺤씤?댁＜?몄슂."
+					"주방",
+					"전기레인지 상태를 확인해 주세요."
 				);
 				case "DOOR_SENSOR" -> new SimulatorEventTemplate(
 					normalizedAppliance,
 					normalizedEvent,
-					"?꾩뼱 ?쇱꽌",
+					"도어 센서",
 					DeviceType.DOOR_SENSOR,
 					normalizedEvent.contains("LEFT_OPEN") || normalizedEvent.contains("CHECK_DOOR")
 						? AlertType.LIFE
@@ -837,13 +889,13 @@ public class AdminAlertService {
 					title,
 					message,
 					message,
-					"?꾧?",
-					"臾??곹깭瑜??뺤씤?댁＜?몄슂."
+					"현관",
+					"문 상태를 확인해 주세요."
 				);
 				case "REFRIGERATOR" -> new SimulatorEventTemplate(
 					normalizedAppliance,
 					normalizedEvent,
-					"?됱옣怨?,
+					"냉장고",
 					DeviceType.REFRIGERATOR,
 					normalizedEvent.contains("FIND_ITEM") ? AlertType.LOCATION
 						: normalizedEvent.contains("TEMPERATURE") ? AlertType.LIFE
@@ -852,10 +904,10 @@ public class AdminAlertService {
 					title,
 					message,
 					message,
-					"二쇰갑",
-					"?됱옣怨??곹깭瑜??뺤씤?댁＜?몄슂."
+					"주방",
+					"냉장고 상태를 확인해 주세요."
 				);
-				default -> throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_APPLIANCE_TYPE", "吏?먰븯吏 ?딅뒗 媛??醫낅쪟?낅땲??");
+				default -> throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_APPLIANCE_TYPE", "지원하지 않는 가전 종류입니다.");
 			};
 		}
 
@@ -871,7 +923,7 @@ public class AdminAlertService {
 		private AlertTemplate toAlertTemplate() {
 			return new AlertTemplate(
 				"simulator-" + this.applianceType + "-" + this.eventType,
-				"?쒕??덉씠??,
+				"시뮬레이터",
 				this.eventType,
 				this.deviceName,
 				this.deviceType,

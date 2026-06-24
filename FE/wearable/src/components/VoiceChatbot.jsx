@@ -15,7 +15,7 @@ import { requestVoiceChat } from '../services/voiceChatbotService'
 import { handleStructuredVoiceCommand } from '../../../app/src/services/voiceIntentEngine'
 
 const CHATBOT_INTRO =
-  'AI 챗봇 실행 완료. 현재 알림 가전 상태 위치 안내 보호자 연결을 도와드려요. 삐 소리 뒤에 기능을 말해주세요.'
+  'AI 챗봇. 무엇을 도와드릴까요? 현재 알림, 가전 상태, 위치 안내, 보호자 연결. 알림을 들은 뒤 원하는 기능을 말씀해주세요.'
 const TURN_CUE_AUDIO_SRC = '/chatbot-turn-cue.mp3'
 const TURN_BEEP_DURATION_MS = 180
 const TURN_BEEP_FREQUENCY_HZ = 880
@@ -65,6 +65,13 @@ const VOICE_INTENT = {
   UNKNOWN: 'UNKNOWN',
 }
 const WAKE_WORDS = [
+  '챗봇 켜줘',
+  '챗봇켜줘',
+  '챗봇 켜 주세요',
+  '챗봇 켜주세요',
+  '챗봇 열어줘',
+  '챗봇 열어 주세요',
+  '챗봇 열어주세요',
   '챗봇켜줘',
   '챗봇켜죠',
   '챗봇켜주',
@@ -318,10 +325,12 @@ export function VoiceChatbot({
   const wakeRestartTimerRef = useRef(null)
   const wakeSilenceTimerRef = useRef(null)
   const wakeStartGuardTimerRef = useRef(null)
+  const wakeStoppedRef = useRef(false)
   const userSilenceTimerRef = useRef(null)
   const waitingUserTimerRef = useRef(null)
   const recognitionWatchdogTimerRef = useRef(null)
   const isOpenRef = useRef(false)
+  const currentChatScreenRef = useRef('ask')
   const autoListenRef = useRef(false)
   const latestTranscriptRef = useRef('')
   const wakeTranscriptRef = useRef('')
@@ -335,6 +344,7 @@ export function VoiceChatbot({
   const uwbPollingTimerRef = useRef(null)
   const lastUwbGuideZoneRef = useRef('')
   const microphoneReadyRef = useRef(false)
+  const voiceIntroSessionRef = useRef(0)
 
   const answers = useMemo(
     () => createAnswers({ alert, alertQueue, isPaired, mode, statusMessage, uwbSession }),
@@ -361,6 +371,10 @@ export function VoiceChatbot({
   }, [isOpen, onOpenChange])
 
   useEffect(() => {
+    currentChatScreenRef.current = currentChatScreen
+  }, [currentChatScreen])
+
+  useEffect(() => {
     chatbotSpeakingChangeHandler = onSpeakingChange || null
     return () => {
       if (chatbotSpeakingChangeHandler === onSpeakingChange) {
@@ -370,14 +384,16 @@ export function VoiceChatbot({
   }, [onSpeakingChange])
 
   useEffect(() => {
-    if (!supportsSpeechRecognition || isOpen) {
+    const shouldListenForWake = supportsSpeechRecognition && (!isOpen || currentChatScreen === 'ask')
+
+    if (!shouldListenForWake) {
       stopWakeListening()
       return undefined
     }
 
     startWakeListening()
     const wakeHealthCheckTimer = window.setInterval(() => {
-      if (!isOpenRef.current && !wakeRecognitionRef.current) {
+      if ((!isOpenRef.current || currentChatScreen === 'ask') && !wakeRecognitionRef.current) {
         startWakeListening()
       }
     }, WAKE_HEALTH_CHECK_INTERVAL_MS)
@@ -386,9 +402,9 @@ export function VoiceChatbot({
       window.clearInterval(wakeHealthCheckTimer)
       stopWakeListening()
     }
-    // Wake listening is intentionally tied only to support/open state.
+    // Wake listening is intentionally tied only to support/open/category state.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, supportsSpeechRecognition])
+  }, [currentChatScreen, isOpen, supportsSpeechRecognition])
 
   useEffect(
     () => () => {
@@ -439,7 +455,7 @@ export function VoiceChatbot({
       return
     }
 
-    if (isOpenRef.current && autoListen && introConversationStartedRef.current) {
+    if (isOpenRef.current && autoListen && introConversationStartedRef.current && currentChatScreenRef.current !== 'ask') {
       return
     }
 
@@ -450,13 +466,14 @@ export function VoiceChatbot({
     userSpeechHandledRef.current = false
     idlePromptGivenRef.current = false
     microphoneReadyRef.current = false
+    voiceIntroSessionRef.current += 1
     clearConversationTimers()
     setConversationState(fromWake ? CONVERSATION_STATE.WAKE_DETECTED : CONVERSATION_STATE.IDLE)
     setChatbotAudioLock(true)
     onOpenChange?.(true)
     stopWakeListening()
     setIsOpen(true)
-    setCurrentChatScreen('ask')
+    setCurrentChatScreen(fromWake ? 'voiceAnswer' : 'ask')
     setSelectedPhrase('')
     setSelectedPhraseIcon('')
     setSelectedQuestion('alert')
@@ -482,6 +499,7 @@ export function VoiceChatbot({
     userSpeechHandledRef.current = false
     idlePromptGivenRef.current = false
     microphoneReadyRef.current = false
+    voiceIntroSessionRef.current += 1
     clearConversationTimers()
     stopUwbPolling()
     stopRecognition()
@@ -525,10 +543,10 @@ export function VoiceChatbot({
       return
     }
 
+    const introSession = voiceIntroSessionRef.current
     introConversationStartedRef.current = true
 
-    await playTurnBeep()
-    if (!isOpenRef.current) {
+    if (!isOpenRef.current || voiceIntroSessionRef.current !== introSession) {
       return
     }
 
@@ -759,7 +777,7 @@ export function VoiceChatbot({
     if (!SpeechRecognition) {
       const message = '이 브라우저는 마이크 인식을 지원하지 않아요.'
       setVoiceStatus(message)
-      runAiTurn(message)
+      runAiTurn(message, { listenAfter: false })
       return
     }
 
@@ -909,7 +927,7 @@ export function VoiceChatbot({
       setCurrentChatScreen('ask')
       setVoiceStatus('마이크 권한을 확인해주세요.')
       microphoneReadyRef.current = false
-      runAiTurn('마이크 권한을 확인해주세요.')
+      runAiTurn('마이크 권한을 확인해주세요.', { listenAfter: false })
     }
 
     recognition.onend = () => {
@@ -1392,7 +1410,7 @@ export function VoiceChatbot({
 
   function runAiTurn(
     text,
-    { closeAfter = false, notificationFeedback = false, voiceEnabled = true } = {},
+    { closeAfter = false, listenAfter = true, notificationFeedback = false, voiceEnabled = true } = {},
   ) {
     stopRecognition()
     clearConversationTimers()
@@ -1421,7 +1439,7 @@ export function VoiceChatbot({
         return
       }
 
-      if (isOpenRef.current) {
+      if (listenAfter && isOpenRef.current) {
         void beginUserListeningTurn()
       }
     }
@@ -1437,30 +1455,50 @@ export function VoiceChatbot({
   function goBack() {
     stopChatbotSpeech()
 
-    if (currentChatScreen === 'start' || currentChatScreen === 'ask' || (embedded && !isOpen)) {
+    if (currentChatScreen === 'voiceAnswer' || currentChatScreen === 'listening' || currentChatScreen === 'thinking') {
+      voiceIntroSessionRef.current += 1
+      autoListenRef.current = false
+      introConversationStartedRef.current = false
+      clearConversationTimers()
+      stopRecognition()
+      setConversationState(CONVERSATION_STATE.IDLE)
+      setTranscript('')
+      setCurrentChatScreen('ask')
+      return
+    }
+
+    if (currentChatScreen === 'ask' || (embedded && !isOpen)) {
       closeChatbot()
       return
     }
 
     const previousScreen = {
-      speak: 'start',
-      speakMore: 'speak',
-      ask: 'start',
+      speak: 'ask',
+      speakMore: 'ask',
+      ask: 'ask',
       recommendations: 'ask',
       aiCard: 'recommendations',
       welfareSelect: 'ask',
       welfareMore: 'welfareSelect',
       answer: 'ask',
-      listening: 'start',
-      thinking: 'start',
-      voiceAnswer: 'start',
+      listening: 'ask',
+      thinking: 'ask',
+      voiceAnswer: 'ask',
     }[currentChatScreen]
 
     setCurrentChatScreen(
       currentChatScreen === 'answer' && selectedQuestion === 'welfare'
         ? 'welfareSelect'
-        : previousScreen || 'start',
+        : previousScreen || 'ask',
     )
+  }
+
+  function shouldKeepWakeListening() {
+    return !isOpenRef.current || currentChatScreenRef.current === 'ask'
+  }
+
+  function isActiveWakeRecognition(recognition) {
+    return wakeRecognitionRef.current === recognition
   }
 
   function startWakeListening() {
@@ -1472,7 +1510,7 @@ export function VoiceChatbot({
       location: globalThis.location?.href,
       isSecureContext: globalThis.isSecureContext,
     })
-    if (!SpeechRecognition || isOpenRef.current || wakeRecognitionRef.current) {
+    if (!SpeechRecognition || !shouldKeepWakeListening() || wakeRecognitionRef.current) {
       return
     }
 
@@ -1481,6 +1519,7 @@ export function VoiceChatbot({
     }
 
     activeWakeOwnerId = instanceIdRef.current
+    wakeStoppedRef.current = false
     setChatbotAudioLock(false)
     const recognition = new SpeechRecognition()
     recognition.lang = 'ko-KR'
@@ -1491,6 +1530,9 @@ export function VoiceChatbot({
     wakeRecognitionRef.current = recognition
 
     recognition.onstart = () => {
+      if (!isActiveWakeRecognition(recognition)) {
+        return
+      }
       window.clearTimeout(wakeStartGuardTimerRef.current)
       console.log('[WearableVoice][wake] recognition onstart')
       onWakeListeningChange?.(true)
@@ -1501,6 +1543,9 @@ export function VoiceChatbot({
     }
 
     recognition.onresult = (event) => {
+      if (!isActiveWakeRecognition(recognition)) {
+        return
+      }
       scheduleWakeWatchdog()
       const heardCandidates = Array.from(event.results)
         .flatMap((result) => getRecognitionAlternatives(result))
@@ -1530,11 +1575,14 @@ export function VoiceChatbot({
     }
 
     recognition.onerror = async (event) => {
+      if (!isActiveWakeRecognition(recognition)) {
+        return
+      }
       window.clearTimeout(wakeStartGuardTimerRef.current)
       window.clearTimeout(wakeSilenceTimerRef.current)
       if (event?.error === 'aborted') {
         wakeRecognitionRef.current = null
-        if (!isOpenRef.current && !wakeMatchedRef.current) {
+        if (!wakeStoppedRef.current && shouldKeepWakeListening() && !wakeMatchedRef.current) {
           scheduleWakeRestart(WAKE_BLOCKED_RESTART_DELAY_MS)
         }
         return
@@ -1567,6 +1615,9 @@ export function VoiceChatbot({
     }
 
     recognition.onend = () => {
+      if (!isActiveWakeRecognition(recognition)) {
+        return
+      }
       window.clearTimeout(wakeStartGuardTimerRef.current)
       window.clearTimeout(wakeSilenceTimerRef.current)
       console.log('[WearableVoice][wake] recognition onend', {
@@ -1579,10 +1630,15 @@ export function VoiceChatbot({
         finishWakeSpeech()
         return
       }
-      scheduleWakeRestart(WAKE_BLOCKED_RESTART_DELAY_MS)
+      if (!wakeStoppedRef.current) {
+        scheduleWakeRestart(WAKE_BLOCKED_RESTART_DELAY_MS)
+      }
     }
 
     recognition.onnomatch = () => {
+      if (!isActiveWakeRecognition(recognition)) {
+        return
+      }
       console.log('[WearableVoice][wake] recognition onnomatch')
       wakeTranscriptRef.current = ''
     }
@@ -1603,7 +1659,7 @@ export function VoiceChatbot({
 
   function scheduleWakeRestart(delayMs = WAKE_RESTART_DELAY_MS) {
     window.clearTimeout(wakeRestartTimerRef.current)
-    if (isOpenRef.current) {
+    if (!shouldKeepWakeListening()) {
       return
     }
     setChatbotAudioLock(false)
@@ -1612,12 +1668,12 @@ export function VoiceChatbot({
 
   function scheduleWakeWatchdog() {
     window.clearTimeout(wakeSilenceTimerRef.current)
-    if (isOpenRef.current || !wakeRecognitionRef.current) {
+    if (!shouldKeepWakeListening() || !wakeRecognitionRef.current) {
       return
     }
 
     wakeSilenceTimerRef.current = window.setTimeout(() => {
-      if (isOpenRef.current || !wakeRecognitionRef.current) {
+      if (!shouldKeepWakeListening() || !wakeRecognitionRef.current) {
         return
       }
 
@@ -1637,7 +1693,7 @@ export function VoiceChatbot({
   function scheduleWakeStartGuard(recognition) {
     window.clearTimeout(wakeStartGuardTimerRef.current)
     wakeStartGuardTimerRef.current = window.setTimeout(() => {
-      if (isOpenRef.current || wakeRecognitionRef.current !== recognition) {
+      if (!shouldKeepWakeListening() || wakeRecognitionRef.current !== recognition) {
         return
       }
 
@@ -1656,6 +1712,7 @@ export function VoiceChatbot({
   }
 
   function stopWakeListening() {
+    wakeStoppedRef.current = true
     window.clearTimeout(wakeRestartTimerRef.current)
     window.clearTimeout(wakeSilenceTimerRef.current)
     window.clearTimeout(wakeStartGuardTimerRef.current)
@@ -1673,7 +1730,7 @@ export function VoiceChatbot({
 
   function finishWakeSpeech() {
     window.clearTimeout(wakeSilenceTimerRef.current)
-    if (!wakeMatchedRef.current || isOpenRef.current) {
+    if (!wakeMatchedRef.current || (isOpenRef.current && currentChatScreenRef.current !== 'ask')) {
       return
     }
 
@@ -1722,11 +1779,10 @@ export function VoiceChatbot({
     setConversationState(CONVERSATION_STATE.AI_SPEECH_ENDED)
     setVoiceStatus('삐 소리 후 말씀해주세요.')
     setTranscript('')
-    await playTurnBeep()
-    await delay(POST_CUE_LISTEN_DELAY_MS)
     if (!isOpenRef.current) {
       return
     }
+    void playTurnBeep()
     startVoiceTurn()
   }
 
@@ -1836,13 +1892,6 @@ export function VoiceChatbot({
             </button>
           ) : null}
 
-          {currentChatScreen === 'start' ? (
-            <StartScreen
-              onAsk={() => setCurrentChatScreen('ask')}
-              onVoiceStart={startVoiceFromInitialScreen}
-            />
-          ) : null}
-
           {currentChatScreen === 'listening' ? <ListeningScreen status={voiceStatus} transcript={transcript} /> : null}
           {currentChatScreen === 'thinking' ? <ThinkingScreen transcript={transcript} /> : null}
 
@@ -1909,7 +1958,7 @@ export function VoiceChatbot({
               isRequesting={isRequesting}
               response={chatResponse}
               transcript={transcript}
-              onListenAgain={startVoiceTurn}
+              onListenAgain={beginUserListeningTurn}
               onReplay={() => {
                 if (!chatResponse?.notificationFeedback || voiceFeedbackEnabled) {
                   speakText(chatResponse?.text || '')
@@ -1920,51 +1969,6 @@ export function VoiceChatbot({
         </section>
       ) : null}
     </>
-  )
-}
-
-function StartScreen({ onAsk, onVoiceStart }) {
-  return (
-    <div className="wearable-chat-content wearable-chat-start">
-      <Header/>
-      <div className="wearable-chat-menu">
-        <button
-          className="wearable-chat-choice wearable-chat-choice-secondary"
-          type="button"
-          aria-label="AI에게 묻기"
-          onClick={onAsk}
-        >
-          <span className="wearable-chat-choice-icon" aria-hidden="true">
-            <SearchIcon />
-          </span>
-          <span>
-            <strong>AI에게 묻기</strong>
-            <small>정보를 찾아드려요</small>
-          </span>
-        </button>
-      </div>
-      <div className="wearable-chat-start-wake">
-        <button
-          className="wearable-chat-mic wearable-chat-wake-button"
-          type="button"
-          aria-label="챗봇 음성 호출로 시작"
-          onClick={onVoiceStart}
-        >
-          <MicIcon />
-        </button>
-      </div>
-      <div className="wearable-chat-wake">
-        <button
-          className="wearable-chat-mic wearable-chat-wake-button"
-          type="button"
-          aria-label="챗봇 음성 호출로 시작"
-          onClick={onVoiceStart}
-        >
-          <MicIcon />
-        </button>
-        <p>‘챗봇 켜줘’라고 말하면 바로 시작해요.</p>
-      </div>
-    </div>
   )
 }
 
@@ -1985,15 +1989,6 @@ function MicIcon() {
       <path d="M5 10.5c0 3.9 3.1 7 7 7s7-3.1 7-7" />
       <path d="M12 17.5V21" />
       <path d="M8.5 21h7" />
-    </svg>
-  )
-}
-
-function SearchIcon() {
-  return (
-    <svg className="wearable-chat-svg-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-      <path d="M10.5 17a6.5 6.5 0 1 1 0-13 6.5 6.5 0 0 1 0 13Z" />
-      <path d="m15.2 15.2 4.3 4.3" />
     </svg>
   )
 }

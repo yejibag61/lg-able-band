@@ -8,6 +8,7 @@ import {
   normalizeUwbSession,
   replayAlert,
   requestEmergencyHelp,
+  requestWearableEmergencyHelp,
   unpairWearable,
 } from './wearableService'
 
@@ -580,12 +581,41 @@ describe('wearableService', () => {
     })
   })
 
+  it('sends wearable emergency requests through the shared emergency API', async () => {
+    const apiFetch = vi.fn(async () => jsonResponse({ status: 'SENT', source: 'WEARABLE' }, 201))
+    const service = createWearableService({
+      baseUrl: 'http://api.test',
+      fetchImpl: apiFetch,
+      fallbackEnabled: false,
+    })
+
+    await service.requestWearableEmergencyHelp('웨어러블에서 긴급 요청')
+
+    expect(apiFetch).toHaveBeenCalledWith(
+      'http://api.test/api/emergency-requests',
+      expect.objectContaining({
+        body: JSON.stringify({
+          message: '웨어러블에서 긴급 요청',
+          source: 'WEARABLE',
+        }),
+        method: 'POST',
+      }),
+    )
+  })
+
   it('requests emergency help from the wearable', async () => {
     const response = await requestEmergencyHelp('도움이 필요합니다.')
 
     expect(response.status).toBe('SENT')
     expect(response.source).toBe('WEARABLE')
     expect(response.message).toContain('긴급 요청')
+  })
+
+  it('requests wearable emergency help from the default service', async () => {
+    const response = await requestWearableEmergencyHelp('도움이 필요합니다.')
+
+    expect(response.status).toBe('SENT')
+    expect(response.source).toBe('WEARABLE')
   })
 
   it('unpairs through the default service without a session and clears the token locally', async () => {

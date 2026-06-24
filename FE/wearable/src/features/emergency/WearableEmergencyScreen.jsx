@@ -19,7 +19,7 @@ export function WearableEmergencyScreen({
           취소
         </button>
         <button className="primary-action" type="button" disabled={isBusy} onClick={onRequest}>
-          보호자에게 보내기
+          {isBusy ? '요청 중' : '보호자에게 보내기'}
         </button>
       </div>
 

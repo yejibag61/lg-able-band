@@ -275,7 +275,7 @@ export function createWearableService({
         fallbackEnabled,
         fallback: () => requestMockEmergencyHelp(message),
         request: async () =>
-          request('/api/wearable/emergency/request', {
+          request('/api/emergency-requests', {
             method: 'POST',
             body: {
               message,

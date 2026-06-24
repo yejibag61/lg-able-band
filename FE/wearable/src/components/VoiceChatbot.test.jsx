@@ -1,10 +1,12 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { VoiceChatbot } from './VoiceChatbot'
 
 describe('wearable VoiceChatbot button selection', () => {
   afterEach(() => {
+    vi.useRealTimers()
     vi.restoreAllMocks()
+    vi.unstubAllGlobals()
     localStorage.removeItem('lg-able-band.wearableAccessToken')
   })
 
@@ -419,4 +421,97 @@ describe('wearable VoiceChatbot button selection', () => {
     expect(container.querySelectorAll('.wearable-ai-category-card')).toHaveLength(0)
     expect(screen.queryByRole('heading', { name: 'AI에게 묻기' })).toBeNull()
   })
+
+  it('opens the voice chatbot from a wake command on another tab and returns to the category screen', async () => {
+    const user = userEvent.setup()
+    const spokenTexts = []
+    const utterances = []
+    const speakMock = vi.fn((utterance) => {
+      spokenTexts.push(utterance.text)
+      utterances.push(utterance)
+    })
+    vi.stubGlobal('SpeechSynthesisUtterance', class {
+      constructor(text) {
+        this.text = text
+      }
+    })
+    vi.stubGlobal('speechSynthesis', {
+      cancel: vi.fn(),
+      getVoices: vi.fn(() => []),
+      pending: false,
+      resume: vi.fn(),
+      speak: speakMock,
+      speaking: false,
+    })
+    vi.stubGlobal('Audio', class {
+      constructor() {
+        this.currentTime = 0
+      }
+
+      addEventListener(event, callback) {
+        if (event === 'ended') {
+          window.setTimeout(callback, 0)
+        }
+      }
+
+      pause() {}
+
+      play() {
+        return Promise.resolve()
+      }
+    })
+    const recognitionStarts = []
+    class MockRecognition {
+      constructor() {
+        this.abort = vi.fn()
+      }
+
+      start() {
+        recognitionStarts.push(this)
+        this.onstart?.()
+      }
+    }
+    vi.stubGlobal('SpeechRecognition', MockRecognition)
+    const { container } = render(
+      <VoiceChatbot
+        isPaired
+        mode="alert"
+        notificationSettings={{ voiceGuide: false, vibrationGuide: false }}
+        showFab={false}
+      />,
+    )
+
+    expect(container.querySelector('.wearable-chat-screen')).toBeNull()
+
+    await act(async () => {
+      globalThis.__ABLE_BAND_OPEN_WEARABLE_CHATBOT__?.()
+    })
+
+    await waitFor(() => {
+      expect(container.querySelector('.wearable-chat-answer')).toBeTruthy()
+    })
+    expect(container.querySelectorAll('.wearable-ai-category-card')).toHaveLength(0)
+    await waitFor(() => {
+      expect(spokenTexts).toContain(
+        'AI 챗봇. 무엇을 도와드릴까요? 현재 알림, 가전 상태, 위치 안내, 보호자 연결. 알림을 들은 뒤 원하는 기능을 말씀해주세요.',
+      )
+    })
+
+    const wakeListeningCount = recognitionStarts.length
+    await act(async () => {
+      utterances.at(-1)?.onend?.()
+    })
+
+    await waitFor(() => {
+      expect(container.querySelector('.wearable-chat-speaking')).toBeTruthy()
+    })
+    expect(recognitionStarts.length).toBeGreaterThan(wakeListeningCount)
+
+    await user.click(container.querySelector('.wearable-chat-back'))
+
+    expect(screen.getByRole('heading', { name: 'AI에게 묻기' })).toBeTruthy()
+    expect(container.querySelector('.wearable-chat-answer')).toBeNull()
+    expect(container.querySelectorAll('.wearable-ai-category-card').length).toBeGreaterThan(0)
+  })
+
 })

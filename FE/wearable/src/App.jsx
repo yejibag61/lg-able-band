@@ -834,11 +834,21 @@ function App() {
 
     setIsUnpairing(true)
     setIsBusy(true)
+    let failedToSync = false
     try {
       await unpairWearable(pairing)
-      await resetPairingSession('연결을 해제했습니다.')
     } catch {
-      setStatusMessage('연동 해제에 실패했습니다.')
+      failedToSync = true
+    }
+
+    try {
+      await resetPairingSession(
+        failedToSync
+          ? '연동 해제 응답을 확인하지 못했습니다. 새 QR로 다시 연동해주세요.'
+          : '연결을 해제했습니다.',
+      )
+    } catch {
+      setStatusMessage('연동 해제 후 QR 화면으로 돌아가지 못했습니다.')
     } finally {
       setIsBusy(false)
       setIsUnpairing(false)

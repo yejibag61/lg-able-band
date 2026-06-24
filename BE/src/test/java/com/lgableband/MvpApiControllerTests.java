@@ -3,6 +3,7 @@ package com.lgableband;
 import static org.hamcrest.Matchers.blankOrNullString;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.greaterThanOrEqualTo;
+import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.not;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -184,7 +185,7 @@ class MvpApiControllerTests {
 	@Test
 	void adminCanBroadcastAlertToAllUsers() throws Exception {
 		String adminToken = loginToken("USER", "admin@example.com");
-		String userToken = loginToken("USER", "user@example.com");
+		String userToken = loginToken("USER", "lglg@lgableband.com");
 
 		this.mockMvc.perform(get("/api/admin/alert-templates").header("Authorization", "Bearer " + adminToken))
 			.andExpect(status().isOk())
@@ -204,6 +205,7 @@ class MvpApiControllerTests {
 			.andExpect(jsonPath("$.templateId").value("washer-complete"))
 			.andExpect(jsonPath("$.audience").value("ALL"))
 			.andExpect(jsonPath("$.dispatchedUserCount").value(greaterThanOrEqualTo(2)))
+			.andExpect(jsonPath("$.dispatchedEmails").value(hasItem("lglg@lgableband.com")))
 			.andExpect(jsonPath("$.occurredAt", containsString("+09:00")));
 
 		this.mockMvc.perform(get("/api/alerts").header("Authorization", "Bearer " + userToken))
@@ -214,7 +216,7 @@ class MvpApiControllerTests {
 	@Test
 	void adminBroadcastToAllAddsAlertToEachUsersOwnList() throws Exception {
 		String adminToken = loginToken("USER", "admin@example.com");
-		String userToken = loginToken("USER", "user@example.com");
+		String userToken = loginToken("USER", "lglg@lgableband.com");
 
 		this.mockMvc.perform(post("/api/admin/alerts/broadcast")
 				.header("Authorization", "Bearer " + adminToken)
@@ -272,7 +274,8 @@ class MvpApiControllerTests {
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.templateId").value("tv-power-status"))
 			.andExpect(jsonPath("$.audience").value("HEARING"))
-			.andExpect(jsonPath("$.dispatchedUserCount").value(greaterThanOrEqualTo(1)));
+			.andExpect(jsonPath("$.dispatchedUserCount").value(greaterThanOrEqualTo(1)))
+			.andExpect(jsonPath("$.dispatchedEmails").value(hasItem("codex-user-" + suffix + "@example.com")));
 	}
 
 	@Test
