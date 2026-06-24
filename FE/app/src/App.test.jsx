@@ -634,7 +634,7 @@ describe('App login to home flow', () => {
     expect(screen.getByText('최근 전달 알림')).toBeTruthy()
     expect(screen.getAllByText('주방에서 위험 신호가 감지되었습니다. 보호자에게도 전달됩니다.').length)
       .toBeGreaterThanOrEqual(1)
-    expect(screen.getAllByText(/안전 전기레인지/).length).toBeGreaterThanOrEqual(1)
+    expect(screen.getAllByText(/전기레인지/).length).toBeGreaterThanOrEqual(1)
   })
 
   it('removes a guardian emergency request from recent delivery history when confirmed', async () => {

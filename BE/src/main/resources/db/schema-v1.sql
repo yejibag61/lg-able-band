@@ -116,7 +116,7 @@ CREATE TABLE IF NOT EXISTS device (
 	updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
 	PRIMARY KEY (device_id),
 	KEY ix_device_user_id (user_id),
-	UNIQUE KEY uk_device_vendor_device_id (vendor_device_id),
+	UNIQUE KEY uk_device_user_vendor_device_id (user_id, vendor_device_id),
 	CONSTRAINT fk_device_user_id FOREIGN KEY (user_id) REFERENCES app_user (user_id) ON DELETE CASCADE,
 	CONSTRAINT ck_device_type CHECK (device_type IN ('WASHER', 'REFRIGERATOR', 'AIR_SENSOR', 'TV', 'RANGE', 'DOOR_SENSOR', 'WEARABLE', 'UWB_TAG')),
 	CONSTRAINT ck_device_connection_status CHECK (connection_status IN ('CONNECTED', 'DISCONNECTED', 'WARNING', 'ERROR'))

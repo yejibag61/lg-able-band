@@ -317,6 +317,12 @@ public class GuardianService {
 			LEFT JOIN device d ON d.device_id = de.device_id
 			WHERE a.user_id = ?
 			  AND (a.alert_type IN ('DANGER', 'EMERGENCY') OR a.severity IN ('HIGH', 'CRITICAL'))
+			  AND NOT EXISTS (
+			    SELECT 1
+			    FROM emergency_request er
+			    WHERE er.user_id = a.user_id
+			      AND er.alert_id = a.alert_id
+			  )
 			  AND ad.delivery_status <> 'CONFIRMED'
 			ORDER BY a.occurred_at DESC, a.alert_id DESC
 			LIMIT 20

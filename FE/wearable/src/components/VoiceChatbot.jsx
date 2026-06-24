@@ -3774,7 +3774,7 @@ function getConnectedApplianceNames(alerts, uwbSession) {
   const names = new Set(['세탁기', '냉장고'])
 
   ;(alerts || []).forEach((item) => {
-    if (item?.deviceName && !['도어센서', '안전 전기레인지'].includes(item.deviceName)) {
+    if (item?.deviceName && !['도어센서', '전기레인지'].includes(item.deviceName)) {
       names.add(item.deviceName)
     }
   })

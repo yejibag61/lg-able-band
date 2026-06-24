@@ -478,7 +478,7 @@ describe('Wearable MVP', () => {
       '위치 안내 기기를 불러오지 못했습니다.',
     )
     expect(screen.queryByText('세탁기')).toBeNull()
-    expect(screen.queryByText('안전 전기레인지')).toBeNull()
+    expect(screen.queryByText('전기레인지')).toBeNull()
   })
 
   it('shows standby and sends emergency requests after pairing', async () => {
@@ -722,7 +722,7 @@ function setupPairingApi({
           },
           {
             deviceId: 12,
-            name: '안전 전기레인지',
+            name: '전기레인지',
             type: 'RANGE',
             connectionStatus: 'WARNING',
             locationSupported: true,
