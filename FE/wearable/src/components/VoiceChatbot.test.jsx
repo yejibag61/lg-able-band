@@ -422,8 +422,8 @@ describe('wearable VoiceChatbot button selection', () => {
     expect(screen.queryByRole('heading', { name: 'AI에게 묻기' })).toBeNull()
   })
 
-  it('opens the voice chatbot from a wake command on another tab and returns to the category screen', async () => {
-    const user = userEvent.setup()
+  it('opens the voice chatbot from a wake command, starts listening, and closes on a close command', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
     const spokenTexts = []
     const utterances = []
     const speakMock = vi.fn((utterance) => {
@@ -502,16 +502,43 @@ describe('wearable VoiceChatbot button selection', () => {
       utterances.at(-1)?.onend?.()
     })
 
+    expect(container.querySelector('.wearable-chat-answer')).toBeTruthy()
+    expect(container.querySelector('.wearable-chat-speaking')).toBeNull()
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2600)
+    })
+
     await waitFor(() => {
       expect(container.querySelector('.wearable-chat-speaking')).toBeTruthy()
     })
     expect(recognitionStarts.length).toBeGreaterThan(wakeListeningCount)
 
-    await user.click(container.querySelector('.wearable-chat-back'))
+    await act(async () => {
+      const activeRecognition = recognitionStarts.at(-1)
+      activeRecognition?.onresult?.({
+        results: [
+          {
+            0: { transcript: '챗봇 꺼줘' },
+            isFinal: true,
+            length: 1,
+          },
+        ],
+      })
+      activeRecognition?.onend?.()
+    })
 
-    expect(screen.getByRole('heading', { name: 'AI에게 묻기' })).toBeTruthy()
-    expect(container.querySelector('.wearable-chat-answer')).toBeNull()
-    expect(container.querySelectorAll('.wearable-ai-category-card').length).toBeGreaterThan(0)
+    await waitFor(() => {
+      expect(spokenTexts).toContain('챗봇을 종료할게요.')
+    })
+
+    await act(async () => {
+      utterances.at(-1)?.onend?.()
+    })
+
+    await waitFor(() => {
+      expect(container.querySelector('.wearable-chat-screen')).toBeNull()
+    })
   })
 
 })

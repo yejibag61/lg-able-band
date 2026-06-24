@@ -21,6 +21,10 @@ const TURN_BEEP_DURATION_MS = 180
 const TURN_BEEP_FREQUENCY_HZ = 880
 const TURN_CUE_MAX_MS = 420
 const POST_CUE_LISTEN_DELAY_MS = 350
+const WAKE_TTS_START_DELAY_MS = 650
+const INTRO_SCREEN_MIN_MS = 2600
+const SPEECH_VOICE_READY_TIMEOUT_MS = 700
+const SPEECH_START_RETRY_MS = 450
 const USER_SILENCE_MS = 3000
 const WAITING_USER_TIMEOUT_MS = 14000
 const RECOGNITION_STUCK_RESTART_MS = 12000
@@ -87,7 +91,6 @@ const WAKE_WORDS = [
   '챗봇커줘',
   '챗봇켜저',
   '챗봇켜져',
-  '챗봇꺼줘',
   '챗봇크줘',
   '챗봇크자',
   '챗봇켜주세요',
@@ -161,7 +164,20 @@ const WAKE_WORDS = [
   '도와줘',
   '도와주세요',
 ]
-const CLOSE_WORDS = ['종료', '닫아', '챗봇꺼줘', '끝내', '대기모드로돌아가', '대기상태로돌아가']
+const CLOSE_WORDS = [
+  '종료',
+  '닫아',
+  '꺼줘',
+  '챗봇꺼줘',
+  '챗봇꺼주세요',
+  '챗봇닫아',
+  '챗봇닫아줘',
+  '챗봇종료',
+  '챗봇종료해줘',
+  '끝내',
+  '대기모드로돌아가',
+  '대기상태로돌아가',
+]
 let speechKeepAliveTimer = null
 let speechFallbackTimer = null
 let speechHardFallbackTimer = null
@@ -550,7 +566,16 @@ export function VoiceChatbot({
       return
     }
 
-    runAiTurn(CHATBOT_INTRO)
+    await delay(WAKE_TTS_START_DELAY_MS)
+    if (!isOpenRef.current || voiceIntroSessionRef.current !== introSession) {
+      return
+    }
+
+    runAiTurn(CHATBOT_INTRO, {
+      minScreenMs: INTRO_SCREEN_MIN_MS,
+      retrySpeechStart: true,
+      waitForVoice: true,
+    })
   }
 
   function selectPhrase(phrase) {
@@ -1006,6 +1031,11 @@ export function VoiceChatbot({
       return
     }
 
+    if (shouldCloseChatbot(spokenText)) {
+      runAiTurn('챗봇을 종료할게요.', { closeAfter: true, listenAfter: false })
+      return
+    }
+
     if (shouldOpenChatbot(spokenText)) {
       runAiTurn('AI 챗봇이 실행 중이에요. 원하시는 기능을 말씀해주세요.')
       return
@@ -1410,7 +1440,7 @@ export function VoiceChatbot({
 
   function runAiTurn(
     text,
-    { closeAfter = false, listenAfter = true, notificationFeedback = false, voiceEnabled = true } = {},
+    { closeAfter = false, listenAfter = true, minScreenMs = 0, notificationFeedback = false, voiceEnabled = true } = {},
   ) {
     stopRecognition()
     clearConversationTimers()
@@ -1426,7 +1456,13 @@ export function VoiceChatbot({
       quickReplies: current?.quickReplies || [],
     }))
 
+    const screenShownAt = Date.now()
     const handleSpeechEnd = async () => {
+      const remainingScreenMs = Math.max(0, minScreenMs - (Date.now() - screenShownAt))
+      if (remainingScreenMs > 0) {
+        await delay(remainingScreenMs)
+      }
+
       setConversationState(CONVERSATION_STATE.AI_SPEECH_ENDED)
       setVoiceStatus('AI 음성이 끝났어요.')
 
@@ -2659,11 +2695,15 @@ function speakText(text, options = {}) {
   return speechQueue
 }
 
-function speakTextNow(text, options = {}) {
+async function speakTextNow(text, options = {}) {
   const trimmedText = String(text || '').trim()
 
   if (!trimmedText || !globalThis.speechSynthesis || !globalThis.SpeechSynthesisUtterance) {
     return Promise.resolve(options.onEnd?.())
+  }
+
+  if (options.waitForVoice) {
+    await waitForSpeechVoices()
   }
 
   return new Promise((resolve) => {
@@ -2678,24 +2718,45 @@ function speakTextNow(text, options = {}) {
       }
       resolve()
     })
-    const utterance = new SpeechSynthesisUtterance(trimmedText)
+    const createUtterance = () => {
+      const utterance = new SpeechSynthesisUtterance(trimmedText)
 
-    utterance.lang = 'ko-KR'
-    utterance.rate = options.rate || 1.04
-    utterance.pitch = 1
-    utterance.volume = 1
-    utterance.voice = findKoreanVoice()
-    utterance.onend = finish
-    utterance.onerror = (event) => {
-      console.warn('TTS 오류:', event?.error || event)
-      finish()
+      utterance.lang = 'ko-KR'
+      utterance.rate = options.rate || 1.04
+      utterance.pitch = 1
+      utterance.volume = 1
+      utterance.voice = findKoreanVoice()
+      utterance.onend = finish
+      utterance.onerror = (event) => {
+        console.warn('TTS 오류:', event?.error || event)
+        finish()
+      }
+      return utterance
     }
 
     try {
+      globalThis.speechSynthesis.cancel?.()
       globalThis.speechSynthesis.resume?.()
       setChatbotSpeaking(true)
-      globalThis.speechSynthesis.speak(utterance)
+      globalThis.speechSynthesis.speak(createUtterance())
       globalThis.speechSynthesis.resume?.()
+
+      if (options.retrySpeechStart) {
+        window.setTimeout(() => {
+          if (globalThis.speechSynthesis?.speaking || globalThis.speechSynthesis?.pending) {
+            return
+          }
+
+          try {
+            globalThis.speechSynthesis?.cancel?.()
+            globalThis.speechSynthesis?.resume?.()
+            globalThis.speechSynthesis?.speak?.(createUtterance())
+            globalThis.speechSynthesis?.resume?.()
+          } catch {
+            // The normal hard fallback will finish the turn if retrying fails.
+          }
+        }, SPEECH_START_RETRY_MS)
+      }
 
       speechKeepAliveTimer = window.setInterval(() => {
         try {
@@ -2864,6 +2925,29 @@ async function playCueAudioFile() {
 function delay(ms) {
   return new Promise((resolve) => {
     window.setTimeout(resolve, ms)
+  })
+}
+
+function waitForSpeechVoices() {
+  const synthesis = globalThis.speechSynthesis
+  if (!synthesis?.getVoices || synthesis.getVoices().length > 0) {
+    return Promise.resolve()
+  }
+
+  return new Promise((resolve) => {
+    const finish = callOnce(resolve)
+    const timer = window.setTimeout(finish, SPEECH_VOICE_READY_TIMEOUT_MS)
+    const handleVoicesChanged = () => {
+      window.clearTimeout(timer)
+      finish()
+    }
+
+    try {
+      synthesis.addEventListener?.('voiceschanged', handleVoicesChanged, { once: true })
+      synthesis.onvoiceschanged = handleVoicesChanged
+    } catch {
+      finish()
+    }
   })
 }
 
@@ -3470,6 +3554,11 @@ function shouldOpenChatbot(text) {
   )
 }
 
+function shouldCloseChatbot(text) {
+  const normalizedText = normalizeSpeechText(text)
+  return CLOSE_WORDS.some((word) => normalizedText.includes(normalizeSpeechText(word)))
+}
+
 function hasWakeSubject(text) {
   return /(챗|쳇|채|첵|책|체크|챡|착|챠|차|챕|찻|채팅|챗지피티|지피티|gpt).{0,8}(봇|본|봄|벗|봇트|보|복|포|bot|보트)?/i.test(text) ||
     /(에이아이|에이아이모드|에이|ai|able|에이블)/i.test(text)
@@ -3486,7 +3575,7 @@ function classifyVoiceIntent(text) {
     return VOICE_INTENT.OPEN_CHATBOT
   }
 
-  if (CLOSE_WORDS.some((word) => normalizedText.includes(word))) {
+  if (shouldCloseChatbot(text)) {
     return VOICE_INTENT.GO_IDLE
   }
 
