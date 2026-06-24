@@ -1,19 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import { broadcastAdminAlert, getAdminAlertTemplates } from '../services/adminAlertService'
 
-const audienceOptions = [
-  { id: 'ALL', label: '전체 사용자' },
-  { id: 'VISUAL', label: '시각장애 사용자' },
-  { id: 'HEARING', label: '청각장애 사용자' },
-]
-
 export function AdminAlertBroadcastTab({ onBroadcastComplete }) {
   const [templates, setTemplates] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [sendingTemplateId, setSendingTemplateId] = useState('')
   const [feedbackMessage, setFeedbackMessage] = useState('')
-  const [selectedAudience, setSelectedAudience] = useState('ALL')
+  const [targetUserEmail, setTargetUserEmail] = useState('')
 
   useEffect(() => {
     let isMounted = true
@@ -55,11 +49,13 @@ export function AdminAlertBroadcastTab({ onBroadcastComplete }) {
     }, {})
   }, [templates])
 
-  const selectedAudienceLabel =
-    audienceOptions.find((option) => option.id === selectedAudience)?.label || '전체 사용자'
-
   async function handleBroadcast(template) {
+    const normalizedEmail = targetUserEmail.trim().toLowerCase()
     if (sendingTemplateId) {
+      return
+    }
+    if (!normalizedEmail) {
+      setFeedbackMessage('알림을 받을 사용자 이메일을 입력해주세요.')
       return
     }
 
@@ -67,10 +63,8 @@ export function AdminAlertBroadcastTab({ onBroadcastComplete }) {
     setFeedbackMessage('')
 
     try {
-      const result = await broadcastAdminAlert(template.templateId, selectedAudience)
-      setFeedbackMessage(
-        `${selectedAudienceLabel} ${result.dispatchedUserCount}명에게 ${template.title} 알림을 전송했습니다.`,
-      )
+      await broadcastAdminAlert(template.templateId, normalizedEmail)
+      setFeedbackMessage(`${normalizedEmail} 사용자에게 ${template.title} 알림을 전송했습니다.`)
       await onBroadcastComplete?.()
     } catch (nextError) {
       setFeedbackMessage(nextError.message || '알림 발송에 실패했습니다.')
@@ -84,33 +78,25 @@ export function AdminAlertBroadcastTab({ onBroadcastComplete }) {
       <section className="content-card admin-alert-hero-card">
         <p className="card-label">관리자 전용</p>
         <strong className="card-title" id="admin-alert-title">알림 발송</strong>
-        <p>시연할 때 필요한 알림을 버튼 한 번으로 원하는 사용자 그룹에게 보낼 수 있습니다.</p>
-        <div className="admin-alert-audience-row" aria-label="발송 대상 선택">
-          {audienceOptions.map((option) => (
-            <button
-              key={option.id}
-              className={selectedAudience === option.id ? 'filter-chip active' : 'filter-chip'}
-              type="button"
-              aria-pressed={selectedAudience === option.id}
-              onClick={() => setSelectedAudience(option.id)}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
+        <p>알림을 받을 사용자 이메일을 입력한 뒤 원하는 알림을 선택하세요.</p>
+        <label className="admin-alert-email-field">
+          <span>사용자 이메일</span>
+          <input
+            type="email"
+            inputMode="email"
+            autoComplete="off"
+            placeholder="user@example.com"
+            value={targetUserEmail}
+            onChange={(event) => {
+              setTargetUserEmail(event.target.value)
+              setFeedbackMessage('')
+            }}
+          />
+        </label>
       </section>
 
-      {loading ? (
-        <p className="empty-state" role="status">
-          알림 발송 항목을 불러오는 중입니다.
-        </p>
-      ) : null}
-
-      {error ? (
-        <p className="member-status-message error" role="alert">
-          {error}
-        </p>
-      ) : null}
+      {loading ? <p className="empty-state" role="status">알림 발송 목록을 불러오는 중입니다.</p> : null}
+      {error ? <p className="member-status-message error" role="alert">{error}</p> : null}
 
       {!loading
         ? Object.entries(groupedTemplates).map(([categoryName, items]) => (
@@ -126,7 +112,7 @@ export function AdminAlertBroadcastTab({ onBroadcastComplete }) {
                     type="button"
                     key={template.templateId}
                     onClick={() => handleBroadcast(template)}
-                    disabled={sendingTemplateId === template.templateId}
+                    disabled={Boolean(sendingTemplateId)}
                   >
                     <div className="admin-alert-button-copy">
                       <strong>{template.featureName}</strong>
@@ -143,11 +129,7 @@ export function AdminAlertBroadcastTab({ onBroadcastComplete }) {
           ))
         : null}
 
-      {feedbackMessage ? (
-        <p className="status-message" role="status">
-          {feedbackMessage}
-        </p>
-      ) : null}
+      {feedbackMessage ? <p className="status-message" role="status">{feedbackMessage}</p> : null}
     </section>
   )
 }

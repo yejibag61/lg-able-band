@@ -1364,8 +1364,8 @@ function installMockBackend() {
     if (url === `${API_BASE_URL}/api/admin/alerts/broadcast` && method === 'POST') {
       return jsonResponse({
         templateId: body.templateId,
-        audience: body.audience,
-        dispatchedUserCount: body.audience === 'ALL' ? 2 : 1,
+        targetUserEmail: body.targetUserEmail,
+        dispatchedUserCount: 1,
       })
     }
 

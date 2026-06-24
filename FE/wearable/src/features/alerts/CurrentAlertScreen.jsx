@@ -7,6 +7,7 @@ export function CurrentAlertScreen({
   alertTotal = 0,
   actionMessage,
   isBusy,
+  isLoading = false,
   syncedTime,
   onConfirm,
   onNextAlert,
@@ -16,6 +17,19 @@ export function CurrentAlertScreen({
   const swipeStartXRef = useRef(null)
   const swipeStartYRef = useRef(null)
   const syncedTimeLabel = formatSyncedTime(syncedTime)
+
+  if (isLoading) {
+    return (
+      <section className="state-screen" aria-label="알림 불러오는 중" aria-live="polite">
+        <div className="screen-topline">
+          <p className="eyebrow">Able Band</p>
+          <span>{syncedTimeLabel}</span>
+        </div>
+        <h1>알림을 불러오는 중입니다.</h1>
+        <p>잠시만 기다려 주세요.</p>
+      </section>
+    )
+  }
 
   if (!alert) {
     const hasActionMessage = Boolean(actionMessage)

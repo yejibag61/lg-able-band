@@ -51,6 +51,7 @@ function App() {
   const [isRestoringPairing, setIsRestoringPairing] = useState(Boolean(initialPairing))
   const [pairingGeneration, setPairingGeneration] = useState(0)
   const [alertQueue, setAlertQueue] = useState([])
+  const [isAlertLoading, setIsAlertLoading] = useState(true)
   const [alertIndex, setAlertIndex] = useState(0)
   const [alertStatuses, setAlertStatuses] = useState({})
   const [uwbSession, setUwbSession] = useState(null)
@@ -427,6 +428,7 @@ function App() {
 
   useEffect(() => {
     if (!isPaired) {
+      setIsAlertLoading(true)
       return undefined
     }
 
@@ -458,6 +460,10 @@ function App() {
 
           setAlertQueue([])
           setStatusMessage(error.message || '알림을 불러오지 못했습니다.')
+        }
+      } finally {
+        if (isMounted) {
+          setIsAlertLoading(false)
         }
       }
     }
@@ -904,6 +910,7 @@ function App() {
             alertPage={alertIndex + 1}
             alertTotal={alertQueue.length}
             actionMessage={inlineStatusMessage}
+            isLoading={isAlertLoading}
             isBusy={isBusy}
             syncedTime={syncedTime}
             onConfirm={handleConfirm}

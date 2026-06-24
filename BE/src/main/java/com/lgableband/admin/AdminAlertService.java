@@ -1,6 +1,5 @@
 package com.lgableband.admin;
 
-import com.lgableband.common.AccessibilityType;
 import com.lgableband.auth.MvpDataService;
 import com.lgableband.common.AlertType;
 import com.lgableband.common.ApiException;
@@ -322,101 +321,64 @@ public class AdminAlertService {
 			.toList();
 	}
 
-	public BroadcastResponse broadcast(String authorization, String templateId, BroadcastAudience audience) {
+	public BroadcastResponse broadcast(String authorization, String templateId, String targetUserEmail) {
 		requireAdmin(authorization);
 		AlertTemplate template = findTemplate(templateId);
-		BroadcastAudience targetAudience = audience == null ? BroadcastAudience.ALL : audience;
+		if (targetUserEmail == null || targetUserEmail.isBlank()) {
+			throw new ApiException(HttpStatus.BAD_REQUEST, "INVALID_TARGET_USER", "대상 사용자 이메일을 입력해주세요.");
+		}
+		String normalizedTargetUserEmail = targetUserEmail.trim().toLowerCase(Locale.ROOT);
 		OffsetDateTime occurredAt = OffsetDateTime.now(SERVICE_OFFSET);
 		JdbcTemplate jdbcTemplate = jdbcTemplateProvider.getIfAvailable();
 
 		if (jdbcTemplate == null) {
-			List<AlertRecipient> recipients = mockDataStore.userIds().stream()
-				.map(userId -> {
-					MockDataStore.UserProfile user = mockDataStore.user(userId);
-					MockDataStore.Account account = mockDataStore.accountById(user.accountId());
-					return new AlertRecipient(userId, account.email(), user.accessibilityType());
-				})
-				.filter(recipient -> matchesAudience(recipient.accessibilityType(), targetAudience))
-				.sorted((left, right) -> left.email().compareToIgnoreCase(right.email()))
-				.toList();
-
-			int dispatchedCount = 0;
-			for (AlertRecipient recipient : recipients) {
-				if (!matchesAudience(recipient.accessibilityType(), targetAudience)) {
-					continue;
-				}
-				mockDataStore.addContextAlert(
-					recipient.userId(),
-					template.alertType(),
-					template.severity(),
-					template.title(),
-					template.message(),
-					template.deviceName(),
-					occurredAt,
-					template.voiceGuide()
-				);
-				dispatchedCount += 1;
-			}
+			long userId = resolveMockUserIdByEmail(normalizedTargetUserEmail);
+			mockDataStore.addContextAlert(
+				userId,
+				template.alertType(),
+				template.severity(),
+				template.title(),
+				template.message(),
+				template.deviceName(),
+				occurredAt,
+				template.voiceGuide()
+			);
 			return new BroadcastResponse(
 				template.templateId(),
 				template.title(),
-				targetAudience,
-				dispatchedCount,
-				recipients.stream().map(AlertRecipient::email).toList(),
+				normalizedTargetUserEmail,
+				1,
+				List.of(normalizedTargetUserEmail),
 				occurredAt
 			);
 		}
 
-		List<AlertRecipient> recipients = targetAudience == BroadcastAudience.ALL
-			? jdbcTemplate.query(
+		Long userId;
+		try {
+			userId = jdbcTemplate.queryForObject(
 				"""
-				SELECT u.user_id, a.email, u.accessibility_type
-				FROM account a
-				JOIN app_user u ON u.account_id = a.account_id
-				WHERE a.role = 'USER'
-				  AND a.email IS NOT NULL
-				  AND TRIM(a.email) <> ''
-				ORDER BY LOWER(a.email) ASC, u.user_id ASC
+				SELECT u.user_id
+				FROM app_user u
+				JOIN account a ON a.account_id = u.account_id
+				WHERE LOWER(a.email) = ?
 				""",
-				(rs, rowNum) -> new AlertRecipient(
-					rs.getLong("user_id"),
-					rs.getString("email"),
-					AccessibilityType.valueOf(rs.getString("accessibility_type"))
-				)
-			)
-			: jdbcTemplate.query(
-				"""
-				SELECT u.user_id, a.email, u.accessibility_type
-				FROM account a
-				JOIN app_user u ON u.account_id = a.account_id
-				WHERE a.role = 'USER'
-				  AND a.email IS NOT NULL
-				  AND TRIM(a.email) <> ''
-				  AND u.accessibility_type = ?
-				ORDER BY LOWER(a.email) ASC, u.user_id ASC
-				""",
-				(rs, rowNum) -> new AlertRecipient(
-					rs.getLong("user_id"),
-					rs.getString("email"),
-					AccessibilityType.valueOf(rs.getString("accessibility_type"))
-				),
-				targetAudience.accessibilityType().name()
+				Long.class,
+				normalizedTargetUserEmail
 			);
-
-		int dispatchedCount = 0;
-		for (AlertRecipient recipient : recipients) {
-			long deviceId = resolveOrCreateDevice(jdbcTemplate, recipient.userId(), template);
-			long eventId = insertDeviceEvent(jdbcTemplate, deviceId, template, occurredAt);
-			insertAlert(jdbcTemplate, recipient.userId(), eventId, template, occurredAt);
-			dispatchedCount += 1;
+		} catch (EmptyResultDataAccessException error) {
+			throw new ApiException(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND", "해당 이메일의 사용자를 찾을 수 없습니다.");
 		}
+
+		long deviceId = resolveOrCreateDevice(jdbcTemplate, userId, template);
+		long eventId = insertDeviceEvent(jdbcTemplate, deviceId, template, occurredAt);
+		insertAlert(jdbcTemplate, userId, eventId, template, occurredAt);
 
 		return new BroadcastResponse(
 			template.templateId(),
 			template.title(),
-			targetAudience,
-			dispatchedCount,
-			recipients.stream().map(AlertRecipient::email).toList(),
+			normalizedTargetUserEmail,
+			1,
+			List.of(normalizedTargetUserEmail),
 			occurredAt
 		);
 	}
@@ -522,22 +484,15 @@ public class AdminAlertService {
 		);
 	}
 
-	private boolean matchesAudience(AccessibilityType accessibilityType, BroadcastAudience audience) {
-		if (audience == BroadcastAudience.ALL) {
-			return true;
-		}
-
-		return audience.accessibilityType() == accessibilityType;
-	}
-
 	private long resolveMockUserIdByEmail(String normalizedEmail) {
-		if ("lglg@lgableband.com".equals(normalizedEmail)) {
-			return 1L;
+		for (Long userId : mockDataStore.userIds()) {
+			var user = mockDataStore.user(userId);
+			var account = mockDataStore.accountById(user.accountId());
+			if (account.email().equalsIgnoreCase(normalizedEmail)) {
+				return userId;
+			}
 		}
-		if ("admin@example.com".equals(normalizedEmail)) {
-			return 3L;
-		}
-		throw new ApiException(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND", "????ъ슜???대찓?쇱쓣 李얠쓣 ???놁뒿?덈떎.");
+		throw new ApiException(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND", "해당 이메일의 사용자를 찾을 수 없습니다.");
 	}
 
 	private MvpDataService.CurrentUser requireAdmin(String authorization) {
@@ -733,7 +688,7 @@ public class AdminAlertService {
 	public record BroadcastResponse(
 		String templateId,
 		String title,
-		BroadcastAudience audience,
+		String targetUserEmail,
 		int dispatchedUserCount,
 		List<String> dispatchedEmails,
 		OffsetDateTime occurredAt
@@ -750,22 +705,6 @@ public class AdminAlertService {
 	) {
 	}
 
-	public enum BroadcastAudience {
-		ALL(null),
-		VISUAL(AccessibilityType.VISUAL),
-		HEARING(AccessibilityType.HEARING);
-
-		private final AccessibilityType accessibilityType;
-
-		BroadcastAudience(AccessibilityType accessibilityType) {
-			this.accessibilityType = accessibilityType;
-		}
-
-		public AccessibilityType accessibilityType() {
-			return this.accessibilityType;
-		}
-	}
-
 	private record AlertTemplate(
 		String templateId,
 		String categoryName,
@@ -780,9 +719,6 @@ public class AdminAlertService {
 		String locationName,
 		String recommendedAction
 	) {
-	}
-
-	private record AlertRecipient(long userId, String email, AccessibilityType accessibilityType) {
 	}
 
 	private record SimulatorEventTemplate(

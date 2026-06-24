@@ -9614,3 +9614,30 @@ h2 {
     min-height: 100dvh;
   }
 }
+.admin-alert-email-field {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.admin-alert-email-field span {
+  color: #4b5563;
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.admin-alert-email-field input {
+  width: 100%;
+  min-height: 48px;
+  border: 1px solid #d8dde5;
+  border-radius: 14px;
+  padding: 0 14px;
+  background: #ffffff;
+  color: #181b20;
+  font: inherit;
+}
+
+.admin-alert-email-field input:focus {
+  border-color: var(--primary-color, #e11d48);
+  outline: 3px solid rgba(225, 29, 72, 0.12);
+}

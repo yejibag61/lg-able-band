@@ -28,7 +28,7 @@ public class AdminAlertController {
 		@RequestHeader("Authorization") String authorization,
 		@RequestBody BroadcastRequest request
 	) {
-		return this.adminAlertService.broadcast(authorization, request.templateId(), request.audience());
+		return this.adminAlertService.broadcast(authorization, request.templateId(), request.targetUserEmail());
 	}
 
 	@PostMapping("/simulator/events")
@@ -49,7 +49,7 @@ public class AdminAlertController {
 	public record AlertTemplateListResponse(List<AdminAlertService.AlertTemplateView> items) {
 	}
 
-	public record BroadcastRequest(String templateId, AdminAlertService.BroadcastAudience audience) {
+	public record BroadcastRequest(String templateId, String targetUserEmail) {
 	}
 
 	public record SimulatorEventRequest(

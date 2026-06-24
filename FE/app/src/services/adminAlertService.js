@@ -5,12 +5,12 @@ export async function getAdminAlertTemplates() {
   return response?.items || []
 }
 
-export async function broadcastAdminAlert(templateId, audience = 'ALL') {
+export async function broadcastAdminAlert(templateId, targetUserEmail) {
   return apiRequest('/api/admin/alerts/broadcast', {
     method: 'POST',
     body: {
       templateId,
-      audience,
+      targetUserEmail,
     },
   })
 }
